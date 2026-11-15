@@ -36,7 +36,7 @@ for (const required of ["index.html", "assets/styles.css", "assets/operational.c
 }
 const config = await readFile(path.join(root, "src/core/config.js"), "utf8");
 if (!config.includes("sb_publishable_")) throw Error("Chave publicável do Supabase ausente.");
-if (config.includes("sb_secret_") || /export\\s+(?:const|let|var)\\s+(?:SERVICE_ROLE|SUPABASE_SECRET_KEY|SUPABASE_SERVICE_ROLE_KEY)\\s*=/.test(config)) throw Error("Possível segredo no frontend.");
+if (config.includes("sb_secret_") || config.includes("SERVICE_ROLE =") || config.includes("service_role =") || config.includes("SUPABASE_SECRET_KEY =")) throw Error("Possível segredo no frontend.");
 const html = await readFile(path.join(root, "index.html"), "utf8");
 if (!html.includes("./src/main.js")) throw Error("index.html não aponta para o app.");
 console.log("Verificação concluída:", jsFiles.length, "arquivos JavaScript.");
