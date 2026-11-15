@@ -60,3 +60,9 @@ Na configuração Cloudflare Pages, selecione o repositório `opewillian/Prototi
 ## Tela inicial do esqueleto
 
 A página inicial apresenta uma entrada simples, sem formulário: **Entrar** abre diretamente o **modo demonstração**. Esse clique não autentica usuários no Supabase e não concede acesso a dados reais. O acesso protegido ao Supabase continua disponível mediante e-mail e senha na opção apropriada dentro do sistema. Consulte `docs/ENTRADA.md`.
+
+## Separação de ambientes: Matriz e Loja
+
+Após clicar em **Entrar**, escolha entre **Matriz** (administração corporativa) e **Loja** (operação da unidade). Cada frente possui layouts, navegação e painel inicial próprios, com arquivos em `src/areas/matriz/` e `src/areas/loja/`.
+
+A seleção do ambiente é uma escolha visual, não uma autorização: os dados reais continuam protegidos pelo Supabase Auth e pelas regras RLS. Veja `docs/AMBIENTES.md`. Para validar a estrutura, execute `npm run test`.

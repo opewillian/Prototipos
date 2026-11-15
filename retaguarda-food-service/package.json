@@ -1,10 +1,11 @@
 {
   "name": "retaguarda-food-service",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "check": "node scripts/build.mjs --check",
-    "build": "node scripts/build.mjs"
+    "test": "node scripts/check-areas.mjs",
+    "build": "node scripts/check-areas.mjs && node scripts/build.mjs"
   }
 }
