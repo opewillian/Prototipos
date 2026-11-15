@@ -31,7 +31,7 @@ export function renderSetup(data={},mode="demo",store=null){
     const ready=count>0;
     const label=ready?"Com registros":"Pendente";
     const explanation=(stage.key==="lists"&&!selectedOperational)?
-      '<p class="setup-hint">Selecione uma loja operacional no topo antes de cadastrar listas.</p>':"";
+      '<p class="setup-hint">Abra o ambiente Loja e selecione uma unidade para cadastrar as listas.</p>':"";
     return '<article class="setup-step"><div class="setup-step-top"><span class="setup-step-num">'+String(i+1).padStart(2,"0")+
       '</span><span class="setup-step-state '+(ready?"is-ready":"")+'">'+label+'</span></div>'+
       '<h3>'+escapeHtml(stage.title)+'</h3><p>'+escapeHtml(stage.description)+'</p>'+
