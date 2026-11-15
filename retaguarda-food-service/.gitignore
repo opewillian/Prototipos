@@ -1,0 +1,7 @@
+# Arquivos locais e segredos não devem ir para o repositório
+.env.local
+.env.*.local
+node_modules/
+dist/
+.DS_Store
+*.log
