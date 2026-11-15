@@ -12,7 +12,7 @@ const stages=[
   {key:"operationalStores",title:"Unidades operacionais",description:"Cadastre as lojas que utilizarão a retaguarda.",target:"lojas",button:"Gerenciar lojas"},
   {key:"items",title:"Catálogo de itens",description:"Inclua os insumos, embalagens e unidades de medida.",target:"matriz",button:"Gerenciar itens"},
   {key:"suppliers",title:"Fornecedores",description:"Cadastre os fornecedores disponíveis na matriz.",target:"fornecedores",button:"Gerenciar fornecedores"},
-  {key:"lists",title:"Listas por loja",description:"Escolha uma loja operacional e prepare suas listas de contagem e compra.",target:"listas",button:"Preparar listas"}
+  {key:"lists",title:"Listas por loja",description:"Prepare as listas dentro do ambiente Loja, por unidade operacional.",target:"listas",button:"Preparar listas"}
 ];
 
 export function renderSetup(data={},mode="demo",store=null){
@@ -36,7 +36,7 @@ export function renderSetup(data={},mode="demo",store=null){
       '</span><span class="setup-step-state '+(ready?"is-ready":"")+'">'+label+'</span></div>'+
       '<h3>'+escapeHtml(stage.title)+'</h3><p>'+escapeHtml(stage.description)+'</p>'+
       '<div class="setup-step-bottom"><strong>'+count+'</strong><span> registros disponíveis</span></div>'+explanation+
-      '<button type="button" class="secondary-btn setup-action" data-module="'+escapeHtml(stage.target)+'">'+escapeHtml(stage.button)+'</button></article>';
+      '<button type="button" class="secondary-btn setup-action" '+(stage.target==="listas"?'data-area-target="loja"':'data-module="'+escapeHtml(stage.target)+'"')+'>'+escapeHtml(stage.target==="listas"?"Abrir ambiente Loja":stage.button)+'</button></article>';
   }).join("");
   const detail='<div class="note">A Matriz centraliza cadastros. Cada lista pertence à sua loja e deve reunir itens já existentes no catálogo. Modo atual: '+
     escapeHtml(mode==="demo"?"demonstração — dados fictícios locais":"Supabase — dados protegidos por RLS")+'.</div>';

@@ -33,7 +33,7 @@ export async function getSetup(mode,storeId){
       operationalStores:stores.filter(s=>s.store_type==="operational" || (s.id||"").startsWith("demo-")).length,
       items:demoList("items").length,
       suppliers:demoList("suppliers").length,
-      lists:storeId?demoList("purchase_lists",storeId,{scope:true}).length:0
+      lists:storeId?demoList("purchase_lists",storeId,{scope:true}).length:demoList("purchase_lists").length
     };
   }
   const counts=[
@@ -41,7 +41,7 @@ export async function getSetup(mode,storeId){
     supabase.from("suppliers").select("id",{count:"exact",head:true}),
     storeId
       ? supabase.from("purchase_lists").select("id",{count:"exact",head:true}).eq("store_id",storeId)
-      : Promise.resolve({count:0,error:null})
+      : supabase.from("purchase_lists").select("id",{count:"exact",head:true})
   ];
   const results=await Promise.all(counts);
   for(const result of results) if(result.error) throw result.error;
