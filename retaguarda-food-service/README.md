@@ -56,3 +56,7 @@ O projeto foi preparado para ser publicado como site estático. Veja `docs/CLOUD
 O aplicativo possui agora `package.json` com `npm run check` e `npm run build`. O build valida JavaScript e copia somente o site para `dist/`.
 
 Na configuração Cloudflare Pages, selecione o repositório `opewillian/Prototipos`, root directory `retaguarda-food-service`, build command `npm run build` e output directory `dist`. Consulte `docs/CLOUDFLARE.md` para o procedimento.
+
+## Tela inicial do esqueleto
+
+A página inicial apresenta uma entrada simples, sem formulário: **Entrar** abre diretamente o **modo demonstração**. Esse clique não autentica usuários no Supabase e não concede acesso a dados reais. O acesso protegido ao Supabase continua disponível mediante e-mail e senha na opção apropriada dentro do sistema. Consulte `docs/ENTRADA.md`.

@@ -8,12 +8,23 @@ import {renderList} from "./components/table.js";
 import {renderEditor} from "./components/editor.js";
 import {renderDashboard} from "./modules/dashboard/index.js";
 import {renderSetup} from "./modules/configuracao/index.js";
+import {renderEntry} from "./components/entry.js";
 
-const state={mode:"demo",moduleId:"dashboard",storeId:"",stores:[],session:null,rows:[],dashboard:{},
+// Entrada exclusivamente visual: não substitui o login real do Supabase.
+const ENTRY_STORAGE_KEY="retaguarda_food_service_entry_v1";
+function hasPrototypeEntry(){
+ try{return sessionStorage.getItem(ENTRY_STORAGE_KEY)==="yes"}catch{return false}
+}
+function storePrototypeEntry(entered){
+ try{if(entered)sessionStorage.setItem(ENTRY_STORAGE_KEY,"yes");else sessionStorage.removeItem(ENTRY_STORAGE_KEY)}catch{}
+}
+const state={entered:hasPrototypeEntry(),mode:"demo",moduleId:"dashboard",storeId:"",stores:[],session:null,rows:[],dashboard:{},
  loading:false,error:"",toast:"",editor:null,lines:[],lookups:{},setup:{}};
 const root=document.getElementById("app");
 let requestId=0;
 async function initialize(){
+ // A entrada deve aparecer mesmo antes de qualquer consulta ao banco.
+ render();
  try{
   const {data,error}=await supabase.auth.getSession();
   if(error)throw error;
@@ -23,7 +34,7 @@ async function initialize(){
   state.session=session;
   if(state.mode==="live")Promise.resolve().then(refreshStores);
  });
- await refreshStores();
+ if(state.entered)await refreshStores();
 }
 async function refreshStores(){
  const id=++requestId;state.loading=true;state.editor=null;state.error="";render();
@@ -65,6 +76,19 @@ async function refreshEditor(id){
  await openEditor(row);
 }
 function render(){
+ if(!state.entered){
+  root.innerHTML=renderEntry();
+  root.querySelector("#prototype-enter")?.addEventListener("click",()=>{
+   storePrototypeEntry(true);
+   state.entered=true;
+   state.mode="demo";
+   state.moduleId="dashboard";
+   state.error="";
+   state.toast="";
+   refreshStores();
+  });
+  return;
+ }
  let content=state.moduleId==="dashboard"?renderDashboard(state.dashboard,state.mode):
   state.moduleId==="configuracao"?renderSetup(state.setup,state.mode,state.stores.find(s=>s.id===state.storeId)):
   renderList(moduleById[state.moduleId],state.rows,state.mode);
@@ -73,6 +97,22 @@ function render(){
  root.innerHTML=layout(state,content);
  const bar=root.querySelector(".top-actions");
  if(bar)bar.insertAdjacentHTML("beforeend",accountButton(state));
+ root.querySelector("#return-to-entry")?.addEventListener("click",async()=>{
+  // Encerrar a sessão real se um usuário tiver acessado o modo Supabase.
+  if(state.session){
+   const {error}=await supabase.auth.signOut();
+   if(error){state.error="Não foi possível encerrar a sessão Supabase: "+error.message;render();return}
+  }
+  ++requestId;
+  storePrototypeEntry(false);
+  state.entered=false;
+  state.mode="demo";
+  state.moduleId="dashboard";
+  state.editor=null;
+  state.error="";
+  state.toast="";
+  render();
+ });
  root.querySelectorAll("[data-module]").forEach(button=>button.addEventListener("click",()=>{state.moduleId=button.dataset.module;state.toast="";loadModule()}));
  root.querySelectorAll("[data-mode]").forEach(button=>button.addEventListener("click",()=>{if(button.dataset.mode===state.mode)return;state.mode=button.dataset.mode;state.toast="";refreshStores()}));
  const store=root.querySelector("#store");

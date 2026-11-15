@@ -23,7 +23,8 @@ export function layout(state, content) {
     '<div class="main-shell"><header class="topbar"><div class="crumb"><span>Retaguarda</span><span class="slash">/</span><strong>' +
     escapeHtml(current.label) + '</strong></div><div class="top-actions"><span class="top-seal">' +
     (live ? 'Supabase · acesso protegido' : 'Dados fictícios') + '</span><span class="profile">' +
-    escapeHtml(signedIn && live ? userName : "Protótipo") + '</span></div></header>' +
+    escapeHtml(signedIn && live ? userName : "Protótipo") + '</span>' +
+    '<button type="button" id="return-to-entry" class="text-btn" aria-label="Voltar à tela de entrada">Sair</button></div></header>' +
     '<main class="main-content"><div class="welcome"><div><span class="eyebrow">PLATAFORMA DE OPERAÇÕES</span><h1>Retaguarda <em>Food Service</em></h1><p>Controle, consistência e decisões melhores para cada loja.</p></div></div>' +
     '<section class="toolbar"><div class="toolbar-group"><label for="store">Unidade selecionada</label><select id="store" ' +
     (options ? "" : "disabled") + '>' + (options || '<option value="">Sem unidades autorizadas</option>') +
