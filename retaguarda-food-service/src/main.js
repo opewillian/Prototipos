@@ -1,5 +1,5 @@
 import {supabase} from "./core/supabase.js";
-import {getStores,getRows,getDashboard} from "./core/api.js";
+import {getStores,getRows,getDashboard,getSetup} from "./core/api.js";
 import {getLines,getLookupRows,saveRow,removeRow,changeStatus} from "./core/write-api.js";
 import {normalize,models} from "./core/models.js";
 import {modules,moduleById} from "./modules/index.js";
@@ -7,9 +7,10 @@ import {layout,accountButton} from "./components/layout.js";
 import {renderList} from "./components/table.js";
 import {renderEditor} from "./components/editor.js";
 import {renderDashboard} from "./modules/dashboard/index.js";
+import {renderSetup} from "./modules/configuracao/index.js";
 
 const state={mode:"demo",moduleId:"dashboard",storeId:"",stores:[],session:null,rows:[],dashboard:{},
- loading:false,error:"",toast:"",editor:null,lines:[],lookups:{}};
+ loading:false,error:"",toast:"",editor:null,lines:[],lookups:{},setup:{}};
 const root=document.getElementById("app");
 let requestId=0;
 async function initialize(){
@@ -39,6 +40,7 @@ async function loadModule(){
  const id=++requestId;state.loading=true;state.editor=null;state.error="";render();
  try{
   if(state.moduleId==="dashboard")state.dashboard=await getDashboard(state.mode,state.storeId);
+  else if(state.moduleId==="configuracao")state.setup=await getSetup(state.mode,state.storeId);
   else state.rows=await getRows(moduleById[state.moduleId],state.mode,state.storeId);
   if(id!==requestId)return;
   state.loading=false;render();
@@ -63,7 +65,9 @@ async function refreshEditor(id){
  await openEditor(row);
 }
 function render(){
- let content=state.moduleId==="dashboard"?renderDashboard(state.dashboard,state.mode):renderList(moduleById[state.moduleId],state.rows,state.mode);
+ let content=state.moduleId==="dashboard"?renderDashboard(state.dashboard,state.mode):
+  state.moduleId==="configuracao"?renderSetup(state.setup,state.mode,state.stores.find(s=>s.id===state.storeId)):
+  renderList(moduleById[state.moduleId],state.rows,state.mode);
  if(state.editor)content=renderEditor(state)+content;
  if(state.toast)content='<div class="success-box" role="status">'+state.toast+'</div>'+content;
  root.innerHTML=layout(state,content);
@@ -87,7 +91,8 @@ function render(){
    const payload=normalize(model,mainform,row,{storeId:state.storeId,userId:state.session?.user?.id});
    const saved=await saveRow(model,payload,row[model.id],state.mode);
    state.toast="Registro salvo com sucesso.";
-   await loadModule();
+   if(model.table==="stores")await refreshStores();
+   else await loadModule();
    // Mantém formulário aberto para adicionar itens após a inclusão.
    const found=state.rows.find(x=>x.id===saved.id);
    if(found)await openEditor(found);
@@ -114,6 +119,7 @@ function render(){
   event.preventDefault();const model=models[state.moduleId],row=state.editor.record;
   try{
    const payload=normalize(model,lineForm,row,{storeId:state.storeId,userId:state.session?.user?.id,child:true,parentId:row.id});
+   if(model.line.table==="purchase_list_items" && state.lines.some(line=>line.item_id===payload.item_id))throw Error("Este item já faz parte da lista.");
    await saveRow(model,payload,null,state.mode,{child:true});
    state.lines=await getLines(model,row.id,state.storeId,state.mode);
    state.editor.lineEditor=false;state.toast="Item incluído.";render();

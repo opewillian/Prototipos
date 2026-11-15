@@ -42,7 +42,10 @@ export function renderEditor(state){
  }
  if(row&&model.line){
   html+='<div class="editor-lines"><div class="panel-head"><strong>Itens vinculados</strong><small>'+state.lines.length+' registros</small></div>'+
-   renderTable(state.lines,model.line.fields.map(f=>({key:f.key,label:f.label})).concat(model.line.table==="purchase_list_items"?[]:[{key:"line_total",label:"Total",kind:"money"}]))+
+   renderTable(state.lines.map(line=>Object.fromEntries(Object.entries(line).map(([key,value])=>{
+     const lookupField=model.line.fields.find(field=>field.key===key && field.type==="lookup");
+     return [key,lookupField?(state.lookups?.[lookupField.lookup]||[]).find(item=>item.id===value)?.name||value:value];
+   }))),model.line.fields.map(f=>({key:f.key,label:f.label})).concat(model.line.table==="purchase_list_items"?[]:[{key:"line_total",label:"Total",kind:"money"}]))+
    (!isLocked?'<div class="line-actions"><button type="button" class="secondary-btn" data-new-line>+ Adicionar item</button></div>':"");
   if(state.editor?.lineEditor&&!isLocked){
    html+='<form id="line-form" class="line-form"><h4>Novo item</h4>'+fieldsHTML(model.line.fields,null,state.lookups||{},false)+

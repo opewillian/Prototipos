@@ -97,6 +97,7 @@ export function normalize(model, form, row={}, {storeId,userId,child=false,paren
     if(model.table==="transfers") result.from_store_id=storeId;
     else result.store_id=storeId;
     if(!storeId) throw Error("Selecione uma unidade.");
+    if(storeId==="matriz") throw Error("Cadastros operacionais pertencem a uma loja. Selecione uma unidade operacional.");
   }
   if(!child && !row[model.id] && model.status) result[model.status.field]=model.status.allowed[0];
   if(!child && !row[model.id] && userId && ["contagem","notas","compras","transferencias","listas","perdas"].some(k=>models[k]===model)) result.created_by=userId;

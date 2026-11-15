@@ -25,3 +25,30 @@ export async function getDashboard(mode,storeId){
  const values=await Promise.all(rs.map(r=>getRows(r,mode,storeId)));
  return Object.fromEntries(rs.map((r,i)=>[r.table,values[i]]));
 }
+
+export async function getSetup(mode,storeId){
+  const stores=await getStores(mode);
+  if(mode==="demo"){
+    return {
+      operationalStores:stores.filter(s=>s.store_type==="operational" || (s.id||"").startsWith("demo-")).length,
+      items:demoList("items").length,
+      suppliers:demoList("suppliers").length,
+      lists:storeId?demoList("purchase_lists",storeId,{scope:true}).length:0
+    };
+  }
+  const counts=[
+    supabase.from("items").select("id",{count:"exact",head:true}),
+    supabase.from("suppliers").select("id",{count:"exact",head:true}),
+    storeId
+      ? supabase.from("purchase_lists").select("id",{count:"exact",head:true}).eq("store_id",storeId)
+      : Promise.resolve({count:0,error:null})
+  ];
+  const results=await Promise.all(counts);
+  for(const result of results) if(result.error) throw result.error;
+  return {
+    operationalStores:stores.filter(s=>s.store_type==="operational").length,
+    items:results[0].count||0,
+    suppliers:results[1].count||0,
+    lists:results[2].count||0
+  };
+}
