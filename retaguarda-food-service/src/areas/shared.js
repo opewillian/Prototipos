@@ -7,8 +7,9 @@ export function commonActions(state){
 export function accessBody(state,content){
  if(!state.session)return '<section class="panel real-login"><span class="eyebrow">ACESSO PROTEGIDO</span><h2>Entrar no Supabase</h2>'+
  '<p>Para acessar os dados da retaguarda, entre com e-mail e senha de um usuário autorizado.</p>'+
- '<form id="login-form"><label>E-mail<input id="email" type="email" required autocomplete="username"></label>'+
- '<label>Senha<input id="password" type="password" required autocomplete="current-password"></label>'+
+ '<form id="login-form"><label>E-mail<input id="email" type="email" required autocomplete="username" value="'+e(state.loginEmail||"")+'"></label>'+
+ '<label>Senha<input id="password" type="password" required autocomplete="current-password"'+(state.loginError?' autofocus':'')+'></label>'+
+ (state.loginError?'<div class="error-box login-error" role="alert">'+e(state.loginError)+'</div>':'')+
  '<button class="primary-btn" type="submit">Entrar com segurança</button></form></section>';
  if(state.area==="matriz"&&state.matrixAuthorized===false)return '<section class="panel real-login"><h2>Acesso negado</h2>'+
  '<p>Esta conta não possui permissão administrativa da Matriz.</p><button id="change-area" class="secondary-btn">Trocar ambiente</button></section>';

@@ -48,4 +48,39 @@ const html=renderEditor({moduleId:"contagem",editor:{record:{id:"c1",status:"dra
 assert.match(html,/Ativo X/);
 assert.doesNotMatch(html,/Inativo Y/);
 
+// ---- Contagem: linhas carregadas de listas ----
+import("../src/modules/contagem/lines.js").then(({parseQty,fmtQty,lineTotal,costFor,mergePending,countSummary,renderCountLines})=>{
+ assert.equal(parseQty(""),null,"vazio = não contado");
+ assert.equal(parseQty("  "),null);
+ assert.equal(parseQty("0"),0,"zero é contagem válida");
+ assert.equal(parseQty("1,25"),1.25);
+ assert.equal(parseQty("2.5"),2.5);
+ assert.ok(Number.isNaN(parseQty("-1")));
+ assert.ok(Number.isNaN(parseQty("abc")));
+ assert.ok(Number.isNaN(parseQty("1.000,50")),"separador de milhar não é aceito");
+ assert.equal(fmtQty(2.5),"2,5");
+ assert.equal(fmtQty(1000),"1000");
+ assert.equal(fmtQty(null),"");
+ assert.equal(lineTotal(2.5,8.9),22.25);
+
+ const lines=[{id:"l1",item_id:"a",counted_quantity:0,unit_cost:5,line_total:0},{id:"l2",item_id:"b",counted_quantity:2,unit_cost:3,line_total:6}];
+ const m=mergePending(lines,[{item_id:"c"}],["a","c","d","d","e"]);
+ assert.deepEqual(m.pending.map(p=>p.item_id),["c","d","e"],"merge não duplica itens gravados, pendentes nem repetidos na lista");
+ assert.equal(m.added,2);assert.equal(m.skipped,3);
+
+ const lookups={items:[{id:"a",name:"A",default_unit_cost:4},{id:"b",name:"B",default_unit_cost:9}],
+  store_last_purchase_cost:[{store_id:"teste",item_id:"b",unit_cost:7.5}]};
+ assert.deepEqual(costFor("b",lookups),{cost:7.5,source:"Última compra da loja"});
+ assert.deepEqual(costFor("a",lookups),{cost:4,source:"Custo padrão do cadastro"});
+
+ assert.deepEqual(countSummary(lines,[{item_id:"c"}]),{counted:2,pending:1,total:6});
+
+ const st={lookups,lines,editor:{pending:[{item_id:"a2"}]}};
+ const open=renderCountLines(st,false);
+ assert.match(open,/data-qty/);assert.match(open,/placeholder="Não contado"/);assert.match(open,/data-load-list/);
+ const locked=renderCountLines(st,true);
+ assert.doesNotMatch(locked,/<input|data-load-list|data-remove-row/,"contagem finalizada não oferece edição");
+ console.log("OK: contagem — vazio x zero, decimais, merge de listas, custo sugerido, resumo e bloqueio.");
+}).catch(error=>{console.error(error);process.exit(1)});
+
 console.log("OK: regras de quantidade, totais, loja do documento, datas e rótulos.");

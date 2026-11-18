@@ -1,6 +1,8 @@
 import {supabase} from "./core/supabase.js";
 import {getStores,getRows,getDashboard,getSetup} from "./core/api.js";
-import {getLines,getLookupRows,saveRow,removeRow,changeStatus} from "./core/write-api.js";
+import {getLines,getLookupRows,getListItemIds,saveRow,removeRow,changeStatus} from "./core/write-api.js";
+import {parseQty,fmtQty,lineTotal,mergePending,summaryHTML} from "./modules/contagem/lines.js";
+import {money} from "./core/format.js";
 import {normalize,models} from "./core/models.js";
 import {moduleById} from "./modules/index.js";
 import {renderList} from "./components/table.js";
@@ -147,11 +149,12 @@ async function openEditor(row=null){
  if(!canEditModule(state.area,state.moduleId,state.features)){state.error="Funcionalidade ainda não liberada para gravação nesta loja.";render();return}
  state.loading=true;state.error="";render();
  try{
-  const types=[...new Set(model.fields.concat(model.line?.fields||[]).filter(f=>f.type==="lookup").map(f=>f.lookup))];
+  const types=[...new Set(model.fields.concat(model.line?.fields||[]).filter(f=>f.type==="lookup").map(f=>f.lookup)
+   .concat(state.moduleId==="contagem"?["purchase_lists","store_last_purchase_cost"]:[]))];
   const data=await Promise.all(types.map(t=>getLookupRows(t,state.mode,state.storeId)));
   state.lookups=Object.fromEntries(types.map((t,i)=>[t,data[i]]));
   state.lines=row&&model.line?await getLines(model,row.id,state.storeId,state.mode):[];
-  state.editor={record:row,lineEditor:false};
+  state.editor={record:row,lineEditor:false,pending:[]};
  }catch(error){state.error="Formulário: "+error.message}
  state.loading=false;render();
 }
@@ -247,7 +250,10 @@ function bindForms(){
   const model=models[state.moduleId],row=state.editor?.record,status=b.dataset.status;
   if(!model||!row)return;
   if(!canEditModule(state.area,state.moduleId,state.features)){state.error="Função não liberada nesta loja.";render();return}
-  if(!confirm("Alterar status? Esta operação pode gerar movimentações de estoque."))return;
+  const pending=state.moduleId==="contagem"&&status==="finalized"?(state.editor?.pending?.length||0):0;
+  const question=pending?pending+" item(ns) sem contagem não serão incluídos. Finalizar mesmo assim? A contagem ficará bloqueada e poderá gerar ajustes de estoque."
+   :"Alterar status? Esta operação pode gerar movimentações de estoque.";
+  if(!confirm(question))return;
   try{
    if(model.line&&!state.lines.length&&status!=="cancelled")throw Error("Inclua itens antes de finalizar.");
    await changeStatus(model,row,status,state.mode);
@@ -275,17 +281,124 @@ function bindForms(){
    state.toast="Item removido.";render();
   }catch(error){state.error=error.message;render()}
  });
+ bindCountLines();
  root.querySelectorAll("[data-area-target]").forEach(b=>b.addEventListener("click",()=>chooseArea(b.dataset.areaTarget)));
  const login=root.querySelector("#login-form");
  if(login)login.addEventListener("submit",async event=>{
   event.preventDefault();
   const b=login.querySelector("button[type=submit]");b.disabled=true;b.textContent="Autenticando...";
-  const {error}=await supabase.auth.signInWithPassword({email:login.querySelector("#email").value.trim(),password:login.querySelector("#password").value});
-  if(error){state.error="Login: "+error.message;render();}
+  state.loginEmail=login.querySelector("#email").value.trim();
+  const {error}=await supabase.auth.signInWithPassword({email:state.loginEmail,password:login.querySelector("#password").value});
+  if(error){state.loginError=loginMessage(error);state.error="";render();}
+  else state.loginError="";
  });
  root.querySelector("#signout")?.addEventListener("click",async()=>{
   const {error}=await supabase.auth.signOut();
   if(error){state.error="Falha ao sair do Supabase: "+error.message;render();}
  });
+}
+function loginMessage(error){
+ const msg=String(error?.message||"");
+ if(/invalid login credentials/i.test(msg))return "E-mail ou senha incorretos.";
+ if(/email not confirmed/i.test(msg))return "E-mail ainda não confirmado. Verifique sua caixa de entrada.";
+ if(/rate limit|too many/i.test(msg))return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+ if(/fetch|network/i.test(msg))return "Sem conexão com o servidor. Verifique a internet e tente novamente.";
+ return "Não foi possível entrar: "+msg;
+}
+
+// ---- Contagem: listas, quantidades e custos (regras em modules/contagem/lines.js) ----
+// Gravações de linha atualizam o DOM sem re-renderizar, para não perder o foco da digitação.
+function setCountMessage(text,isError){
+ const panel=root.querySelector(".count-lines");if(!panel)return;
+ let box=panel.querySelector(".count-message");
+ if(!box){box=document.createElement("div");panel.querySelector(".panel-head").insertAdjacentElement("afterend",box);}
+ box.className="count-message "+(isError?"error-box":"success-box");
+ box.setAttribute("role",isError?"alert":"status");box.textContent=text;
+}
+function refreshCountSummary(){
+ const el=root.querySelector("[data-count-summary]");
+ if(el)el.outerHTML=summaryHTML(state.lines,state.editor?.pending||[]);
+}
+async function saveCountRow(tr){
+ const model=models.contagem,count=state.editor?.record;
+ if(!count||model.locked.includes(count.status)||!tr?.dataset.row)return;
+ const qtyInput=tr.querySelector("[data-qty]"),costInput=tr.querySelector("[data-cost]");
+ const qty=parseQty(qtyInput.value),cost=parseQty(costInput.value);
+ qtyInput.classList.toggle("is-invalid",Number.isNaN(qty));
+ costInput.classList.toggle("is-invalid",Number.isNaN(cost)||cost===null);
+ if(Number.isNaN(qty)||Number.isNaN(cost))return setCountMessage("Use apenas números não negativos, com vírgula para decimais.",true);
+ if(cost===null)return setCountMessage("Informe o custo unitário.",true);
+ const [kind,id]=tr.dataset.row.split(":");
+ if(kind==="line"&&qty===null){
+  const line=state.lines.find(l=>l.id===id);qtyInput.value=fmtQty(line?.counted_quantity);
+  return setCountMessage("Para deixar o item sem contagem, remova-o com ×. Digite 0 para estoque zerado.",true);
+ }
+ if(kind==="pending"&&qty===null)return;
+ const payload={counted_quantity:qty,unit_cost:cost,line_total:lineTotal(qty,cost)};
+ if(tr.dataset.saving==="1"){tr.dataset.again="1";return}
+ tr.dataset.saving="1";tr.classList.add("is-saving");
+ try{
+  if(kind==="line"){
+   const saved=await saveRow(model,payload,id,state.mode,{child:true});
+   state.lines=state.lines.map(l=>l.id===id?saved:l);
+  }else{
+   const saved=await saveRow(model,{...payload,count_id:count.id,store_id:state.storeId,item_id:id},null,state.mode,{child:true});
+   state.lines=state.lines.concat(saved);
+   state.editor.pending=state.editor.pending.filter(p=>p.item_id!==id);
+   tr.dataset.row="line:"+saved.id;tr.classList.remove("is-pending");costInput.removeAttribute("title");
+  }
+  tr.querySelector("[data-total]").textContent=money(payload.line_total);
+  qtyInput.value=fmtQty(qty);costInput.value=fmtQty(cost,4);
+  refreshCountSummary();setCountMessage("Quantidade gravada.",false);
+ }catch(error){setCountMessage("Não foi possível gravar: "+error.message,true)}
+ finally{
+  tr.dataset.saving="";tr.classList.remove("is-saving");
+  if(tr.dataset.again==="1"){tr.dataset.again="";saveCountRow(tr);}
+ }
+}
+function bindCountLines(){
+ const panel=root.querySelector(".count-lines");if(!panel)return;
+ panel.querySelectorAll("tr[data-row] input").forEach(input=>{
+  input.addEventListener("change",()=>saveCountRow(input.closest("tr")));
+  input.addEventListener("keydown",event=>{
+   if(event.key!=="Enter")return;
+   event.preventDefault();
+   // Enter avança para a próxima quantidade visível; o change grava a atual.
+   const all=[...panel.querySelectorAll("tr[data-row]:not([hidden]) [data-qty]")];
+   const next=all[all.indexOf(input.closest("tr").querySelector("[data-qty]"))+1];
+   if(next){next.focus();next.select();}else input.blur();
+  });
+ });
+ panel.querySelector("#count-search")?.addEventListener("input",event=>{
+  const term=event.target.value.trim().toLowerCase();
+  panel.querySelectorAll("tr[data-row]").forEach(tr=>{tr.hidden=Boolean(term)&&!tr.dataset.search.includes(term)});
+ });
+ panel.querySelector("[data-load-list]")?.addEventListener("click",async()=>{
+  const listId=panel.querySelector("#count-list").value;
+  if(!listId)return setCountMessage("Selecione uma lista.",true);
+  try{
+   const merged=mergePending(state.lines,state.editor.pending,await getListItemIds(listId));
+   state.editor.pending=merged.pending;state.error="";
+   state.toast=merged.added+" item(ns) adicionado(s) da lista"+(merged.skipped?"; "+merged.skipped+" já estava(m) na contagem":"")+".";
+   render();
+  }catch(error){setCountMessage("Não foi possível carregar a lista: "+error.message,true)}
+ });
+ panel.querySelector("[data-add-item]")?.addEventListener("click",()=>{
+  const itemId=panel.querySelector("#count-item").value;
+  if(!itemId)return setCountMessage("Selecione um item.",true);
+  const merged=mergePending(state.lines,state.editor.pending,[itemId]);
+  if(!merged.added)return setCountMessage("Este item já está na contagem.",true);
+  state.editor.pending=merged.pending;state.toast="Item incluído. Digite a quantidade.";state.error="";render();
+  root.querySelector('tr[data-item="'+CSS.escape(itemId)+'"] [data-qty]')?.focus();
+ });
+ panel.querySelectorAll("[data-remove-row]").forEach(button=>button.addEventListener("click",async()=>{
+  const [kind,id]=button.closest("tr").dataset.row.split(":");
+  if(kind==="pending"){state.editor.pending=state.editor.pending.filter(p=>p.item_id!==id);state.toast="";render();return}
+  if(!confirm("Remover este item da contagem?"))return;
+  try{
+   await removeRow(models.contagem,id,state.mode,{child:true});
+   state.lines=state.lines.filter(l=>l.id!==id);state.toast="Item removido.";state.error="";render();
+  }catch(error){setCountMessage("Não foi possível remover: "+error.message,true)}
+ }));
 }
 initialize();

@@ -29,9 +29,14 @@ export async function getLines(model,parentId){
  const {data,error}=await supabase.from(model.line.table).select("*").eq(model.line.fk,parentId).limit(500);
  if(error)throw error;return data||[];
 }
+export async function getListItemIds(listId){
+ const {data,error}=await supabase.from("purchase_list_items").select("item_id,sort_order").eq("list_id",listId)
+  .order("sort_order",{ascending:true,nullsFirst:false}).limit(1000);
+ if(error)throw error;return (data||[]).map(r=>r.item_id);
+}
 export async function getLookupRows(table,_mode,storeId){
  let query=supabase.from(table).select("*").limit(500);
- if(["stock_counts","purchase_lists"].includes(table)){
+ if(["stock_counts","purchase_lists","store_last_purchase_cost"].includes(table)){
   if(!storeId)return [];
   query=query.eq("store_id",storeId);
  }

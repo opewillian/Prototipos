@@ -1,6 +1,7 @@
 import {escapeHtml,displayValue} from "../core/format.js";
 import {models,statusLabels,TODAY} from "../core/models.js";
 import {renderTable} from "./table.js";
+import {renderCountLines} from "../modules/contagem/lines.js";
 
 const safe=escapeHtml;
 function control(field,record,lookups,editing){
@@ -41,7 +42,9 @@ export function renderEditor(state){
    '<button class="secondary-btn" type="button" data-status="'+safe(s)+'">'+safe(statusLabels[s]||s)+'</button>').join("")+'</div>';
   html+='</div>';
  }
- if(row&&model.line){
+ if(row&&model.line&&state.moduleId==="contagem"){
+  html+=renderCountLines(state,isLocked);
+ }else if(row&&model.line){
   html+='<div class="editor-lines"><div class="panel-head"><strong>Itens vinculados</strong><small>'+state.lines.length+' registros</small></div>'+
    renderTable(state.lines.map(line=>Object.fromEntries(Object.entries(line).map(([key,value])=>{
      const lookupField=model.line.fields.find(field=>field.key===key && field.type==="lookup");
