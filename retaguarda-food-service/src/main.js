@@ -38,6 +38,8 @@ function go(path){location.hash=path.startsWith("#")?path:"#"+path}
 
 async function route(){
  const seq=++renderSeq;
+ // Fecha painéis e diálogos abertos ao trocar de tela.
+ document.querySelectorAll(".overlay").forEach(o=>o.remove());
  if(recoveryMode)return renderReset();
  if(!app.session){shellKey="";return renderLogin()}
  if(!app.loaded){
