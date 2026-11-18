@@ -1,6 +1,7 @@
 // Acesso a dados no Supabase. Toda autorização é aplicada pelo banco (RLS);
 // estas funções apenas padronizam consultas e erros.
 import {supabase} from "./supabase.js";
+import {trackWrite} from "./audit.js";
 
 function apply(q,opts){
  for(const [k,v] of Object.entries(opts.eq||{}))q=v===null?q.is(k,null):q.eq(k,v);
@@ -38,13 +39,13 @@ export async function get(table,id,select="*",key="id"){
 }
 export async function insert(table,row){
  if(table==="stores")throw Error("Unidades são gerenciadas fora da retaguarda.");
- const {data,error}=await supabase.from(table).insert(row).select("*").single();
- if(error)throw error;return data;
+  const {data,error}=await supabase.from(table).insert(row).select("*").single();
+ if(error)throw error;trackWrite("insert",table,data);return data;
 }
 export async function insertMany(table,rows){
  if(!rows.length)return [];
- const {data,error}=await supabase.from(table).insert(rows).select("*");
- if(error)throw error;return data||[];
+  const {data,error}=await supabase.from(table).insert(rows).select("*");
+ if(error)throw error;for(const r of data||[])trackWrite("insert",table,r);return data||[];
 }
 export async function update(table,id,patch,extra={}){
  if(table==="stores")throw Error("Unidades são gerenciadas fora da retaguarda.");
@@ -52,14 +53,15 @@ export async function update(table,id,patch,extra={}){
  for(const [k,v] of Object.entries(extra))q=q.eq(k,v);
  const {data,error}=await q.select("*");
  if(error)throw error;
- if(!data?.length)throw Error("O registro mudou ou você não tem permissão para alterá-lo. Recarregue a página.");
- return data[0];
+  if(!data?.length)throw Error("O registro mudou ou você não tem permissão para alterá-lo. Recarregue a página.");
+ trackWrite("update",table,data[0],patch);return data[0];
 }
 export async function remove(table,id){
  if(table==="stores")throw Error("Unidades são gerenciadas fora da retaguarda.");
- const {data,error}=await supabase.from(table).delete().eq("id",id).select("id");
+  const {data,error}=await supabase.from(table).delete().eq("id",id).select("*");
  if(error)throw error;
- if(!data?.length)throw Error("Não foi possível excluir: registro bloqueado ou sem permissão.");
+  if(!data?.length)throw Error("Não foi possível excluir: registro bloqueado ou sem permissão.");
+ trackWrite("delete",table,data[0]);
 }
 /** Próximo número sequencial amigável por loja (ex.: CT-0007). */
 export async function nextNumber(table,column,storeColumn,storeId,prefix){

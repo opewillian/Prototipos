@@ -3,7 +3,8 @@
 import {e,initials,normalizeText} from "../core/format.js";
 import {icon} from "../core/icons.js";
 import {LOGO} from "./access.js";
-import {matrizModules} from "./matriz/shell.js";
+import {matrizEnabled} from "./matriz/shell.js";
+import {hasMatrix} from "../core/access.js";
 import {enabledModules} from "./loja/shell.js";
 
 const COLLAPSE_KEY="rfs-sidebar-collapsed";
@@ -31,7 +32,7 @@ export function appShell(app){
 }
 
 function navItems(app,area,storeId){
- if(area==="matriz")return matrizModules.map(m=>({...m,href:"#/matriz/"+m.id}));
+ if(area==="matriz")return matrizEnabled(app).map(m=>({...m,href:"#/matriz/"+m.id}));
  return enabledModules(app,storeId).map(m=>({...m,href:"#/loja/"+encodeURIComponent(storeId)+"/"+m.id}));
 }
 
@@ -53,7 +54,7 @@ export function updateShell(root,app,{area,storeId,moduleId}){
  root.querySelector("[data-area-label]").textContent=area==="matriz"?"Matriz":"Operação da loja";
  // Ambiente
  const env=root.querySelector("#env");
- const opts=(app.isAdmin?[["matriz","Matriz"]]:[]).concat(shops(app).length?[["loja","Loja"]]:[]);
+ const opts=(hasMatrix(app)?[["matriz","Matriz"]]:[]).concat(shops(app).length?[["loja","Loja"]]:[]);
  env.innerHTML=opts.map(([v,l])=>'<option value="'+v+'"'+(v===area?" selected":"")+'>'+e(l)+'</option>').join("");
  root.querySelector("[data-env-field]").hidden=opts.length<2;
  // Loja

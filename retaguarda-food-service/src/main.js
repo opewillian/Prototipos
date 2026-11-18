@@ -3,8 +3,10 @@ import {supabase} from "./core/supabase.js";
 import {list} from "./core/db.js";
 import {loading,alertBox,errorMessage,toast} from "./core/ui.js";
 import {loginView,chooseView,passwordResetView} from "./areas/access.js";
-import {matrizModules} from "./areas/matriz/shell.js";
-import {enabledModules} from "./areas/loja/shell.js";
+import {matrizEnabled,matrizCanEdit} from "./areas/matriz/shell.js";
+import {enabledModules,lojaCanEdit} from "./areas/loja/shell.js";
+import {hasMatrix} from "./core/access.js";
+import {setAuditUser} from "./core/audit.js";
 import {appShell,updateShell,bindAppShell,markStore} from "./areas/shell.js";
 
 const LAST_KEY="rfs-last-route";
@@ -12,18 +14,19 @@ function lastRoute(){try{return localStorage.getItem(LAST_KEY)||""}catch{return 
 function saveRoute(v){try{localStorage.setItem(LAST_KEY,v)}catch{}}
 
 const root=document.getElementById("app");
-const app={session:null,profile:null,memberships:[],stores:[],flags:{},isAdmin:false,loaded:false};
+const app={session:null,profile:null,memberships:[],perms:[],stores:[],flags:{},isAdmin:false,loaded:false};
 let shellKey="";let renderSeq=0;let recoveryMode=false;
 
 async function loadContext(){
  const uid=app.session.user.id;
- const [profiles,memberships,stores,flags]=await Promise.all([
+ const [profiles,memberships,stores,flags,perms]=await Promise.all([
   list("user_profiles",{eq:{user_id:uid}}),
   list("store_memberships",{eq:{user_id:uid}}),
   list("stores",{eq:{active:true},order:"name",asc:true}),
-  list("store_feature_flags",{select:"store_id,feature_code,enabled"})
+  list("store_feature_flags",{select:"store_id,feature_code,enabled"}),
+  list("user_tab_permissions",{eq:{user_id:uid}})
  ]);
- app.profile=profiles[0]||null;app.memberships=memberships;app.stores=stores;
+ app.profile=profiles[0]||null;app.memberships=memberships;app.stores=stores;app.perms=perms;setAuditUser(uid);
  app.isAdmin=memberships.some(m=>m.store_id==="matriz"&&m.role==="matrix_admin"&&m.active);
  app.flags={};
  for(const f of flags)(app.flags[f.store_id]||(app.flags[f.store_id]={}))[f.feature_code]=f.enabled===true;
@@ -50,11 +53,13 @@ async function route(){
  const {area,parts}=parseRoute();
  const shops=app.stores.filter(s=>s.store_type==="operational");
  if(area==="matriz"){
-  if(!app.isAdmin)return go(shops[0]?"/loja/"+shops[0].id:"/escolher");
-  const id=matrizModules.some(m=>m.id===parts[1])?parts[1]:"painel";
+  const mm=matrizEnabled(app);
+  if(!mm.length)return go(shops[0]?"/loja/"+shops[0].id:"/escolher");
+  const id=mm.some(m=>m.id===parts[1])?parts[1]:mm[0].id;
   ensureShell();updateShell(root,app,{area:"matriz",storeId:null,moduleId:id});markStore(root,"");
   saveRoute("matriz");
-  const mod=matrizModules.find(m=>m.id===id).mod;
+  const mod=mm.find(m=>m.id===id).mod;
+  root.querySelector("#content").classList.toggle("read-only",!matrizCanEdit(app,id));
   return runModule(seq,mod,{area:"matriz",params:parts.slice(2),storeId:null,store:null});
  }
  if(area==="loja"){
@@ -66,15 +71,16 @@ async function route(){
   ensureShell();updateShell(root,app,{area:"loja",storeId,moduleId:id});markStore(root,storeId);
   saveRoute("loja:"+storeId);
   const mod=mods.find(m=>m.id===id).mod;
+  root.querySelector("#content").classList.toggle("read-only",!lojaCanEdit(app,storeId,id));
   return runModule(seq,mod,{area:"loja",params:parts.slice(3),storeId,store});
  }
  if(area==="escolher")return renderChoose(shops.length||app.isAdmin?"":"");
  // Sem rota: volta ao último ambiente/loja usado.
  const last=lastRoute();
- if(last==="matriz"&&app.isAdmin)return go("/matriz");
+ if(last==="matriz"&&hasMatrix(app))return go("/matriz");
  if(last.startsWith("loja:")&&shops.some(s=>s.id===last.slice(5)))return go("/loja/"+last.slice(5));
  if(shops.length)return go("/loja/"+shops[0].id);
- if(app.isAdmin)return go("/matriz");
+ if(hasMatrix(app))return go("/matriz");
  renderChoose();
 }
 

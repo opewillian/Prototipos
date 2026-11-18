@@ -205,7 +205,23 @@ tr.is-saving{opacity:.6}
 .perm-opts input{accent-color:var(--brand);margin:0}
 .perm-opts label:has(input:checked){background:var(--brand-50);color:var(--brand-700)}
 .access-tools{display:flex;gap:6px;margin-top:10px}
+.store-picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.store-pick{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;background:#fff}
+.store-pick input{accent-color:var(--brand);width:16px;height:16px;margin:0}
+.store-pick span{display:flex;flex-direction:column;font-weight:600;color:var(--ink)}
+.store-pick small{font-weight:500;color:var(--muted);font-size:11.5px}
+.store-pick:has(input:checked){border-color:var(--brand);background:var(--brand-50)}
 .self-lock .access-store,.self-lock .switch{opacity:.6;pointer-events:none}
+
+/* ---------- Somente consulta (sem permissão de edição no módulo) ---------- */
+.read-only [data-new],.read-only .add-row,.read-only [data-status],.read-only [data-finalize],.read-only [data-receive],.read-only [data-record],
+.read-only [data-issue],.read-only [data-cancel],.read-only [data-save],.read-only [data-edit],.read-only [data-delete],.read-only [data-remove],
+.read-only [data-del],.read-only [data-pay-ok],.read-only [data-pay-del],.read-only [data-add-pay],.read-only [data-gen-pay],.read-only [data-link],
+.read-only [data-unlink],.read-only [data-manage],.read-only [data-import],.read-only [data-recalc],.read-only [data-apply],.read-only [data-st],
+.read-only label:has(> [data-file]){display:none!important}
+.read-only .cell-input,.read-only [data-pref],.read-only [data-sup]{pointer-events:none;background:var(--surface-2)}
+.log-changes{margin:4px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--graphite)}
+.log-changes li{padding:1px 0}
 
 /* ---------- Responsivo ---------- */
 @media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:1fr}.doc-meta{grid-template-columns:repeat(2,minmax(0,1fr))}}

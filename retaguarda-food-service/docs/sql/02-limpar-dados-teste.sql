@@ -26,6 +26,7 @@ delete from public.store_item_suppliers where item_id in (select id from public.
    or supplier_id in (select id from public.suppliers where code = 'TST-F1');
 delete from public.items where code like 'TST-%';
 delete from public.suppliers where code = 'TST-F1';
+delete from public.audit_events where action = 'teste_log' or store_id = 'teste';
 select (select count(*) from public.stock_counts where store_id='teste') as contagens,
        (select count(*) from public.invoices where store_id='teste') as notas,
        (select count(*) from public.items where code like 'TST-%') as itens_teste;
