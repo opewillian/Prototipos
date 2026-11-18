@@ -31,7 +31,7 @@ for (const file of jsFiles) {
     await assertExists(candidate);
   }
 }
-for (const required of ["index.html", "assets/styles.css", "assets/operational.css", "src/main.js", "src/core/supabase.js"]) {
+for (const required of ["index.html", "assets/app.css", "assets/shell.css", "assets/brand/logo-mft.png", "src/main.js", "src/core/supabase.js"]) {
   await assertExists(path.join(root, required));
 }
 const config = await readFile(path.join(root, "src/core/config.js"), "utf8");
