@@ -1,6 +1,6 @@
 import {escapeHtml as e} from "../../core/format.js";
 import {storeModules} from "./config.js";
-import {featureByModule} from "../../core/features.js";
+import {featureByModule} from "../../core/feature-map.js";
 import {commonActions,sourceControl,accessBody,modeNote} from "../shared.js";
 export function storeLayout(state,content){
  const current=storeModules.find(x=>x.id===state.moduleId)||storeModules[0];
