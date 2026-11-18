@@ -1,11 +1,12 @@
 import {escapeHtml as e} from "../../core/format.js";
 import {storeModules} from "./config.js";
+import {featureByModule} from "../../core/features.js";
 import {commonActions,sourceControl,accessBody,modeNote} from "../shared.js";
 export function storeLayout(state,content){
  const current=storeModules.find(x=>x.id===state.moduleId)||storeModules[0];
- const operational=state.stores.filter(s=>s.store_type==="operational"||String(s.id||"").startsWith("demo-"));
+ const operational=state.stores.filter(s=>s.store_type==="operational");
  const store=operational.find(s=>s.id===state.storeId);
- const nav=storeModules.map(m=>'<button class="loja-nav-item '+(state.moduleId===m.id?"selected":"")+'" data-module="'+e(m.id)+'"><small>'+e(m.initials)+'</small>'+e(m.label)+'</button>').join("");
+ const nav=storeModules.map(m=>'<button class="loja-nav-item '+(state.moduleId===m.id?"selected":"")+'" data-module="'+e(m.id)+'"><small>'+e(m.initials)+'</small>'+e(m.label)+(featureByModule[m.id]&&!state.features?.[featureByModule[m.id]]?' · Aguardando liberação':'')+'</button>').join("");
  const options=operational.map(s=>'<option value="'+e(s.id)+'"'+(s.id===state.storeId?" selected":"")+'>'+e(s.name)+'</option>').join("");
  return '<div class="loja-shell"><header class="loja-top"><div class="loja-brand"><b>FS</b><span>Retaguarda<small>OPERAÇÃO DE LOJA</small></span></div>'+commonActions(state)+'</header>'+
  '<div class="loja-unit"><div><small>UNIDADE OPERACIONAL</small><h2>'+e(store?.name||"Selecione uma loja")+'</h2></div><div class="loja-unit-select"><label for="store">Unidade</label><select id="store">'+options+'</select><button id="choose-store">Escolher loja</button></div></div>'+

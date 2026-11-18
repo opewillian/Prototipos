@@ -22,12 +22,11 @@ export function renderEntry() {
       <aside class="entry-art" aria-hidden="true">
         <div class="entry-art-heading">RET<span>AGUARDA</span><small>FOOD SERVICE</small></div>
         <div class="entry-art-card">
-          <div class="entry-art-card-header"><span>Visão da operação</span><i></i></div>
+          <div class="entry-art-card-header"><span>Ambientes independentes</span><i></i></div>
           <div class="entry-art-grid">
-            <div><small>Unidades</small><strong>02</strong><em>Visão consolidada</em></div>
-            <div><small>Contagens</small><strong>03</strong><em>Inventários</em></div>
+            <div><small>Administração</small><strong>Matriz</strong><em>Cadastros centrais</em></div>
+            <div><small>Operação</small><strong>Loja</strong><em>Dados por unidade</em></div>
           </div>
-          <div class="entry-art-chart"><span style="--bar:42%"></span><span style="--bar:62%"></span><span style="--bar:51%"></span><span style="--bar:78%"></span><span style="--bar:69%"></span><span style="--bar:91%"></span><span style="--bar:74%"></span></div>
           <div class="entry-art-lines"><i></i><i></i><i></i></div>
         </div>
         <div class="entry-art-foot">Dois ambientes, uma operação conectada.</div>

@@ -9,18 +9,18 @@ export function renderTable(rows,columns){
  }).join("")+'</tr>').join("");
  return '<div class="table-scroll"><table><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
 }
-export function renderList(descriptor,rows,mode){
- const editable=!!models[descriptor.id]&&!models[descriptor.id].readOnly;
+export function renderList(descriptor,rows,_mode,canEdit=false){
+ const editable=canEdit&&!!models[descriptor.id]&&!models[descriptor.id].readOnly;
  return '<div class="section-head"><div><span class="eyebrow">MÓDULO / '+escapeHtml(descriptor.label.toUpperCase())+
  '</span><h2>'+escapeHtml(descriptor.title)+'</h2><p>'+escapeHtml(descriptor.description)+'</p></div>'+
  '<div class="list-tools"><span class="number-chip">'+rows.length+' registros</span>'+
  (editable?'<button type="button" class="primary-btn" data-new-record>+ Novo registro</button>':"")+'</div></div>'+
  '<section class="panel"><div class="panel-head"><strong>Registros'+(rows.length?" · selecione para editar":"")+'</strong><small>'+
- (mode==="demo"?"Demonstração editável local":"Supabase com permissões por loja")+'</small></div>'+
+ "Supabase · Dados autorizados"+'</small></div>'+
  (rows.length?'<div class="table-scroll"><table><thead><tr>'+descriptor.columns.map(c=>'<th>'+escapeHtml(c.label)+'</th>').join("")+
  '<th>Ação</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+descriptor.columns.map(c=>{
   const raw=r[c.key],text=c.kind==="status"?(statusLabels[raw]||raw):displayValue(raw,c.kind);
   return '<td>'+escapeHtml(text)+'</td>';
  }).join("")+'<td>'+(editable?'<button type="button" class="table-edit" data-edit-record="'+escapeHtml(r.id)+'">Abrir</button>':"—")+'</td></tr>').join("")+
- '</tbody></table></div>':renderTable([],descriptor.columns))+'</section>';
+ '</tbody></table></div>':renderTable([],descriptor.columns))+'</section>'+(!canEdit&&!!models[descriptor.id]&&!models[descriptor.id].readOnly?'<div class="note">Gravações ainda não liberadas para esta unidade.</div>':"");
 }
