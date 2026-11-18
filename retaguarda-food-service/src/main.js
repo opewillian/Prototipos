@@ -15,6 +15,7 @@ import {isMatrixAdmin,getMatrixHome,getMatrixOrders} from "./areas/matriz/data.j
 import {matrixHome,matrixOrders} from "./areas/matriz/home.js";
 import {storeHome} from "./areas/loja/home.js";
 import {renderSetup} from "./modules/configuracao/index.js";
+import {getStoreFeatures,canEditModule} from "./core/features.js";
 
 const ENTRY_KEY="retaguarda_food_service_entry_v1";
 const AREA_KEY="retaguarda_food_service_area_v1";
@@ -27,15 +28,15 @@ const area=["matriz","loja"].includes(savedArea)?savedArea:null;
 const storedStore=area==="loja"?(getSaved(STORE_KEY)||""):"";
 const state={
  entered,area,needsStoreChoice:area==="loja"&&!storedStore,
- mode:"demo",moduleId:area==="matriz"?"inicio-matriz":"dashboard",
+ mode:"live",moduleId:area==="matriz"?"inicio-matriz":"dashboard",
  storeId:storedStore,stores:[],session:null,matrixAuthorized:true,
  rows:[],dashboard:{},matrixDashboard:{},matrixOrderRows:[],setup:{},
- loading:false,error:"",toast:"",editor:null,lines:[],lookups:{}
+ loading:false,error:"",toast:"",editor:null,lines:[],lookups:{},features:{}
 };
 const root=document.getElementById("app");
 let requestId=0;
 function operationalStores(){
- return state.stores.filter(s=>s.store_type==="operational"||String(s.id||"").startsWith("demo-"));
+ return state.stores.filter(s=>s.store_type==="operational");
 }
 function stopRequests(){requestId++;state.loading=false;state.editor=null}
 
@@ -48,7 +49,7 @@ async function initialize(){
  }catch(error){state.error="Sessão Supabase: "+error.message}
  supabase.auth.onAuthStateChange((_event,session)=>{
   state.session=session;
-  if(state.area&&state.mode==="live")Promise.resolve().then(refreshStores);
+  if(state.area)Promise.resolve().then(refreshStores);
  });
  if(state.entered&&state.area)await refreshStores();
  else render();
@@ -74,14 +75,14 @@ async function exitApp(){
   if(error){state.error="Não foi possível sair do Supabase: "+error.message;render();return}
  }
  stopRequests();setSaved(ENTRY_KEY,null);setSaved(AREA_KEY,null);setSaved(STORE_KEY,null);
- state.entered=false;state.area=null;state.storeId="";state.mode="demo";
+ state.entered=false;state.area=null;state.storeId="";state.mode="live";
  state.session=null;state.error="";state.toast="";state.moduleId="dashboard";render();
 }
 async function refreshStores(){
  if(!state.area){render();return}
  const id=++requestId;
  state.loading=true;state.error="";state.editor=null;render();
- if(state.mode==="live"&&!state.session){
+ if(!state.session){
   state.stores=[];state.storeId="";state.loading=false;
   if(state.area==="loja")state.needsStoreChoice=true;
   render();return;
@@ -91,7 +92,7 @@ async function refreshStores(){
   if(id!==requestId)return;
   state.stores=stores;
   if(state.area==="matriz"){
-   state.storeId="";
+   state.storeId="";state.features={};
    state.matrixAuthorized=await isMatrixAdmin(state.mode,state.session?.user?.id);
    if(id!==requestId)return;
    if(!state.matrixAuthorized){state.loading=false;render();return}
@@ -99,7 +100,9 @@ async function refreshStores(){
    if(!operationalStores().some(s=>s.id===state.storeId)){
     state.storeId="";state.needsStoreChoice=true;setSaved(STORE_KEY,null);
    }
-   if(state.needsStoreChoice){state.loading=false;render();return}
+   if(state.needsStoreChoice){state.features={};state.loading=false;render();return}
+   state.features=await getStoreFeatures(state.storeId);
+   if(id!==requestId)return;
   }
   await loadModule();
  }catch(error){
@@ -112,7 +115,7 @@ async function loadModule(){
  if(state.area==="loja"&&state.needsStoreChoice){render();return}
  if(state.area==="matriz"&&!matrixIds.has(state.moduleId))state.moduleId="inicio-matriz";
  if(state.area==="loja"&&!storeIds.has(state.moduleId))state.moduleId="dashboard";
- if(state.mode==="live"&&(!state.session||(state.area==="matriz"&&!state.matrixAuthorized))){
+ if(!state.session||(state.area==="matriz"&&!state.matrixAuthorized)){
   state.loading=false;render();return;
  }
  const id=++requestId;state.loading=true;state.error="";state.editor=null;render();
@@ -137,6 +140,7 @@ async function openEditor(row=null){
  const model=models[state.moduleId];
  if(!model||model.readOnly)return;
  if(!(state.area==="matriz"?matrixIds:storeIds).has(state.moduleId))return;
+ if(!canEditModule(state.area,state.moduleId,state.features)){state.error="Funcionalidade ainda não liberada para gravação nesta loja.";render();return}
  state.loading=true;state.error="";render();
  try{
   const types=[...new Set(model.fields.concat(model.line?.fields||[]).filter(f=>f.type==="lookup").map(f=>f.lookup))];
@@ -156,7 +160,7 @@ function moduleContent(){
   return storeHome(state.dashboard,operationalStores().find(s=>s.id===state.storeId));
  }
  const descriptor=moduleById[state.moduleId];
- return descriptor?renderList(descriptor,state.rows,state.mode):"";
+ return descriptor?renderList(descriptor,state.rows,"live",canEditModule(state.area,state.moduleId,state.features)):"";
 }
 function bindAreaButtons(){
  root.querySelectorAll("[data-area]").forEach(b=>b.addEventListener("click",()=>chooseArea(b.dataset.area)));
@@ -172,7 +176,7 @@ function render(){
   root.innerHTML=renderEntry();
   root.querySelector("#prototype-enter")?.addEventListener("click",()=>{
    setSaved(ENTRY_KEY,"yes");
-   state.entered=true;state.area=null;state.mode="demo";state.error="";state.toast="";
+   state.entered=true;state.area=null;state.mode="live";state.error="";state.toast="";
    setSaved(AREA_KEY,null);setSaved(STORE_KEY,null);render();
   });
   return;
@@ -181,12 +185,15 @@ function render(){
   root.innerHTML=renderAreaChoice();bindAreaButtons();bindExit();return;
  }
  if(state.area==="loja"&&state.needsStoreChoice&&!state.loading&&!(state.mode==="live"&&!state.session)){
-  root.innerHTML=renderStoreChoice(state.stores,state.mode,state.error);
+  root.innerHTML=renderStoreChoice(state.stores,state.error);
   bindAreaButtons();bindChangeArea();
-  root.querySelectorAll("[data-choose-store]").forEach(b=>b.addEventListener("click",()=>{
+  root.querySelectorAll("[data-choose-store]").forEach(b=>b.addEventListener("click",async()=>{
    const id=b.dataset.chooseStore;
    if(!operationalStores().some(s=>s.id===id))return;
-   state.storeId=id;state.needsStoreChoice=false;setSaved(STORE_KEY,id);loadModule();
+   state.storeId=id;state.needsStoreChoice=false;setSaved(STORE_KEY,id);
+   state.loading=true;render();
+   try{state.features=await getStoreFeatures(id);await loadModule()}
+   catch(error){state.loading=false;state.error="Funcionalidades: "+error.message;render()}
   }));
   return;
  }
@@ -200,15 +207,10 @@ function render(){
   if(!(state.area==="matriz"?matrixIds:storeIds).has(target))return;
   state.moduleId=target;state.toast="";loadModule();
  }));
- root.querySelectorAll("[data-mode]").forEach(b=>b.addEventListener("click",()=>{
-  const mode=b.dataset.mode;
-  if(!["demo","live"].includes(mode)||mode===state.mode)return;
-  state.mode=mode;state.error="";state.toast="";refreshStores();
- }));
  root.querySelector("#store")?.addEventListener("change",event=>{
   const id=event.target.value;
   if(!operationalStores().some(s=>s.id===id))return;
-  state.storeId=id;setSaved(STORE_KEY,id);loadModule();
+  state.storeId=id;setSaved(STORE_KEY,id);getStoreFeatures(id).then(f=>{state.features=f;loadModule()}).catch(error=>{state.error=error.message;render()});
  });
  root.querySelector("#choose-store")?.addEventListener("click",()=>{
   stopRequests();state.needsStoreChoice=true;render();
@@ -226,11 +228,12 @@ function bindForms(){
   event.preventDefault();
   const model=models[state.moduleId],row=state.editor?.record||{};
   if(!model||model.locked?.includes(row.status))return;
+  if(!canEditModule(state.area,state.moduleId,state.features)){state.error="Função não liberada nesta loja.";render();return}
   try{
    const payload=normalize(model,form,row,{storeId:state.storeId,userId:state.session?.user?.id});
    const saved=await saveRow(model,payload,row[model.id],state.mode);
    state.toast="Registro salvo.";
-   if(model.table==="stores")await refreshStores();else await loadModule();
+   await loadModule();
    const found=state.rows.find(x=>x.id===saved.id);
    if(found)await openEditor(found);
    render();
@@ -239,6 +242,7 @@ function bindForms(){
  root.querySelectorAll("[data-status]").forEach(b=>b.addEventListener("click",async()=>{
   const model=models[state.moduleId],row=state.editor?.record,status=b.dataset.status;
   if(!model||!row)return;
+  if(!canEditModule(state.area,state.moduleId,state.features)){state.error="Função não liberada nesta loja.";render();return}
   if(!confirm("Alterar status? Esta operação pode gerar movimentações de estoque."))return;
   try{
    if(model.line&&!state.lines.length&&status!=="cancelled")throw Error("Inclua itens antes de finalizar.");
