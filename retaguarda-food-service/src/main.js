@@ -3,8 +3,13 @@ import {supabase} from "./core/supabase.js";
 import {list} from "./core/db.js";
 import {loading,alertBox,errorMessage,toast} from "./core/ui.js";
 import {loginView,chooseView,passwordResetView} from "./areas/access.js";
-import {matrizShell,matrizModules,setMatrizActive,bindMatrizShell} from "./areas/matriz/shell.js";
-import {lojaShell,enabledModules,setLojaActive} from "./areas/loja/shell.js";
+import {matrizModules} from "./areas/matriz/shell.js";
+import {enabledModules} from "./areas/loja/shell.js";
+import {appShell,updateShell,bindAppShell,markStore} from "./areas/shell.js";
+
+const LAST_KEY="rfs-last-route";
+function lastRoute(){try{return localStorage.getItem(LAST_KEY)||""}catch{return ""}}
+function saveRoute(v){try{localStorage.setItem(LAST_KEY,v)}catch{}}
 
 const root=document.getElementById("app");
 const app={session:null,profile:null,memberships:[],stores:[],flags:{},isAdmin:false,loaded:false};
@@ -43,28 +48,42 @@ async function route(){
  const {area,parts}=parseRoute();
  const shops=app.stores.filter(s=>s.store_type==="operational");
  if(area==="matriz"){
-  if(!app.isAdmin)return renderChoose("Seu usuário não tem acesso administrativo à Matriz.");
+  if(!app.isAdmin)return go(shops[0]?"/loja/"+shops[0].id:"/escolher");
   const id=matrizModules.some(m=>m.id===parts[1])?parts[1]:"painel";
-  if("matriz"!==shellKey){root.innerHTML=matrizShell(app,id);shellKey="matriz";bindShell();bindMatrizShell(root)}
-  setMatrizActive(root,id);
+  ensureShell();updateShell(root,app,{area:"matriz",storeId:null,moduleId:id});markStore(root,"");
+  saveRoute("matriz");
   const mod=matrizModules.find(m=>m.id===id).mod;
   return runModule(seq,mod,{area:"matriz",params:parts.slice(2),storeId:null,store:null});
  }
  if(area==="loja"){
   const storeId=parts[1];
   const store=shops.find(s=>s.id===storeId);
-  if(!store)return renderChoose(storeId?"Loja não encontrada ou sem acesso.":"");
+  if(!store)return go(shops[0]?"/loja/"+shops[0].id:app.isAdmin?"/matriz":"/escolher");
   const mods=enabledModules(app,storeId);
   const id=mods.some(m=>m.id===parts[2])?parts[2]:"inicio";
-  const key="loja:"+storeId;
-  if(key!==shellKey){root.innerHTML=lojaShell(app,storeId,id);shellKey=key;bindShell()}
-  setLojaActive(root,id);
+  ensureShell();updateShell(root,app,{area:"loja",storeId,moduleId:id});markStore(root,storeId);
+  saveRoute("loja:"+storeId);
   const mod=mods.find(m=>m.id===id).mod;
   return runModule(seq,mod,{area:"loja",params:parts.slice(3),storeId,store});
  }
- // Sem rota: se só há um destino possível, entra direto.
- if(!app.isAdmin&&shops.length===1)return go("/loja/"+shops[0].id);
+ if(area==="escolher")return renderChoose(shops.length||app.isAdmin?"":"");
+ // Sem rota: volta ao último ambiente/loja usado.
+ const last=lastRoute();
+ if(last==="matriz"&&app.isAdmin)return go("/matriz");
+ if(last.startsWith("loja:")&&shops.some(s=>s.id===last.slice(5)))return go("/loja/"+last.slice(5));
+ if(shops.length)return go("/loja/"+shops[0].id);
+ if(app.isAdmin)return go("/matriz");
  renderChoose();
+}
+
+function ensureShell(){
+ if(shellKey==="app"&&root.querySelector("#shell"))return;
+ root.innerHTML=appShell(app);shellKey="app";
+ bindAppShell(root,app,{
+  onSignOut:signOut,
+  onStore:id=>{const {area,parts}=parseRoute();const mod=area==="loja"?parts[2]:"";go("/loja/"+encodeURIComponent(id)+(mod?"/"+mod:""))},
+  onEnv:v=>{if(v==="matriz")go("/matriz");else{const last=lastRoute();const sid=last.startsWith("loja:")?last.slice(5):app.stores.find(s=>s.store_type==="operational")?.id;go("/loja/"+encodeURIComponent(sid||""))}}
+ });
 }
 
 async function runModule(seq,mod,info){
@@ -79,12 +98,6 @@ async function runModule(seq,mod,info){
  catch(error){if(seq===renderSeq)el.innerHTML=alertBox(errorMessage(error))}
 }
 
-function bindShell(){
- root.querySelectorAll("[data-signout]").forEach(b=>b.addEventListener("click",signOut));
- root.querySelector("#store-switch")?.addEventListener("change",ev=>{
-  const mod=parseRoute().parts[2]||"";go("/loja/"+encodeURIComponent(ev.target.value)+(mod?"/"+mod:""));
- });
-}
 async function signOut(){
  await supabase.auth.signOut();
  app.loaded=false;shellKey="";history.replaceState(null,"",location.pathname);route();
