@@ -1,27 +1,17 @@
-# Integração com o Supabase
+# Integração Supabase — Retaguarda MFT
 
-Projeto conectado: **Retaguarda MFT** — `nngcbrqemhnbyqjjdnlh`.
-URL pública: `https://nngcbrqemhnbyqjjdnlh.supabase.co`.
+Projeto: `nngcbrqemhnbyqjjdnlh`.
+Cliente: `src/core/supabase.js`.
+Configuração pública: `src/core/config.js`.
 
-A camada `src/core/supabase.js` instancia o cliente oficial no navegador com uma **chave publicável**.
-A camada `src/core/api.js` concentra as consultas e faz o filtro por unidade quando aplicável.
-Cada módulo contém seu próprio arquivo `index.js` com campos e tabela.
+**Somente Supabase.** O modo de dados fictícios e o armazenamento local de registros foram retirados.
 
-## Estado atual
+As unidades são compartilhadas em um único projeto, com tabelas operacionais isoladas por `store_id`, políticas RLS e integridade referencial. A unidade Teste é `teste`.
 
-- A instância Supabase foi encontrada ativa e com as tabelas esperadas.
-- Não há usuários em `public.user_profiles` e os módulos reais exigem login e associação autorizada no banco.
-- RLS existente **não foi alterado**, nem foi adicionada política de leitura anônima.
-- No modo Supabase, a aplicação é **somente leitura**; no modo demonstração, os dados fictícios permanecem no navegador.
-- O projeto compartilha o backend existente Retaguarda MFT. Se for necessária independência entre protótipos, crie um projeto Supabase separado antes de usar dados reais.
-- Nenhuma chave `service_role` ou secret foi adicionada ao repositório.
+`stores`: SELECT para usuários autenticados com vínculo, escrita revogada. Novas lojas somente pelo painel administrativo do Supabase.
 
-## Próximos passos
+`store_feature_flags`: SELECT sujeito a RLS; escrita não concedida a usuários comuns. A função `mft_private.has_tab_access` exige a flag ativa ao gravar um módulo; além disso, políticas restritivas exigem aprovação da loja destino para transferências e habilitação de catálogo para vínculos `store_item_suppliers`.
 
-1. Configurar usuários reais no Auth, perfis e permissões por unidade.
-2. Validar cada tela com login de teste que tenha acesso autorizado.
-3. Planejar gravações com validações e testes de RLS para cada módulo.
-4. Adicionar Storage privado para anexos com regras por unidade e tipo de documento.
-5. Evoluir o frontend para um fluxo com build e testes automatizados antes de produção.
+Os módulos exibem dados conforme a sessão autorizada. No futuro, liberar funcionalidades por loja exige habilitar sua respectiva flag no Supabase.
 
-Referências: https://supabase.com/docs/guides/database/postgres/row-level-security e https://supabase.com/docs/reference/javascript/initializing
+**Não usar service_role no frontend**. Validar login, escrita e RLS por loja antes de produção.
