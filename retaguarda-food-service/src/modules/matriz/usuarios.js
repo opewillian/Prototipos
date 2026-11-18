@@ -36,15 +36,24 @@ function manage(ctx,p,mem,perms){
  const isSelf=p.user_id===ctx.userId;
  const m=sid=>mem.find(x=>x.store_id===sid);
  const perm=(sid,tab)=>perms.find(x=>x.store_id===sid&&x.tab_code===tab);
- const body=(isSelf?alertBox("Você não pode alterar o próprio acesso administrativo.","info"):'')+
-  '<div class="form-section"><h3>Matriz</h3>'+toggle("admin",!!(m("matriz")?.active&&m("matriz")?.role==="matrix_admin"),"Administrador da Matriz (acesso a todas as lojas e cadastros)")+'</div>'+
-  stores.map(s=>{const x=m(s.id);
-   return '<div class="form-section card" style="padding:16px;margin-top:14px"><h3 style="margin-bottom:10px">'+e(s.name)+'</h3><div class="form-grid">'+
-    field("Papel nesta loja",select("role:"+s.id,ROLES.filter(r=>r[0]!=="matrix_admin"),x?.active?x.role:"",{placeholder:"Sem acesso"}))+'<div></div></div>'+
-    '<table class="table" style="margin-top:12px"><thead><tr><th>Módulo</th><th>Ver</th><th>Editar</th></tr></thead><tbody>'+TABS.map(([t,l])=>{const pp=perm(s.id,t);
-     return '<tr><td>'+e(l)+'</td><td><input type="checkbox" name="v:'+e(s.id)+':'+t+'"'+(pp?pp.can_view?" checked":"":" checked")+'></td><td><input type="checkbox" name="e:'+e(s.id)+':'+t+'"'+(pp?pp.can_edit?" checked":"":" checked")+'></td></tr>'}).join("")+'</tbody></table></div>';
-  }).join("");
- openDrawer({title:p.display_name||"Usuário",wide:true,body,onSubmit:async form=>{
+ const isAdmin=!!(m("matriz")?.active&&m("matriz")?.role==="matrix_admin");
+ // Sem permissão gravada: gerente/operador veem e editam; consulta só vê.
+ const def=(role,kind)=>kind==="v"?true:role!=="viewer";
+ const body='<div class="form-section"><h3>Matriz</h3>'+
+  (isSelf?'<label class="switch"><input type="checkbox" name="admin"'+(isAdmin?" checked":"")+' disabled><span class="switch-track"></span><span>Administrador da Matriz</span></label><p class="field-hint" style="margin:6px 0 0">Você não pode alterar o próprio acesso administrativo.</p>'
+   :toggle("admin",isAdmin,"Administrador da Matriz")+'<p class="field-hint" style="margin:6px 0 0">Acesso a todas as lojas, cadastros e acompanhamento.</p>')+'</div>'+
+  '<div class="form-section"><h3>Lojas</h3>'+
+  stores.map(s=>{const x=m(s.id);const role=x?.active?x.role:"";
+   return '<div class="access-store'+(role?"":" off")+'" data-store="'+e(s.id)+'"><div class="access-head"><strong>'+e(s.name)+'</strong>'+
+    select("role:"+s.id,ROLES.filter(r=>r[0]!=="matrix_admin"),role,{placeholder:"Sem acesso",attrs:'data-role aria-label="Papel em '+e(s.name)+'"'})+'</div>'+
+    '<div class="access-body"><div class="perm-grid">'+TABS.map(([t,l])=>{const pp=perm(s.id,t);
+     const v=pp?pp.can_view:def(role,"v"),ed=pp?pp.can_edit:def(role,"e");
+     return '<div class="perm"><span class="perm-name">'+e(l)+'</span><span class="perm-opts">'+
+      '<label><input type="checkbox" name="v:'+e(s.id)+':'+t+'"'+(v?" checked":"")+'>Ver</label>'+
+      '<label><input type="checkbox" name="e:'+e(s.id)+':'+t+'"'+(ed?" checked":"")+'>Editar</label></span></div>'}).join("")+'</div>'+
+    '<div class="access-tools"><button type="button" class="btn btn-ghost btn-sm" data-all="edit">Liberar tudo</button><button type="button" class="btn btn-ghost btn-sm" data-all="view">Somente consulta</button></div></div></div>';
+  }).join("")+'</div>';
+ const dr=openDrawer({title:p.display_name||"Usuário",wide:true,body,onSubmit:async form=>{
   const f=form.elements;
   if(!isSelf){
    const wantAdmin=f.admin.checked,cur=m("matriz");
@@ -64,6 +73,21 @@ function manage(ctx,p,mem,perms){
   }
   toast("Acessos atualizados.");ctx.reload();
  }});
+ const form=dr.el;
+ form.querySelectorAll("[data-role]").forEach(sel=>sel.addEventListener("change",()=>{
+  const box=sel.closest(".access-store");box.classList.toggle("off",!sel.value);
+  if(sel.value==="viewer")box.querySelectorAll('input[name^="e:"]').forEach(i=>i.checked=false);
+ }));
+ // Editar implica Ver; tirar Ver tira Editar.
+ form.addEventListener("change",ev=>{
+  const n=ev.target.name||"";if(!/^[ve]:/.test(n))return;
+  const [k,sid,t]=n.split(":");const other=form.elements[(k==="v"?"e":"v")+":"+sid+":"+t];
+  if(k==="e"&&ev.target.checked)other.checked=true;
+  if(k==="v"&&!ev.target.checked)other.checked=false;
+ });
+ form.querySelectorAll("[data-all]").forEach(b=>b.onclick=()=>{
+  b.closest(".access-store").querySelectorAll(".perm").forEach(pr=>{const [v,ed]=pr.querySelectorAll("input");v.checked=true;ed.checked=b.dataset.all==="edit"});
+ });
 }
 async function upsertMember(user_id,store_id,role,active,cur){
  if(cur){const {error}=await supabase.from("store_memberships").update({role,active}).eq("user_id",user_id).eq("store_id",store_id);if(error)throw error;return}
