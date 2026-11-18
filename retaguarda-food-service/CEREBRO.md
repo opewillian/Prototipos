@@ -574,6 +574,19 @@ Situação: **Implementado → Testando em Teste** (não homologado). Arquivo pr
 
 **Pendências:** executar os dois SQL; confirmar `component_type` do CMV; criação de logins de novos usuários só pelo painel do Supabase (exige service role); sugestão de compra depende de duas contagens finalizadas em datas diferentes.
 
+### Layout único inspirado no Degust — 18/11/2026 (versão 1.1)
+
+**Pedido do usuário:** não gostou do layout separado nem da forma de trocar de loja; pediu para se inspirar no Degust One (Linx), analisado em navegador com login do usuário, somente leitura.
+
+**O que mudou:**
+- Matriz e Loja passam a usar **uma única estrutura**: menu lateral vinho, recolhível (ícones ↔ nomes), com busca no menu e grupos (Loja: Início, Estoque, Compras, Análise; Matriz: Painel, Pedidos das lojas, Cadastros).
+- **Barra superior fixa** com **Ambiente** (Matriz/Loja, só aparece se houver as duas opções) e **Loja pesquisável** (nome e código, teclado e Ctrl+K). Trocar a loja mantém o módulo aberto.
+- Sem tela de escolha após o login: abre o último ambiente/loja usado (localStorage `rfs-last-route`).
+- Visual: indicadores com faixa lateral colorida, cabeçalho de tabela em vinho, títulos de página e de cartões em caixa alta.
+- Arquivos: `src/areas/shell.js` (estrutura), `src/areas/matriz/shell.js` e `src/areas/loja/shell.js` viraram apenas registros de módulos.
+
+**Decisão anterior substituída:** "Matriz e Loja não devem ser um painel único com menus diferentes" / identidades visuais distintas. Justificativa: pedido explícito do usuário de seguir o modelo do Degust, em que a troca de contexto é feita na barra superior. A separação de dados, permissões e módulos entre Matriz e Loja continua igual.
+
 ## 11. Diretrizes visuais e de experiência
 
 **Identidade (versão 1.0):** marca MFT — vinho #85071D (principal), grafite #595959, fundo claro; títulos Montserrat, texto Inter. Matriz com menu lateral grafite; Loja com barra vinho e navegação horizontal. Substitui grafite/cobre e verde do protótipo. Módulos sem flag liberada não aparecem no menu (sem rótulo "Aguardando liberação").
@@ -726,6 +739,7 @@ Depois:
 | Identidade (18/11/2026) | Marca MFT (vinho/grafite, logo) nos dois ambientes |
 | Entrada (18/11/2026) | Tela inicial é o login real; escolha de ambiente depois |
 | Módulos não liberados (18/11/2026) | Ocultos no menu da loja, sem rótulos de protótipo |
+| Layout (18/11/2026, v1.1) | Estrutura única estilo Degust: menu lateral recolhível + barra com Ambiente e Loja pesquisável |
 
 ---
 
