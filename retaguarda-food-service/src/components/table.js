@@ -1,5 +1,5 @@
 import {escapeHtml,displayValue} from "../core/format.js";
-import {statusLabels,models} from "../core/models.js";
+import {statusLabels,listTypeLabels,models} from "../core/models.js";
 export function renderTable(rows,columns){
  if(!rows?.length)return '<div class="empty"><div class="empty-icon">▤</div><strong>Nenhum registro disponível</strong><p>Crie um registro ou verifique o acesso à unidade.</p></div>';
  const head=columns.map(c=>'<th>'+escapeHtml(c.label)+'</th>').join("");
@@ -19,7 +19,7 @@ export function renderList(descriptor,rows,_mode,canEdit=false){
  "Supabase · Dados autorizados"+'</small></div>'+
  (rows.length?'<div class="table-scroll"><table><thead><tr>'+descriptor.columns.map(c=>'<th>'+escapeHtml(c.label)+'</th>').join("")+
  '<th>Ação</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+descriptor.columns.map(c=>{
-  const raw=r[c.key],text=c.kind==="status"?(statusLabels[raw]||raw):displayValue(raw,c.kind);
+  const raw=r[c.key],text=c.kind==="status"?(statusLabels[raw]||raw):c.kind==="listType"?(listTypeLabels[raw]||raw):displayValue(raw,c.kind);
   return '<td>'+escapeHtml(text)+'</td>';
  }).join("")+'<td>'+(editable?'<button type="button" class="table-edit" data-edit-record="'+escapeHtml(r.id)+'">Abrir</button>':"—")+'</td></tr>').join("")+
  '</tbody></table></div>':renderTable([],descriptor.columns))+'</section>'+(!canEdit&&!!models[descriptor.id]&&!models[descriptor.id].readOnly?'<div class="note">Gravações ainda não liberadas para esta unidade.</div>':"");

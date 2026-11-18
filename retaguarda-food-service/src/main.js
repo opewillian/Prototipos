@@ -48,8 +48,12 @@ async function initialize(){
   state.session=data.session;
  }catch(error){state.error="Sessão Supabase: "+error.message}
  supabase.auth.onAuthStateChange((_event,session)=>{
+  // Renovação de token (TOKEN_REFRESHED) e INITIAL_SESSION não trocam o usuário:
+  // recarregar aqui fecharia formulários abertos e duplicaria consultas.
+  const changedUser=(state.session?.user?.id||null)!==(session?.user?.id||null);
   state.session=session;
-  if(state.area)Promise.resolve().then(refreshStores);
+  // setTimeout evita chamar o Supabase dentro do callback de autenticação (risco de bloqueio).
+  if(changedUser&&state.area)setTimeout(refreshStores,0);
  });
  if(state.entered&&state.area)await refreshStores();
  else render();

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "node scripts/build.mjs --check",
-    "test": "node scripts/check-areas.mjs",
-    "build": "node scripts/check-areas.mjs && node scripts/build.mjs"
+    "test": "node scripts/check-areas.mjs && node scripts/check-rules.mjs",
+    "build": "npm run test && node scripts/build.mjs"
   }
 }

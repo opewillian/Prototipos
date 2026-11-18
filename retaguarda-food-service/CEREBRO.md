@@ -454,6 +454,45 @@ A última inspeção da unidade Teste mostrou a loja provisionada e **sem itens,
 - Visibilidade via menu não é autorização.
 - Revisar fluxo real de login e evento de sessão para evitar consulta com usuário não autenticado.
 
+### Auditoria técnica de 18/11/2026 (segunda sessão)
+
+**Como foi feita:** leitura integral do código, `npm run test`/`npm run build`, comparação do site publicado com o HEAD da main (idênticos), sondagem da API REST com a chave publicável sem login e navegação no site publicado pelo Chrome.
+
+**Limites desta auditoria (não inventar resultados):**
+- Não houve login: a IA não digita senhas. Fluxos autenticados (Matriz, Loja Teste, gravações, status, gatilhos) **não foram testados no navegador**.
+- O conector Supabase disponível na sessão pertence a outra conta; o esquema, as políticas RLS, os gatilhos e a contagem de registros do projeto `nngcbrqemhnbyqjjdnlh` **não foram inspecionados**. Os nomes de colunas usados no código não foram confrontados com o banco.
+
+**Verificado:**
+- Sem login, todas as tabelas e views (stores, items, suppliers, listas, contagens, pedidos, notas, flags, perfis, vínculos, saldo, último custo) respondem `permission denied` ao papel anon.
+- Tela de entrada, escolha de ambiente e tela de login da Loja carregam sem erros de console.
+- CI (GitHub Actions) verde nos últimos runs; build executa testes.
+
+**Diagnóstico por módulo (código):**
+
+| Módulo | Situação |
+| --- | --- |
+| Entrada / ambientes / login | Implementado; login real não testado nesta sessão |
+| Matriz · Painel, Unidades, Usuários, Pedidos | Somente consulta; contagens limitadas a 200 registros |
+| Matriz · Itens e Fornecedores | CRUD genérico; sem busca/filtro, sem vínculo item × loja × fornecedor |
+| Listas | Cabeçalho + incluir/remover itens (bloqueia duplicado no front); sem busca, impressão ou reutilização |
+| Contagem | Linhas manuais; **não carrega lista**, **custo não vem da última nota**, sem total da contagem, sem edição de linha |
+| Pedidos de compra | Campos de lista/contagem existem mas **não carregam itens**; sugestão não calculada; status sem ordem de transição |
+| Notas fiscais | Cabeçalho + itens; sem pagamentos/anexos; recebimento depende de gatilho não verificado |
+| Transferências | Cabeçalho + itens; colunas mostram IDs das lojas |
+| Perdas | Cabeçalho + itens |
+| CMV | Somente leitura de fechamentos; geração não implementada |
+
+**Correções aplicadas (branch fix/auditoria-estabilidade):**
+1. Checkboxes "Compõe CMV" e "Ativo/Ativa" estavam **sem rótulo** (função `bool` chamada sem label).
+2. Total da linha do pedido usava a quantidade **contada** quando preenchida; agora usa a **solicitada** (`lineQuantityField` em models.js).
+3. Editar uma transferência pela loja destino sobrescrevia `from_store_id` com a loja atual; agora a loja do documento é preservada na edição (vale também para `store_id`).
+4. Renovação automática do token (TOKEN_REFRESHED) e INITIAL_SESSION recarregavam a tela e **fechavam formulários abertos**; agora só há recarga quando o usuário muda (login/logout), chamada fora do callback de autenticação.
+5. Itens/fornecedores/listas inativos não são oferecidos em novos lançamentos (permanecem visíveis se já gravados).
+6. "Aguardando liberação" não aparece mais antes do login/seleção de loja; tipo de lista exibido em português; erro de digitação "RETAgUARDA".
+7. Novo `scripts/check-rules.mjs` (incluído em `npm run test`): zero válido, vazio ≠ zero, decimais com vírgula, negativos recusados, total por quantidade correta, loja preservada, Matriz não operacional, datas da nota, rótulos.
+
+**Bloqueios para continuar:** (a) login do usuário no navegador para testes funcionais na Teste; (b) acesso ao projeto Supabase Retaguarda MFT (conector da conta correta ou exportação do esquema/políticas/gatilhos) antes de qualquer trabalho que dependa do banco.
+
 ---
 
 ## 11. Diretrizes visuais e de experiência
@@ -641,5 +680,7 @@ Depois:
 ### Registro de referência
 
 **18/11/2026 — consolidação inicial:** documento criado a partir do histórico de desenvolvimento e da inspeção dos arquivos principais da branch main. Estado informado: Supabase e Cloudflare conectados; Matriz/Loja separados; sem dados fictícios; Teste provisionada; cadastro de lojas bloqueado; homologação funcional dos módulos ainda em evolução.
+
+**18/11/2026 — auditoria técnica:** ver "Auditoria técnica de 18/11/2026" na seção 10. Próxima entrega planejada após os bloqueios: Fase 2 (vínculo item × loja × fornecedor, busca em Itens/Fornecedores) e depois Listas → Contagem (carregar lista com merge, custo da última nota com fallback, totais, finalização).
 
 **Este arquivo não é uma especificação congelada.** Deve evoluir junto do produto, mas decisões não devem desaparecer sem explicação ou aprovação explícita.

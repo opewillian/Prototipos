@@ -14,10 +14,10 @@ export const models = {
  matriz:{table:"items",id:"id",scope:false,fields:[
   txt("code","Código",true),txt("name","Nome do item",true),txt("category","Categoria"),
   txt("base_unit","Unidade de medida",true),num("default_unit_cost","Custo padrão",true),
-  num("minimum_stock","Estoque mínimo"),bool("composes_cmv"),bool("active")]},
+  num("minimum_stock","Estoque mínimo"),bool("composes_cmv","Compõe CMV"),bool("active","Ativo")]},
  fornecedores:{table:"suppliers",id:"id",scope:false,fields:[
   txt("code","Código"),txt("name","Razão social ou nome",true),
-  txt("tax_id","Documento"),txt("email","E-mail"),txt("phone","Telefone"),bool("active")]},
+  txt("tax_id","Documento"),txt("email","E-mail"),txt("phone","Telefone"),bool("active","Ativo")]},
  contagem:{table:"stock_counts",id:"id",scope:true,fields:[
   txt("display_id","Identificador",true),date("count_date","Data da contagem",true),
   txt("notes","Observações")],status:{field:"status",allowed:["draft","finalized","cancelled"]},
@@ -56,7 +56,7 @@ export const models = {
  usuarios:{table:"user_profiles",id:"user_id",scope:false,readOnly:true,fields:[]},
  listas:{table:"purchase_lists",id:"id",scope:true,fields:[
   txt("name","Nome da lista",true),sel("list_type","Utilização",[
-    ["both","Contagem e compra"],["count","Contagem"],["order","Compra"]]),bool("active")],
+    ["both","Contagem e compra"],["count","Contagem"],["order","Compra"]]),bool("active","Ativa")],
   line:{table:"purchase_list_items",fk:"list_id",fields:[ref("item_id","Item","items",true)]}},
  perdas:{table:"losses",id:"id",scope:true,fields:[
   txt("reason","Motivo",true),date("loss_date","Data da perda",true)],
@@ -64,6 +64,12 @@ export const models = {
   line:{table:"loss_items",fk:"loss_id",fields:[
    ref("item_id","Item","items",true),num("quantity","Quantidade",true),num("unit_cost","Custo unitário",true)]}}
 };
+// Campo de quantidade que compõe o total de cada tipo de linha.
+export const lineQuantityField = {
+ stock_count_items:"counted_quantity", invoice_items:"quantity", transfer_items:"quantity",
+ loss_items:"quantity", purchase_order_items:"requested_quantity"
+};
+export const listTypeLabels = {both:"Contagem e compra",count:"Contagem",order:"Compra"};
 export const TODAY = () => new Date().toLocaleDateString("en-CA");
 export function normalize(model, form, row={}, {storeId,userId,child=false,parentId}={}) {
   const schema = child ? model.line : model;
@@ -85,14 +91,15 @@ export function normalize(model, form, row={}, {storeId,userId,child=false,paren
       if(model.table==="transfers") {result.from_store_id=row.from_store_id||storeId;result.to_store_id=row.to_store_id;}
       else result.store_id=storeId;
     }
-    const qty=Number(result.quantity??result.counted_quantity??result.requested_quantity??0);
+    const qty=Number(result[lineQuantityField[schema.table]]??0);
     if(["invoice_items","transfer_items","loss_items"].includes(schema.table) && qty<=0) throw Error("A quantidade precisa ser maior que zero.");
     if(["stock_count_items","invoice_items","transfer_items","loss_items","purchase_order_items"].includes(schema.table)){
       result.line_total=Math.round(qty*Number(result.unit_cost||0)*100)/100;
     }
   } else if(model.scope){
-    if(model.table==="transfers") result.from_store_id=storeId;
-    else result.store_id=storeId;
+    // Em edição, a loja do documento nunca muda (ex.: transferência aberta pela loja destino).
+    if(model.table==="transfers") result.from_store_id=row.from_store_id||storeId;
+    else result.store_id=row.store_id||storeId;
     if(!storeId) throw Error("Selecione uma unidade.");
     if(storeId==="matriz") throw Error("Cadastros operacionais pertencem a uma loja. Selecione uma unidade operacional.");
   }

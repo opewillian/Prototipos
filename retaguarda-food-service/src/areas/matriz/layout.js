@@ -12,7 +12,7 @@ export function matrixLayout(state,content){
  return '<div class="mat-shell"><aside class="mat-sidebar"><div class="mat-brand"><b>M</b><span>Retaguarda<small>ADMINISTRAÇÃO CENTRAL</small></span></div>'+
   '<div class="mat-context"><small>AMBIENTE</small><strong>Matriz</strong><span>Gestão corporativa</span></div><nav class="mat-nav" aria-label="Menu da Matriz">'+nav+'</nav>'+
   '<div class="mat-sidebar-foot">Painel administrativo</div></aside><div class="mat-work"><header class="mat-top"><span>Administração / <strong>'+e(current.label)+'</strong></span>'+commonActions(state)+'</header>'+
-  '<main class="mat-content"><div class="mat-heading"><div><small>RETAgUARDA / MATRIZ</small><h1>'+e(current.label)+'</h1><p>Cadastros e acompanhamento central da operação.</p></div>'+sourceControl(state)+'</div>'+
+  '<main class="mat-content"><div class="mat-heading"><div><small>RETAGUARDA / MATRIZ</small><h1>'+e(current.label)+'</h1><p>Cadastros e acompanhamento central da operação.</p></div>'+sourceControl(state)+'</div>'+
   modeNote(state)+(state.error?'<div class="error-box" role="alert">'+e(state.error)+'</div>':"")+accessBody(state,content)+
   '<footer class="mat-footer">Retaguarda Food Service · Matriz</footer></main></div></div>';
 }

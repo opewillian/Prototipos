@@ -12,7 +12,8 @@ function control(field,record,lookups,editing){
  if(field.type==="checkbox")return '<label class="check-field"><input type="checkbox"'+common+(current===true||(!record&&["active","composes_cmv"].includes(field.key))?" checked":"")+' '+disabled+'> '+safe(field.label)+'</label>';
  if(field.type==="select"||field.type==="lookup"){
   let options=field.options||[];
-  if(field.type==="lookup")options=(lookups[field.lookup]||[]).map(r=>[r.id,r.name||r.display_id||r.number||r.code||r.id]);
+  // Itens/fornecedores/listas inativos não são oferecidos, exceto se já estiverem gravados no registro.
+  if(field.type==="lookup")options=(lookups[field.lookup]||[]).filter(r=>r.active!==false||String(r.id)===String(value)).map(r=>[r.id,r.name||r.display_id||r.number||r.code||r.id]);
   return '<label class="form-field">'+safe(field.label)+'<select'+common+req+disabled+'><option value="">Selecione</option>'+
    options.map(([id,name])=>'<option value="'+safe(id)+'"'+(String(id)===String(value)?" selected":"")+'>'+safe(name)+'</option>').join("")+
    '</select></label>';

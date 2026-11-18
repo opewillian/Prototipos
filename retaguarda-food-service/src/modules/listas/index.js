@@ -11,7 +11,7 @@ export default {
   orderBy:"created_at",
   columns:[
     {key:"name",label:"Nome"},
-    {key:"list_type",label:"Utilização"},
+    {key:"list_type",label:"Utilização",kind:"listType"},
     {key:"active",label:"Ativa",kind:"boolean"}
   ]
 };
