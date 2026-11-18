@@ -62,10 +62,7 @@ export const models = {
   txt("reason","Motivo",true),date("loss_date","Data da perda",true)],
   status:{field:"status",allowed:["draft","recorded","cancelled"]},locked:["recorded","cancelled"],
   line:{table:"loss_items",fk:"loss_id",fields:[
-   ref("item_id","Item","items",true),num("quantity","Quantidade",true),num("unit_cost","Custo unitário",true)]}},
- lojas:{table:"stores",id:"id",scope:false,fields:[
-  txt("id","Identificador",true),txt("code","Código",true),txt("name","Nome",true),
-  sel("store_type","Tipo",[["operational","Operacional"],["matrix","Matriz"]]),bool("active")]}
+   ref("item_id","Item","items",true),num("quantity","Quantidade",true),num("unit_cost","Custo unitário",true)]}}
 };
 export const TODAY = () => new Date().toLocaleDateString("en-CA");
 export function normalize(model, form, row={}, {storeId,userId,child=false,parentId}={}) {

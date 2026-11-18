@@ -4,8 +4,8 @@ export default {
   title:"Cadastro de lojas",
   group:"MATRIZ",
   initials:"LJ",
-  description:"Cadastro das unidades operacionais, administrado pela Matriz.",
-  table:"stores",
+  description:"Unidades existentes no Supabase. Não é possível cadastrar, editar ou excluir lojas pela retaguarda.",
+  readOnly:true,table:"stores",
   orderBy:"name",
   columns:[
     {key:"code",label:"Código"},
