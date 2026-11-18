@@ -12,7 +12,7 @@ function apply(q,opts){
  for(const [k,v] of Object.entries(opts.neq||{}))q=q.neq(k,v);
  if(opts.or)q=q.or(opts.or);
  if(opts.order)q=q.order(opts.order,{ascending:opts.asc===true,nullsFirst:false});
- if(opts.order2)q=q.order(opts.order2,{ascending:opts.asc2===true});
+ if(opts.order2)q=q.order(opts.order2,{ascending:opts.asc2===true,nullsFirst:false});
  return q;
 }
 export async function list(table,opts={}){

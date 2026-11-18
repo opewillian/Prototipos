@@ -10,13 +10,15 @@ export async function computeCMV(storeId,startId,endId){
  const [c1,c2,items]=await Promise.all([get("stock_counts",startId),get("stock_counts",endId),loadItems()]);
  if(c1.store_id!==storeId||c2.store_id!==storeId)throw Error("Contagens de outra loja.");
  if(c1.status!=="finalized"||c2.status!=="finalized")throw Error("Use apenas contagens finalizadas.");
- if(String(c2.count_date)<=String(c1.count_date))throw Error("A contagem final deve ser posterior à inicial.");
+ if(String(c2.count_date)<String(c1.count_date)||String(c2.finalized_at)<=String(c1.finalized_at))throw Error("A contagem final deve ser posterior à inicial.");
  const map=byId(items);const cmvItem=id=>map.get(id)?.composes_cmv!==false;
+ // Período exato: entre a finalização das duas contagens (mesmo dia também é aceito).
+ const from=c1.finalized_at,to=c2.finalized_at;
  const [l1,l2,invs,trs,losses]=await Promise.all([
   list("stock_count_items",{eq:{count_id:startId}}),list("stock_count_items",{eq:{count_id:endId}}),
-  list("invoices",{select:"id,invoice_number,entry_date",eq:{store_id:storeId,status:"received"},gt:{entry_date:c1.count_date},lte:{entry_date:c2.count_date}}),
-  list("transfers",{select:"id,number,from_store_id,to_store_id,issued_at",eq:{status:"issued"},or:"from_store_id.eq."+storeId+",to_store_id.eq."+storeId,gt:{issued_at:c1.finalized_at},lte:{issued_at:c2.finalized_at}}),
-  list("losses",{select:"id,loss_date,reason",eq:{store_id:storeId,status:"recorded"},gt:{loss_date:c1.count_date},lte:{loss_date:c2.count_date}})
+  list("invoices",{select:"id,invoice_number,entry_date",eq:{store_id:storeId,status:"received"},gt:{received_at:from},lte:{received_at:to}}),
+  list("transfers",{select:"id,number,from_store_id,to_store_id,issued_at",eq:{status:"issued"},or:"from_store_id.eq."+storeId+",to_store_id.eq."+storeId,gt:{issued_at:from},lte:{issued_at:to}}),
+  list("losses",{select:"id,loss_date,reason",eq:{store_id:storeId,status:"recorded"},gt:{created_at:from},lte:{created_at:to}})
  ]);
  const [invLines,trLines,lossLines]=await Promise.all([
   list("invoice_items",{in:{invoice_id:invs.map(i=>i.id)}}),list("transfer_items",{in:{transfer_id:trs.map(t=>t.id)}}),list("loss_items",{in:{loss_id:losses.map(l=>l.id)}})
@@ -42,7 +44,7 @@ export async function render(ctx){
  if(ctx.params[0])return detail(ctx,ctx.params[0]);
  const [closings,counts]=await Promise.all([
   list("cmv_closings",{eq:{store_id:ctx.storeId},order:"end_date"}),
-  list("stock_counts",{select:"id,display_id,count_date",eq:{store_id:ctx.storeId,status:"finalized"},order:"count_date"})
+  list("stock_counts",{select:"id,display_id,count_date",eq:{store_id:ctx.storeId,status:"finalized"},order:"count_date",order2:"finalized_at"})
  ]);
  if(!ctx.isCurrent())return;
  const last=closings[0];

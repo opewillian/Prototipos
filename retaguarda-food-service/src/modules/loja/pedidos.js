@@ -40,7 +40,7 @@ export async function render(ctx){
 async function newOrder(ctx){
  const [lists,counts]=await Promise.all([
   list("purchase_lists",{eq:{store_id:ctx.storeId,active:true},order:"name",asc:true}),
-  list("stock_counts",{select:"id,display_id,count_date",eq:{store_id:ctx.storeId,status:"finalized"},order:"count_date",limit:20})
+  list("stock_counts",{select:"id,display_id,count_date,finalized_at",eq:{store_id:ctx.storeId,status:"finalized"},order:"count_date",order2:"finalized_at",limit:20})
  ]);
  const buyLists=lists.filter(l=>l.list_type!=="count");
  openDrawer({title:"Novo pedido de compra",submitLabel:"Criar e calcular sugestão",body:'<div class="form-grid">'+
@@ -166,7 +166,14 @@ async function detail(ctx,id){
   ctx.el.querySelectorAll("tr[data-id] input").forEach(i=>{i.addEventListener("change",()=>saveLine(i.closest("tr")));i.addEventListener("focus",()=>i.select())});
   ctx.el.querySelectorAll("[data-sup]").forEach(s=>s.addEventListener("change",async()=>{
    const r=rows.find(x=>x.id===s.closest("tr").dataset.id);
-   try{Object.assign(r,await update("purchase_order_items",r.id,{supplier_id:s.value||null}));draw()}catch(error){toast(errorMessage(error),"danger")}
+   try{
+    // O banco exige o vínculo loja × item × fornecedor; cria-o quando ainda não existe.
+    if(s.value&&!links.some(l=>l.item_id===r.item_id&&l.supplier_id===s.value)){
+     const first=!links.some(l=>l.item_id===r.item_id);
+     links.push(await insert("store_item_suppliers",{store_id:ctx.storeId,item_id:r.item_id,supplier_id:s.value,preferred:first,active:true}));
+    }
+    Object.assign(r,await update("purchase_order_items",r.id,{supplier_id:s.value||null}));draw()
+   }catch(error){toast(errorMessage(error),"danger");draw()}
   }));
   ctx.el.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
    const rid=b.closest("tr").dataset.id;try{await remove("purchase_order_items",rid);rows=rows.filter(r=>r.id!==rid);draw()}catch(error){toast(errorMessage(error),"danger")}
