@@ -1,37 +1,30 @@
-# Publicação com Cloudflare Pages
+# Cloudflare Pages — Retaguarda Food Service
 
-Repositório: `opewillian/Prototipos` (privado).
-Aplicação: `retaguarda-food-service/`.
+URL pública: https://retaguarda-food-service.pages.dev
 
-No Cloudflare Dashboard, vá até Workers & Pages, crie um projeto **Pages** e selecione **Import an existing Git repository**. Autorize o GitHub e escolha `opewillian/Prototipos`.
-
-## Configurações do deploy
+A publicação é automática pelo GitHub, com:
 
 | Campo | Valor |
-| --- | --- |
-| Nome sugerido | `retaguarda-food-service` |
-| Production branch | `main` |
-| Framework preset | `None` |
-| Root directory (advanced) | `retaguarda-food-service` |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
+|---|---|
+| Repositório | `opewillian/Prototipos` |
+| Branch | `main` |
+| Diretório raiz | `retaguarda-food-service` |
+| Build | `npm run build` |
+| Saída | `dist` |
 
-O script `scripts/build.mjs` faz validação sintática e de imports e publica somente os diretórios `src/` e `assets/`, além do `index.html`. Outras pastas do repositório não serão expostas pelo Pages.
+O script de build executa os testes de interface, valida sintaxe e imports JavaScript e copia apenas `index.html`, `src/` e `assets/` para o site publicado.
 
-A integração com Supabase usa chave **publicável**, não uma chave secreta. O navegador acessa dados reais somente mediante login e políticas RLS.
+## Teste após cada publicação
 
-## Teste depois do deploy
+1. Abra a URL e clique em **Entrar**.
+2. Escolha **Matriz** ou **Loja**.
+3. Faça login real com a conta autorizada no Supabase.
+4. Na Loja, escolha a unidade **Teste**.
+5. Confirme que os módulos carregam e que os dados lidos pertencem somente à loja escolhida.
+6. Cadastre registros de teste exclusivamente na **Teste**, depois confira a persistência no Supabase.
+7. Verifique que o cadastro/edição/exclusão de unidades não existe na interface da Matriz.
+8. Teste novas funcionalidades e seus efeitos no estoque antes de habilitá-las para outras lojas.
 
-1. Copie a URL `*.pages.dev` real fornecida pelo Cloudflare.
-2. Verifique o modo **Demonstração** criando um registro fictício e atualizando a página.
-3. Mude para **Supabase**, entre com sua conta administradora já criada e confirme a exibição da Matriz.
-4. Crie uma loja de teste e cadastre itens e fornecedores, conferindo no painel Supabase.
-5. Não finalize operações de inventário, recebimento ou transferências com dados reais até testar os gatilhos.
-6. Em Supabase → Authentication → URL Configuration, configure a URL do Cloudflare para futuros e-mails e fluxos de recuperação de senha.
-7. Verifique se novos commits na pasta do projeto causam deploy automático.
+**Atenção:** o botão Entrar apenas navega para a escolha de ambientes. Credenciais reais são obrigatórias para acessar registros do Supabase. Não existe fonte fictícia de dados.
 
-Caso `Prototipos` não apareça na lista de repositórios do Cloudflare, revise o acesso do aplicativo Cloudflare Pages no GitHub e autorize este repositório.
-
-**Observação:** o assistente preparou o build e o repositório, mas não executou a conexão com a conta Cloudflare. A etapa de autorização do GitHub no Cloudflare é feita no painel.
-
-Referências: https://developers.cloudflare.com/pages/configuration/monorepos/ e https://developers.cloudflare.com/pages/framework-guides/deploy-anything/
+Os administradores podem liberar módulos por loja em `store_feature_flags` após homologação. Nenhuma chave secreta deve ser publicada no frontend.

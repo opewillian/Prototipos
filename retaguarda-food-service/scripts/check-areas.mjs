@@ -9,6 +9,7 @@ import {storeLayout} from "../src/areas/loja/layout.js";
 import {accessBody} from "../src/areas/shared.js";
 import {renderList} from "../src/components/table.js";
 import {models} from "../src/core/models.js";
+import {featureByModule} from "../src/core/feature-map.js";
 import lojas from "../src/modules/lojas/index.js";
 
 const stores=[
@@ -56,6 +57,10 @@ assert.match(denied,/Acesso negado/);
 assert.doesNotMatch(denied,/Conteúdo protegido/);
 
 assert.equal(models.lojas,undefined,"A criação e edição de unidades devem estar removidas.");
+assert.equal(featureByModule.contagem,"counts");
+assert.equal(featureByModule.notas,"notes");
+const lockedStore=storeLayout({...state,area:"loja",storeId:"teste",moduleId:"contagem",features:{}},"Conteúdo");
+assert.match(lockedStore,/Aguardando liberação/);
 assert.equal(lojas.readOnly,true);
 const storesList=renderList(lojas,stores,"live",false);
 assert.doesNotMatch(storesList,/data-new-record|data-edit-record/);

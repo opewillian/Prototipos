@@ -1,51 +1,23 @@
-# Retaguarda Food Service — Separação entre Matriz e Loja
+# Ambientes Matriz e Loja
 
-## Fluxo de entrada
+O usuário clica em **Entrar**, escolhe entre **Matriz** e **Loja** e autentica-se no Supabase para ver dados reais. A escolha de ambiente não concede permissões.
 
-1. A tela inicial oferece **Entrar**, sem e-mail nem senha, exclusivamente no **protótipo**.
-2. Após entrar, o usuário encontra a **seleção do ambiente**: Matriz ou Loja.
-3. Ao escolher **Matriz**, abre uma aplicação administrativa, com menu lateral e painel corporativo.
-4. Ao escolher **Loja**, a pessoa primeiro escolhe uma **unidade operacional** e depois abre a aplicação da loja, com menu horizontal.
-5. **Trocar ambiente** volta à seleção, sem descartar a sessão Supabase.
-6. **Sair** volta à tela inicial. Se houver uma sessão Supabase autenticada, ela é encerrada.
-7. As escolhas de entrada, ambiente e loja ficam em `sessionStorage` até o encerramento da sessão da aba (ou clique em Sair).
+## Matriz
 
-## Estrutura por frente
+- Painel administrativo e acompanhamento de compras de várias unidades
+- Cadastro central de itens e fornecedores
+- Usuários e perfis (visualização; gestão de permissões será evoluída)
+- Lista das unidades em modo **somente leitura**
+- O botão de criar unidade foi removido e o banco revogou privilégios de gravação em `stores` para usuários autenticados.
 
-```
-src/
-  areas/
-    selection.js        # Tela após entrar + seleção da unidade
-    shared.js           # Alternância demo/Supabase, controles de sessão
-    matriz/
-      config.js         # Menu exclusivo
-      layout.js         # Casca visual administrativa
-      data.js           # Consultas corporativas e autorização
-      home.js           # Painel corporativo e pedidos centralizados
-    loja/
-      config.js         # Menu exclusivo
-      layout.js         # Casca visual operacional
-      home.js           # Painel de indicadores da unidade
-  modules/              # Componentes de cada domínio funcional
-  core/                 # Supabase e camada compartilhada de acesso
-```
+## Loja
 
-**Matriz**: Painel da Matriz, Configuração inicial, Unidades, Itens, Fornecedores, Usuários e perfis, Pedidos das lojas (acompanhamento).
+- Seleção de unidade operacional autorizada
+- Painel, Contagem, Listas, Notas Fiscais, Pedidos de Compra, Transferências, Perdas, CMV
+- Registros isolados por `store_id` e políticas RLS
+- `store_feature_flags` define, por unidade, quais funcionalidades podem receber gravações
+- Inicialmente, **Teste** é a única unidade operacional provisionada e liberada para homologação
 
-**Loja**: Visão da loja, Contagem, Listas, Notas fiscais, Pedidos de compra, Transferências, Perdas e CMV.
+As telas e os módulos ficam em arquivos independentes em `src/areas/matriz/`, `src/areas/loja/` e `src/modules/`. O cliente Supabase fica em `src/core/`.
 
-Menus e estilos são independentes. Os módulos de negócios existentes são reaproveitados conforme o ambiente.
-
-## Segurança e dados
-
-- O clique inicial e a escolha do ambiente **não autentica** ninguém no Supabase.
-- Em **Demonstração**, todos os dados são fictícios e editáveis somente no navegador.
-- Em **Supabase**, é necessário autenticar usuário real.
-- O ambiente Matriz consulta o vínculo ativo `matrix_admin` em `store_memberships`. Sem ele, exibe acesso não autorizado.
-- O ambiente Loja lista apenas unidades de tipo `operational` visíveis pelas regras RLS.
-- A seleção de ambiente não concede acesso adicional; o banco continua aplicando isolamento de dados e permissões.
-- Não foram alteradas tabelas, políticas ou registros do Supabase nesta etapa.
-
-## Testes
-
-Execute `npm run test` para testar seleção e isolamento dos menus, ou `npm run build` para testar e preparar a pasta `dist`. O GitHub Actions executa o build a cada push. Esses são testes automatizados de interface e sintaxe; não substituem testes de navegação e autorização com navegador autenticado.
+Não há registros fictícios ou alternância de fonte de dados.
