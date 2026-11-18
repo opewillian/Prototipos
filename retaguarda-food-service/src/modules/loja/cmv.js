@@ -97,7 +97,8 @@ async function preview(ctx,s,en){
  const exists=(await list("cmv_closings",{select:"id",eq:{store_id:ctx.storeId,start_count_id:s,end_count_id:en}}))[0];
  ctx.el.innerHTML=backLink(ctx.base+"/cmv","CMV")+
   '<div class="doc-head"><div><div class="doc-title"><h1>CMV de '+dateBR(r.c1.count_date)+' a '+dateBR(r.c2.count_date)+'</h1><span class="pill pill-warn">Prévia</span></div><p class="muted" style="margin:6px 0 0">Contagens '+e(r.c1.display_id)+' → '+e(r.c2.display_id)+'</p></div>'+
-  '<div class="page-actions">'+(exists?btn("Ver fechamento salvo",{variant:"secondary",href:ctx.base+"/cmv/"+exists.id}):btn("Salvar fechamento",{variant:"ok",icon:"check",attrs:"data-save"}))+'</div></div>'+
+  '<div class="page-actions">'+(exists?btn("Ver fechamento salvo",{variant:"secondary",href:ctx.base+"/cmv/"+exists.id}):r.c1.count_date===r.c2.count_date?'':btn("Salvar fechamento",{variant:"ok",icon:"check",attrs:"data-save"}))+'</div></div>'+
+  (!exists&&r.c1.count_date===r.c2.count_date?alertBox("As duas contagens são do mesmo dia. Para salvar um fechamento, escolha contagens de datas diferentes; esta prévia serve apenas para conferência.","info"):'')+
   '<div class="kpis">'+kpi("CMV do período",money(r.totals.cmv),"",{icon:"chart"})+kpi("Compras",money(r.totals.purchases),"",{icon:"receipt",tone:"info"})+kpi("Perdas",money(r.totals.losses),r.totals.cmv?pct(r.totals.losses/r.totals.cmv)+" do CMV":"",{icon:"trash",tone:"warn"})+kpi("Itens",r.rows.length,"compõem o CMV",{icon:"box",tone:"ok"})+'</div>'+
   memoryView(ctx,r);
  bindMemory(ctx);

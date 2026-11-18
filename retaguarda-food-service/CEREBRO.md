@@ -4,7 +4,7 @@
 >
 > **Última revisão:** 18/11/2026  
 > **Natureza:** projeto real em desenvolvimento; funcionalidades ainda não homologadas não devem ser apresentadas como prontas.  
-> **Referência de código auditada nesta revisão:** branch main, commit 01af9a0e11dd.  
+> **Referência de código desta revisão:** versão 1.0 (branch feat/versao-1, publicada na main em 18/11/2026).  
 > **Manutenção:** atualizar este arquivo sempre que uma decisão ou funcionalidade mudar. O código e o esquema real do Supabase prevalecem para descrever o que *existe*; este documento prevalece para descrever o que *se pretende construir*, salvo decisão posterior explícita.
 
 ---
@@ -65,7 +65,7 @@ O frontend usa a URL do Supabase e uma **chave publicável**; nunca usar service
 ## 3. Jornada de acesso e navegação
 
 1. A URL pública abre a **tela de entrada** com botão **Entrar**.
-2. Clicar em Entrar **não solicita credenciais** e **não concede autorização**; apenas abre a tela seguinte.
+2. **(Alterado na versão 1.0, 18/11/2026)** A tela inicial já é o login (e-mail e senha, com "Esqueci minha senha"). Justificativa: o usuário pediu a experiência de um usuário real; o botão "Entrar" sem credenciais levava a telas vazias até o login. Antes: Entrar abria a escolha de ambiente sem credenciais.
 3. Surge a tela **Selecionar ambiente**, com dois cartões independentes: **Matriz** ou **Loja**.
 4. Para acessar informações reais, é exigido **login verdadeiro via Supabase Auth**, e as permissões da sessão são consultadas.
 5. Escolha **Matriz**: abre painel e menu administrativos próprios.
@@ -94,6 +94,25 @@ O frontend usa a URL do Supabase e uma **chave publicável**; nunca usar service
 ---
 
 ## 4. Mapa arquitetural dos arquivos
+
+> **Versão 1.0 (18/11/2026) — estrutura atual.** Substitui o mapa conceitual abaixo, mantido como histórico.
+>
+>     index.html                      # fontes Inter/Montserrat, app.css + shell.css
+>     assets/app.css                  # tokens da marca MFT e componentes
+>     assets/shell.css                # login, escolha de ambiente, menus Matriz (grafite) e Loja (vinho)
+>     assets/brand/logo-mft.png       # logo oficial
+>     src/main.js                     # sessão, contexto (perfil, vínculos, lojas, flags) e rotas por hash
+>     src/core/  config, supabase, db (list/get/insert/update/remove/nextNumber), format, icons, ui (componentes, drawer, diálogo, toast)
+>     src/areas/access.js             # login, nova senha, escolha de ambiente
+>     src/areas/matriz/shell.js       # menu da Matriz + registro dos módulos
+>     src/areas/loja/shell.js         # barra da loja + módulos visíveis conforme store_feature_flags
+>     src/modules/matriz/  painel, pedidos, itens, fornecedores, unidades, usuarios
+>     src/modules/loja/    inicio, contagem, listas, pedidos, notas, transferencias, perdas, cmv
+>     src/modules/shared/  catalog (itens, saldos, custo), doclines (linhas de documento), demand (consumo e sugestão)
+>     docs/sql/            01-anexos-storage.sql, 02-limpar-dados-teste.sql (executar como admin no Supabase)
+>
+> Rotas: `#/matriz/<módulo>[/<id>]` e `#/loja/<loja>/<módulo>[/<id>]`. Cada módulo exporta `render(ctx)`.
+> `npm run test` e `npm run build` validam sintaxe, imports e arquivos obrigatórios (os testes de interface do protótipo foram removidos a pedido do usuário).
 
 Estrutura conceitual atual, a ser mantida e evoluída:
 
@@ -533,7 +552,32 @@ Situação: **Implementado → Testando em Teste** (não homologado). Arquivo pr
 
 ---
 
+### Versão 1.0 — entrega de 18/11/2026 (branch feat/versao-1)
+
+**Pedido do usuário:** sistema com design e funcionalidades de versão final, identidade da marca, sem rótulos de protótipo, sem etapas de homologação, conectado ao Supabase, e apagar os dados [TESTE].
+
+**Implementado e testado no navegador (prévia da branch, login real como matrix_admin, loja Teste):**
+- Todas as 14 telas carregam sem erro de console.
+- Nota fiscal: lançar, itens, gerar 2 parcelas, pagar, dar entrada (movimentos invoice_receipt gerados).
+- Perda: itens e registro (movimento loss). Contagem: carregar lista, quantidades, total R$ 55,25 conferido, finalizar (ajustes corretos).
+- Pedido: criação com lista + contagem, sugestão (Arroz contado 0, mínimo 2 → 2 kg), fornecedor, envio.
+- CMV: prévia correta (22,25 + 90,60 − 55,25 = 57,60; perdas 8,90 destacadas). Itens, fornecedores (vínculo), usuários (abre), painéis.
+
+**Fatos do banco descobertos nesta entrega:**
+- `invoice_payments.status`: pending, paid, cancelled. `user_tab_permissions.tab_code`: códigos de feature (counts, lists...), e exige vínculo em `store_memberships` da mesma loja (FK).
+- `purchase_order_items.supplier_id` exige vínculo existente em `store_item_suppliers` (FK loja+item+fornecedor). A tela de pedido cria o vínculo ao escolher fornecedor ainda não vinculado.
+- `cmv_closings` exige datas diferentes entre contagem inicial e final (check). A prévia mesmo dia é exibida, sem botão salvar.
+- `cmv_closing_items.component_type`: valores aceitos ainda desconhecidos; a gravação do detalhe é tentada com "cmv" e, se recusada, o fechamento é salvo assim mesmo (a tela recalcula a memória pelas contagens e documentos travados).
+- Movimento de perda usa `loss_date` à meia-noite; CMV usa horários de finalização/recebimento/emissão para o período e `created_at` para perdas.
+- Não existe bucket de Storage: anexos exigem `docs/sql/01-anexos-storage.sql`.
+- Documentos finalizados não podem ser excluídos pelo app (gatilhos). Limpeza de dados de teste: `docs/sql/02-limpar-dados-teste.sql`.
+
+**Pendências:** executar os dois SQL; confirmar `component_type` do CMV; criação de logins de novos usuários só pelo painel do Supabase (exige service role); sugestão de compra depende de duas contagens finalizadas em datas diferentes.
+
 ## 11. Diretrizes visuais e de experiência
+
+**Identidade (versão 1.0):** marca MFT — vinho #85071D (principal), grafite #595959, fundo claro; títulos Montserrat, texto Inter. Matriz com menu lateral grafite; Loja com barra vinho e navegação horizontal. Substitui grafite/cobre e verde do protótipo. Módulos sem flag liberada não aparecem no menu (sem rótulo "Aguardando liberação").
+
 
 - Visual moderno, premium, corporativo, sem excesso de poluição.
 - Matriz: grafite/cobre, gestão mais analítica, menu lateral.
@@ -679,6 +723,9 @@ Depois:
 | CMV | Estoque inicial + compras líquidas elegíveis − estoque final, com perdas discriminadas |
 | Segurança | RLS, regras SQL, roles por loja/aba e feature flags por unidade |
 | Status de homologação | Flag ativa não equivale a módulo concluído |
+| Identidade (18/11/2026) | Marca MFT (vinho/grafite, logo) nos dois ambientes |
+| Entrada (18/11/2026) | Tela inicial é o login real; escolha de ambiente depois |
+| Módulos não liberados (18/11/2026) | Ocultos no menu da loja, sem rótulos de protótipo |
 
 ---
 

@@ -200,7 +200,7 @@ tr.is-saving{opacity:.6}
  .table.stack td.num{text-align:right}
  .drawer-body{padding:18px}
 }
-@media (max-width:460px){.kpis{grid-template-columns:1fr}.doc-meta{grid-template-columns:1fr}}
+@media (max-width:460px){.kpis{gap:10px}.kpi{padding:12px;gap:0}.kpi-icon{display:none}.kpi strong{font-size:17px}.kpi span{font-size:11px}.doc-meta{grid-template-columns:1fr 1fr}}
 
 /* ---------- Impressão ---------- */
 @media print{
