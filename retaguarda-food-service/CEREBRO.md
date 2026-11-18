@@ -322,6 +322,7 @@ Regras:
 - Valor total por linha e estoque total; permitir revisão antes de finalizar.
 - Finalizada fica bloqueada; gatilho do banco pode gerar ajuste de estoque.
 - Não confundir contagem com tela de estoque separada.
+- **Restrição do banco:** `counted_quantity` é NOT NULL; itens não contados não viram linha (ficam pendentes só na tela). Mudar isso exigiria migração e revisão do gatilho de ajuste — não fazer sem aprovação.
 
 ### 8.4 Notas fiscais
 
@@ -433,7 +434,7 @@ Estados atuais do banco (nomes técnicos):
 - Formulários genéricos: não cobrem toda validação, fluxo de edição de linhas e UX de cada módulo.
 - Matriz/usuários: consulta, mas gestão completa de convites e permissões ainda não feita.
 - Fornecedores por item/loja: esquema existe, tela própria e regras de seleção ainda não concluídas.
-- Listas → contagens/pedidos: integração de carregamento e merge a construir.
+- Listas → contagem: carregamento com merge implementado em 18/11 (em teste na Teste). Listas → pedidos: a construir.
 - Pedido de compra inteligente e vínculo automático com contagem: pendentes.
 - Notas fiscais com anexos, parcelas e comprovantes: pendentes.
 - Fechamento CMV com memória de cálculo: pendente.
@@ -491,7 +492,44 @@ A última inspeção da unidade Teste mostrou a loja provisionada e **sem itens,
 6. "Aguardando liberação" não aparece mais antes do login/seleção de loja; tipo de lista exibido em português; erro de digitação "RETAgUARDA".
 7. Novo `scripts/check-rules.mjs` (incluído em `npm run test`): zero válido, vazio ≠ zero, decimais com vírgula, negativos recusados, total por quantidade correta, loja preservada, Matriz não operacional, datas da nota, rótulos.
 
-**Bloqueios para continuar:** (a) login do usuário no navegador para testes funcionais na Teste; (b) acesso ao projeto Supabase Retaguarda MFT (conector da conta correta ou exportação do esquema/políticas/gatilhos) antes de qualquer trabalho que dependa do banco.
+Essas correções foram publicadas na main (commit 2ac1469) em 18/11/2026; CI verde e Cloudflare atualizado.
+
+**Bloqueio restante:** acesso administrativo ao projeto Supabase Retaguarda MFT (conector da conta correta ou exportação do esquema/políticas/gatilhos). Sem ele, definições de RLS, funções e gatilhos continuam não lidas; os testes abaixo foram feitos como usuário autenticado pela API pública.
+
+### Teste funcional autenticado de 18/11/2026
+
+Usuário administrador logado no site publicado (papel `matrix_admin` com vínculo ativo em `matriz`). Testes feitos pela interface e pela API com a sessão do usuário, apenas na loja **Teste**.
+
+**Banco no início:** todas as tabelas vazias (1 perfil de usuário); lojas `matriz` e `teste`; as 10 flags habilitadas somente para `teste`.
+
+**Registros de homologação criados (identificados com [TESTE]):** itens `TST-001 [TESTE] Arroz` (kg, 5,50) e `TST-002 [TESTE] Óleo` (un, 8,90) no catálogo central; fornecedor `TST-F1 [TESTE] Fornecedor Homologação`; lista `[TESTE] Lista semanal` (2 itens) na Teste; contagem `CT-TESTE-01` **finalizada** na Teste (Arroz 0; Óleo 2,5 × 8,90). Remover ou inativar esses registros só com aprovação do usuário.
+
+**Resultados:**
+- Todas as colunas usadas pelo código existem no banco (consulta sem erro em todas as tabelas/views).
+- Matriz: criação de itens e fornecedor OK; rótulos dos checkboxes visíveis.
+- Listas: inclusão de itens OK; duplicidade bloqueada no front **e** no banco (`purchase_list_items_list_id_item_id_key`).
+- Isolamento: linha com `store_id` diferente do documento e contagem com `store_id = matriz` são recusadas por RLS.
+- Contagem: zero e decimal aceitos; campo vazio recusado; item repetido bloqueado no banco (`stock_count_items_count_id_item_id_key`).
+- Finalização: status `finalized` + `finalized_at`; gerou **1** `stock_movements` (`count_adjustment`, +2,5 Óleo, custo 8,90) e `store_stock_balance` = 2,5. Arroz contado 0 sem saldo anterior não gerou movimento (delta 0).
+- Após finalizar, o banco bloqueia: editar linhas ("parent is no longer a draft"), voltar para rascunho ("Only draft counts can change status") e excluir.
+- **Esquema:** `stock_count_items.counted_quantity` é **NOT NULL**. Portanto "não contado" não pode ser gravado como linha: itens pendentes ficam só na tela até receberem quantidade (decisão de implementação abaixo).
+- `store_last_purchase_cost` expõe `store_id`, `item_id`, `unit_cost`, `entry_date`, `received_at`.
+- Erro de login vinha em inglês ("Invalid login credentials") e aparecia acima do formulário, fora da área visível.
+
+### Contagem com listas — entrega de 18/11/2026 (branch feat/contagem-lista)
+
+Situação: **Implementado → Testando em Teste** (não homologado). Arquivo principal: `src/modules/contagem/lines.js` (regras e renderização) + eventos em `main.js`.
+
+- No rascunho: **Carregar lista** (listas ativas da loja com uso contagem ou ambos) acrescenta itens ausentes sem duplicar; **Incluir item avulso**; **Buscar na contagem** por nome/código.
+- Cada linha tem quantidade e custo editáveis; a gravação acontece ao sair do campo ou com Enter (que avança para a próxima quantidade). Vírgula decimal; negativos e texto recusados; sem separador de milhar.
+- **Vazio = não contado:** linha pendente (fundo destacado, "Não contado") não é gravada. **0 = contado sem estoque**, gravado normalmente. Apagar a quantidade de uma linha já gravada é recusado com orientação para remover pelo ×.
+- Custo sugerido: última compra recebida da loja (`store_last_purchase_cost`), senão custo padrão do item; a origem aparece na dica do campo. Editável.
+- Resumo no topo: itens contados, sem contagem e valor total da contagem.
+- Finalizar com itens pendentes pede confirmação dizendo quantos ficarão fora.
+- Contagem finalizada mostra tabela somente leitura (sem campos, sem remover).
+- Pendentes vivem só na tela: ao reabrir a contagem, basta carregar a lista de novo (o merge traz só o que falta).
+- Login: mensagem em português dentro do formulário e e-mail preservado após erro.
+- Testes automatizados novos em `scripts/check-rules.mjs` (parseQty, fmtQty, merge, custo, resumo, bloqueio).
 
 ---
 
@@ -681,6 +719,6 @@ Depois:
 
 **18/11/2026 — consolidação inicial:** documento criado a partir do histórico de desenvolvimento e da inspeção dos arquivos principais da branch main. Estado informado: Supabase e Cloudflare conectados; Matriz/Loja separados; sem dados fictícios; Teste provisionada; cadastro de lojas bloqueado; homologação funcional dos módulos ainda em evolução.
 
-**18/11/2026 — auditoria técnica:** ver "Auditoria técnica de 18/11/2026" na seção 10. Próxima entrega planejada após os bloqueios: Fase 2 (vínculo item × loja × fornecedor, busca em Itens/Fornecedores) e depois Listas → Contagem (carregar lista com merge, custo da última nota com fallback, totais, finalização).
+**18/11/2026 — auditoria técnica e teste autenticado:** ver seção 10 (auditoria, teste funcional e entrega "Contagem com listas"). Próximos passos: homologar a contagem com listas na Teste; depois Fase 2 (vínculo item × loja × fornecedor, busca em Itens/Fornecedores) e Listas (busca, impressão, ordenação).
 
 **Este arquivo não é uma especificação congelada.** Deve evoluir junto do produto, mas decisões não devem desaparecer sem explicação ou aprovação explícita.
