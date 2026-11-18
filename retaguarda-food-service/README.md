@@ -1,5 +1,7 @@
 # Retaguarda Food Service
 
+> **Memória permanente do projeto:** leia [CEREBRO.md](./CEREBRO.md) antes de desenvolver, alterar arquitetura ou liberar funcionalidades em outras lojas.
+
 Aplicação modular para gestão de lojas food service, com dois ambientes independentes: **Matriz** e **Loja**.
 
 ## Acesso
