@@ -615,6 +615,9 @@ Situação: **Implementado → Testando em Teste** (não homologado). Arquivo pr
 - Lojas: papel interno `store_operator` (gerentes antigos mantidos); o app mostra ao usuário apenas as lojas com vínculo ativo (cadastro antigo de administrador sem vínculo de loja continua vendo todas).
 - Substitui a regra da v1.2 de "Administrador da Matriz" como opção na tela e os níveis Ver/Editar.
 
+### Módulo Unidades retirado — 18/11/2026
+A pedido do usuário, a tela Matriz › Unidades foi removida: o cadastro e a consulta de lojas são feitos diretamente no Supabase (pela sessão de desenvolvimento/administração). Continua proibido criar, editar ou excluir lojas pela retaguarda. "Painel e Unidades acompanham o acesso à Matriz" passa a valer só para o Painel.
+
 ## 11. Diretrizes visuais e de experiência
 
 **Identidade (versão 1.0):** marca MFT — vinho #85071D (principal), grafite #595959, fundo claro; títulos Montserrat, texto Inter. Matriz com menu lateral grafite; Loja com barra vinho e navegação horizontal. Substitui grafite/cobre e verde do protótipo. Módulos sem flag liberada não aparecem no menu (sem rótulo "Aguardando liberação").
