@@ -1,6 +1,6 @@
 // Estrutura única da Retaguarda (Matriz e Loja): menu lateral recolhível com busca e grupos,
 // barra superior com Ambiente e Loja pesquisável. Trocar de loja mantém o módulo atual.
-import {e,initials,normalizeText} from "../core/format.js";
+import {e,normalizeText} from "../core/format.js";
 import {icon} from "../core/icons.js";
 import {LOGO} from "./access.js";
 import {matrizEnabled} from "./matriz/shell.js";
@@ -27,7 +27,7 @@ export function appShell(app){
   '<div class="tb-field tb-store"><span class="tb-label">Loja</span><div class="combo" id="store-combo"><button type="button" class="combo-btn" id="store-btn" aria-haspopup="listbox" aria-expanded="false"></button>'+
   '<div class="combo-pop" id="store-pop" hidden><label class="combo-search">'+icon("search",15)+'<input id="store-q" placeholder="Buscar loja por nome ou código" autocomplete="off"></label><ul class="combo-list" role="listbox" id="store-list"></ul></div></div></div>'+
   '<span class="tb-spacer"></span>'+
-  '<div class="tb-user" title="'+e(name)+'"><span class="avatar">'+e(initials(name))+'</span><span class="tb-user-name">'+e(name)+'</span></div>'+
+  '<div class="tb-user" title="'+e(name)+'"><span class="tb-user-name">'+e(name)+'</span></div>'+
   '</header><main class="content" id="content"></main></div><div class="sb-scrim" data-close-nav></div></div>';
 }
 
