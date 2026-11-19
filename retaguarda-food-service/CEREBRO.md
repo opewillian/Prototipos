@@ -231,6 +231,17 @@ A linha layout-independent-components acima é apenas **descrição conceitual**
 - O catálogo global é compartilhado; **alterações em items/suppliers podem afetar todas as lojas** e devem ser testadas/planejadas como mudança corporativa.
 - Transferências não devem movimentar estoque de lojas de produção durante homologação; exigir liberação também no destino.
 
+### Loja Teste → Congonhas (CGH)
+
+**Execução: 18/11/2026 — concluída no Supabase Retaguarda MFT** (`nngcbrqemhnbyqjjdnlh`).
+
+- **Identidade preservada:** `public.stores.id = 'teste'` não foi alterado. A unidade de homologação agora se chama **Congonhas**, código **CGH**, tipo `operational`, `active = true`. Não trocar o ID por `cgh`: documentos, endereços/rotas e vínculos do aplicativo continuam referenciando `teste`.
+- **Limpeza realizada:** executado `docs/sql/02-limpar-dados-teste.sql` em transação. Antes do COMMIT houve simulação com ROLLBACK: `contagens = 0`, `notas = 0`, `itens_teste = 0`. A execução definitiva foi confirmada e uma nova consulta fora da transação verificou os mesmos zeros.
+- **Dados removidos:** documentos, linhas e movimentações operacionais da unidade `teste`; catálogo de teste `items.code LIKE 'TST-%'` (2 itens), fornecedor `TST-F1` (1 fornecedor) e vínculos associados; eventos `audit_events.store_id = 'teste'` e `action = 'teste_log'`. Após a limpeza, nenhum desses cadastros ou eventos de teste permaneceu. A alteração de `session_replication_role` foi local à transação, sem modificar permanentemente gatilhos.
+- **Renomeação realizada:** transação `UPDATE public.stores SET name='Congonhas', code='CGH', updated_at=now() WHERE id='teste'`, validada com ROLLBACK antes da execução definitiva com COMMIT. O arquivo `docs/sql/03-renomear-teste-para-cgh.sql` não estava presente no repositório no momento da execução; aplicou-se o SQL explicitamente aprovado para a etapa.
+- **Verificação posterior:** `matriz` permaneceu `MATRIZ / Loja matriz / matrix / active`; `teste` ficou `CGH / Congonhas / operational / active`. As **10** linhas de `store_feature_flags` da unidade permaneceram habilitadas e o vínculo `store_memberships` com papel `store_manager` permaneceu ativo. Nenhuma outra loja foi modificada; sem alterações de RLS, funções ou gatilhos.
+- **Orientação de continuidade:** menções históricas a **Teste** neste documento referem-se à **mesma unidade** de homologação, hoje chamada **Congonhas (CGH)** e ainda identificada internamente por `teste`. Para reverter apenas a identificação visual: `UPDATE public.stores SET name='Teste', code='TESTE' WHERE id='teste';`. A limpeza dos dados não é revertida por esse UPDATE.
+
 ### Feature flags
 
 Tabela: store_feature_flags (store_id, feature_code, enabled).
