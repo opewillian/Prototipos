@@ -629,8 +629,8 @@ Situação: **Implementado → Testando em Teste** (não homologado). Arquivo pr
 ### Módulo Unidades retirado — 18/11/2026
 A pedido do usuário, a tela Matriz › Unidades foi removida: o cadastro e a consulta de lojas são feitos diretamente no Supabase (pela sessão de desenvolvimento/administração). Continua proibido criar, editar ou excluir lojas pela retaguarda. "Painel e Unidades acompanham o acesso à Matriz" passa a valer só para o Painel.
 
-### Loja Teste → Congonhas (CGH) — 18/11/2026
-Decisão do usuário: a loja de homologação `teste` será renomeada para **Congonhas**, código **CGH** (a CGH já trabalhada no Everest: empresa 57, DEL-CGH-PUB). O id interno continua `teste`. A retaguarda não pode alterar `stores` (permissão revogada), então o rename é feito pelo SQL `docs/sql/03-renomear-teste-para-cgh.sql`, executado no Supabase. Lançamentos da CGH (itens, lista, estoque inicial de 31/10, notas) ficam para depois, por decisão do usuário; fontes: `Documents\MFT\CONGONHAS 7666 -CMV OUTUBRO 2026.xlsx` (abas ESTOQUE e ITENS). Com o rename, a Teste deixa de ser loja de homologação; definir outra loja de testes se necessário.
+### Congonhas (CGH) — próximos lançamentos
+Rename e limpeza já executados (ver seção "Loja Teste → Congonhas (CGH)" acima; SQL em `docs/sql/03-renomear-teste-para-cgh.sql`). Por decisão do usuário, os lançamentos da CGH (cadastro de itens, lista de contagem, estoque inicial de 31/10 e notas) ficam para depois. Fonte: `Documents\MFT\CONGONHAS 7666 -CMV OUTUBRO 2026.xlsx` (abas ESTOQUE e ITENS). Com o rename, não há mais loja dedicada a testes; criar outra se necessário.
 
 ## 11. Diretrizes visuais e de experiência
 
