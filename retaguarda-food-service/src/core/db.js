@@ -1,7 +1,7 @@
 // Acesso a dados no Supabase. Toda autorização é aplicada pelo banco (RLS);
 // estas funções apenas padronizam consultas e erros.
 import {supabase} from "./supabase.js";
-import {trackWrite} from "./audit.js";
+import {trackWrite,TRACKED} from "./audit.js";
 
 function apply(q,opts){
  for(const [k,v] of Object.entries(opts.eq||{}))q=v===null?q.is(k,null):q.eq(k,v);
@@ -49,12 +49,15 @@ export async function insertMany(table,rows){
 }
 export async function update(table,id,patch,extra={}){
  if(table==="stores")throw Error("Unidades são gerenciadas fora da retaguarda.");
+ // Guarda a versão anterior para o log registrar só o que mudou.
+ let old=null;
+ if(TRACKED[table]){const r=await supabase.from(table).select("*").eq("id",id).maybeSingle();old=r.data||null}
  let q=supabase.from(table).update(patch).eq("id",id);
  for(const [k,v] of Object.entries(extra))q=q.eq(k,v);
  const {data,error}=await q.select("*");
  if(error)throw error;
   if(!data?.length)throw Error("O registro mudou ou você não tem permissão para alterá-lo. Recarregue a página.");
- trackWrite("update",table,data[0],patch);return data[0];
+ trackWrite("update",table,data[0],patch,old);return data[0];
 }
 export async function remove(table,id){
  if(table==="stores")throw Error("Unidades são gerenciadas fora da retaguarda.");

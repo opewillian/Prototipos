@@ -21,12 +21,16 @@ function storeOf(row){return row?.store_id||row?.from_store_id||"matriz"}
 function nameOf(row){for(const k of NAME_KEYS)if(row?.[k])return String(row[k]);return ""}
 
 /** Chamado pelo acesso a dados após inserir/alterar/excluir. Não interrompe a operação se falhar. */
-export function trackWrite(op,table,row,patch){
+export function trackWrite(op,table,row,patch,old){
  if(!TRACKED[table]||!row?.id)return;
  const details={registro:nameOf(row)};
  if(op==="update"){
-  details.campos=Object.keys(patch||{}).filter(k=>!/_at$|_by$/.test(k));
-  if(patch?.status)details.status=patch.status;
+  const same=(a,b)=>a===b||(a!=null&&b!=null&&String(a)===String(b))||(a!=null&&b!=null&&!isNaN(a)&&!isNaN(b)&&Number(a)===Number(b));
+  const keys=Object.keys(patch||{}).filter(k=>!/_at$|_by$|_id$/.test(k)&&!(old&&same(old[k],patch[k])));
+  if(!keys.length&&!(patch?.status&&old?.status!==patch.status))return;
+  details.campos=keys;
+  details.alteracoes=keys.slice(0,10).map(k=>({campo:k,de:old?old[k]:null,para:patch[k]}));
+  if(patch?.status&&old?.status!==patch.status)details.status=patch.status;
  }
  logEvent({action:op,entity_type:table,entity_id:row.id,store_id:storeOf(row),details}).catch(()=>{});
 }
