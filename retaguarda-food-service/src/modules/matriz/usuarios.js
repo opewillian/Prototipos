@@ -45,7 +45,7 @@ export async function render(ctx){
   const tags=[];
   if(a.admin)tags.push('<span class="pill pill-info">Administrador da Matriz</span>');
   else if(Object.values(a.matrixMods).some(Boolean))tags.push('<span class="tag">Matriz: '+e(MATRIX_TABS.filter(([t])=>a.matrixMods[t]).map(([,l])=>l.split(" ")[0]).join(", "))+'</span>');
-  if(a.selected.length)tags.push('<span class="tag">'+e(a.selected.map(storeName).join(", "))+' · '+e(roleLabel(a.role))+'</span>');
+  if(a.selected.length)tags.push('<span class="tag">'+e(a.selected.map(storeName).join(", "))+'</span>');
   return tags.join(" ")||'<span class="muted">Sem acesso</span>';
  };
  ctx.el.innerHTML=pageHead("Usuários e acessos","Libere as lojas e os módulos de cada pessoa. Os módulos valem para todas as lojas liberadas.")+
@@ -87,7 +87,7 @@ function manage(ctx,p,mem,perms,history,stores){
   '<div class="form-section"><h3>Lojas liberadas</h3>'+
    '<div class="store-picks">'+stores.map(s=>'<label class="store-pick"><input type="checkbox" name="store:'+e(s.id)+'"'+(before.selected.includes(s.id)?" checked":"")+'><span>'+e(s.name)+'<small>'+e(s.code||"")+'</small></span></label>').join("")+'</div>'+
    (stores.length>3?'<div class="access-tools"><button type="button" class="btn btn-ghost btn-sm" data-stores="all">Marcar todas</button><button type="button" class="btn btn-ghost btn-sm" data-stores="none">Desmarcar todas</button></div>':'')+
-   '<div class="field" style="margin-top:12px;max-width:260px"><span class="field-label">Papel nas lojas</span>'+select("role",ROLES,before.role,{placeholder:false})+'</div></div>'+
+   '</div>'+
   '<div class="form-section" data-store-mods><h3>Módulos das lojas</h3><p class="field-hint" style="margin:-6px 0 10px">Valem para todas as lojas liberadas acima.</p>'+
    (before.differs?alertBox("As lojas desta pessoa tinham liberações diferentes. Ao salvar, todas passam a seguir os módulos abaixo.","warn"):'')+
    levelChips("s",STORE_TABS,before.storeMods,false)+
@@ -96,9 +96,13 @@ function manage(ctx,p,mem,perms,history,stores){
 
  const dr=openDrawer({title:p.display_name||"Usuário",wide:true,body,onSubmit:async form=>{
   const f=form.elements;
-  const after={admin:isSelf?before.admin:f.admin.checked,selected:stores.filter(s=>f["store:"+s.id].checked).map(s=>s.id),role:f.role.value,storeMods:{},matrixMods:{}};
+  const after={admin:isSelf?before.admin:f.admin.checked,selected:stores.filter(s=>f["store:"+s.id].checked).map(s=>s.id),storeMods:{},matrixMods:{}};
   const lv=(pfx,t)=>f[pfx+"e:"+t].checked?"e":f[pfx+"v:"+t].checked?"v":"";
   for(const [t] of STORE_TABS)after.storeMods[t]=lv("s",t);
+  // Papel derivado dos módulos (não há seletor): com algum "Editar" = operador; só "Ver" = consulta.
+  // Gerentes já cadastrados continuam gerentes enquanto puderem editar.
+  const canEdit=Object.values(after.storeMods).includes("e");
+  const roleFor=cur=>!canEdit?"viewer":cur?.role==="store_manager"?"store_manager":"store_operator";
   for(const [t] of MATRIX_TABS)after.matrixMods[t]=after.admin?"":lv("m",t);
   if(after.selected.length&&!Object.values(after.storeMods).some(Boolean))throw Error("Libere ao menos um módulo para as lojas marcadas, ou desmarque as lojas.");
   const m=sid=>mem.find(x=>x.store_id===sid);
@@ -113,7 +117,7 @@ function manage(ctx,p,mem,perms,history,stores){
   // Lojas: mesma liberação em todas as marcadas.
   for(const s of stores){
    const cur=m(s.id),on=after.selected.includes(s.id);
-   if(on){await upsertMember(p.user_id,s.id,after.role,true,cur);await upsertPerms(p.user_id,s.id,STORE_TABS,after.storeMods)}
+   if(on){await upsertMember(p.user_id,s.id,roleFor(cur),true,cur);await upsertPerms(p.user_id,s.id,STORE_TABS,after.storeMods)}
    else if(cur?.active)await upsertMember(p.user_id,s.id,cur.role,false,cur);
   }
   const changes=diff(before,after,storeName,isSelf);
@@ -123,7 +127,6 @@ function manage(ctx,p,mem,perms,history,stores){
  }});
  const form=dr.el;
  form.querySelector('[name="admin"]')?.addEventListener("change",ev=>{form.querySelector("[data-matrix-mods]").hidden=ev.target.checked});
- form.querySelector('[name="role"]').addEventListener("change",ev=>{if(ev.target.value==="viewer")form.querySelectorAll('[name^="se:"]').forEach(i=>i.checked=false)});
  form.addEventListener("change",ev=>{
   const n=ev.target.name||"";const mt=n.match(/^([ms])([ve]):(.+)$/);if(!mt)return;
   const other=form.elements[mt[1]+(mt[2]==="v"?"e":"v")+":"+mt[3]];
@@ -140,7 +143,6 @@ function diff(a,b,storeName,isSelf){
  const add=b.selected.filter(x=>!a.selected.includes(x)),rem=a.selected.filter(x=>!b.selected.includes(x));
  if(add.length)out.push("Lojas liberadas: "+add.map(storeName).join(", "));
  if(rem.length)out.push("Lojas removidas: "+rem.map(storeName).join(", "));
- if(b.selected.length&&a.role!==b.role)out.push("Papel nas lojas: "+roleLabel(a.role)+" → "+roleLabel(b.role));
  if(b.selected.length)for(const [t,l] of STORE_TABS)if((a.storeMods[t]||"")!==(b.storeMods[t]||"")||(a.differs&&add.length===0&&false))out.push("Lojas · "+l+": "+LEVEL[a.storeMods[t]||""]+" → "+LEVEL[b.storeMods[t]||""]);
  if(b.selected.length&&a.differs)out.push("Liberação de módulos unificada para todas as lojas");
  if(!isSelf&&!b.admin)for(const [t,l] of MATRIX_TABS)if((a.matrixMods[t]||"")!==(b.matrixMods[t]||""))out.push("Matriz · "+l+": "+LEVEL[a.matrixMods[t]||""]+" → "+LEVEL[b.matrixMods[t]||""]);

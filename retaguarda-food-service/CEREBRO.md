@@ -592,9 +592,10 @@ Situação: **Implementado → Testando em Teste** (não homologado). Arquivo pr
 **Pedido do usuário:** liberar lojas e fazer **uma única liberação de módulos** (ex.: Notas fiscais liberado = notas de todas as lojas a que a pessoa tem acesso); incluir os acessos da Matriz; incluir log de alterações.
 
 **Regra de acesso (tela Matriz › Usuários e acessos):**
-- Seções: **Matriz** (administrador = acesso total; ou módulos da Matriz: Pedidos das lojas `orders`, Itens `catalog`, Fornecedores `suppliers`, Usuários e log `users`), **Lojas liberadas** (marcar lojas), **Papel nas lojas** (Gerente, Operador, Consulta) e **Módulos das lojas** (Contagem, Listas, Pedidos, Notas, Transferências, Perdas, CMV — Ver/Editar).
+- Seções: **Matriz** (administrador = acesso total; ou módulos da Matriz: Pedidos das lojas `orders`, Itens `catalog`, Fornecedores `suppliers`, Usuários e log `users`), **Lojas liberadas** (marcar lojas) e **Módulos das lojas** (Contagem, Listas, Pedidos, Notas, Transferências, Perdas, CMV — Ver/Editar).
 - O banco continua por loja: ao salvar, a mesma liberação é gravada em `store_memberships` e `user_tab_permissions` de cada loja marcada; desmarcar a loja desativa o vínculo. Acesso parcial à Matriz grava vínculo `matriz` com papel `viewer` + permissões com `store_id='matriz'`.
 - Códigos aceitos pelo check de `user_tab_permissions.tab_code`: counts, lists, orders, notes, transfers, losses, cmv, catalog, suppliers, users. A permissão exige vínculo ativo na mesma loja (FK).
+- **Sem seletor de papel** (removido a pedido, sem efeito prático): o papel gravado em store_memberships é derivado dos módulos — algum Editar = store_operator (gerentes existentes são mantidos), só Ver = viewer.
 - Frontend: `src/core/access.js` (storePerm, matrixPerm, hasMatrix). Menus mostram só módulos com "Ver"; sem "Editar" a tela fica em modo consulta (classe `.read-only` esconde ações). **RLS no banco não foi alterado**: para usuário não administrador com módulos parciais da Matriz, leituras/gravações dependem das políticas existentes (que hoje privilegiam `matrix_admin`); validar com um usuário real antes de liberar.
 
 **Log de alterações:**
