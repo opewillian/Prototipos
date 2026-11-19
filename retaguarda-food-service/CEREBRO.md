@@ -587,6 +587,23 @@ Situação: **Implementado → Testando em Teste** (não homologado). Arquivo pr
 
 **Decisão anterior substituída:** "Matriz e Loja não devem ser um painel único com menus diferentes" / identidades visuais distintas. Justificativa: pedido explícito do usuário de seguir o modelo do Degust, em que a troca de contexto é feita na barra superior. A separação de dados, permissões e módulos entre Matriz e Loja continua igual.
 
+### Acessos únicos e log de alterações — 18/11/2026 (versão 1.2)
+
+**Pedido do usuário:** liberar lojas e fazer **uma única liberação de módulos** (ex.: Notas fiscais liberado = notas de todas as lojas a que a pessoa tem acesso); incluir os acessos da Matriz; incluir log de alterações.
+
+**Regra de acesso (tela Matriz › Usuários e acessos):**
+- Seções: **Matriz** (administrador = acesso total; ou módulos da Matriz: Pedidos das lojas `orders`, Itens `catalog`, Fornecedores `suppliers`, Usuários e log `users`), **Lojas liberadas** (marcar lojas), **Papel nas lojas** (Gerente, Operador, Consulta) e **Módulos das lojas** (Contagem, Listas, Pedidos, Notas, Transferências, Perdas, CMV — Ver/Editar).
+- O banco continua por loja: ao salvar, a mesma liberação é gravada em `store_memberships` e `user_tab_permissions` de cada loja marcada; desmarcar a loja desativa o vínculo. Acesso parcial à Matriz grava vínculo `matriz` com papel `viewer` + permissões com `store_id='matriz'`.
+- Códigos aceitos pelo check de `user_tab_permissions.tab_code`: counts, lists, orders, notes, transfers, losses, cmv, catalog, suppliers, users. A permissão exige vínculo ativo na mesma loja (FK).
+- Frontend: `src/core/access.js` (storePerm, matrixPerm, hasMatrix). Menus mostram só módulos com "Ver"; sem "Editar" a tela fica em modo consulta (classe `.read-only` esconde ações). **RLS no banco não foi alterado**: para usuário não administrador com módulos parciais da Matriz, leituras/gravações dependem das políticas existentes (que hoje privilegiam `matrix_admin`); validar com um usuário real antes de liberar.
+
+**Log de alterações:**
+- Tabela `audit_events` (id, store_id, user_id, action, entity_type, entity_id, details jsonb, created_at). O app grava; **o banco recusa exclusão** (log imutável pelo app). Não há gatilhos de auditoria no banco: o registro vem do app (`src/core/audit.js`).
+- Registrado automaticamente em `db.insert/update/remove` para: itens, fornecedores, vínculos de fornecedor, listas, contagens, pedidos, notas, parcelas, perdas, transferências e fechamentos de CMV. Alterações guardam só os campos que mudaram, com valor anterior e novo. Linhas de documentos não entram (evita ruído).
+- Alterações de acesso: `action='access'`, `entity_type='user_access'`, `entity_id`=usuário, com lista legível das mudanças.
+- Telas: Matriz › Log de alterações (90 dias, filtros por tipo e loja, busca) e histórico dentro do painel de cada usuário.
+- Um registro de sonda (`action='teste_log'`) ficou no log; `docs/sql/02-limpar-dados-teste.sql` o remove.
+
 ## 11. Diretrizes visuais e de experiência
 
 **Identidade (versão 1.0):** marca MFT — vinho #85071D (principal), grafite #595959, fundo claro; títulos Montserrat, texto Inter. Matriz com menu lateral grafite; Loja com barra vinho e navegação horizontal. Substitui grafite/cobre e verde do protótipo. Módulos sem flag liberada não aparecem no menu (sem rótulo "Aguardando liberação").
@@ -740,6 +757,8 @@ Depois:
 | Entrada (18/11/2026) | Tela inicial é o login real; escolha de ambiente depois |
 | Módulos não liberados (18/11/2026) | Ocultos no menu da loja, sem rótulos de protótipo |
 | Layout (18/11/2026, v1.1) | Estrutura única estilo Degust: menu lateral recolhível + barra com Ambiente e Loja pesquisável |
+| Acessos (18/11/2026, v1.2) | Lojas liberadas + um único conjunto de módulos para todas elas; módulos próprios da Matriz |
+| Auditoria (18/11/2026, v1.2) | Log de alterações gravado pelo app em audit_events, imutável pelo app |
 
 ---
 
