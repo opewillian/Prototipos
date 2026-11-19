@@ -101,8 +101,12 @@
  .tb-user-name{display:none}
 }
 @media (max-width:640px){
- .topbar{flex-wrap:wrap;gap:8px}
- .tb-label{display:none}
- .tb-store{order:5;flex-basis:100%;max-width:none}
- .tb-select{min-width:0}
+ /* Celular: tudo numa linha só — menu, ambiente, loja (ocupa o resto, nome cortado com …) e avatar. */
+ .topbar{gap:8px;padding:8px 12px;min-height:54px}
+ .tb-label,.tb-spacer{display:none}
+ .tb-field[data-env-field]{flex:none}
+ .tb-select{min-width:0;width:92px;padding:0 24px 0 10px;background-position:right 6px center}
+ .tb-store{flex:1;max-width:none;min-width:0}
+ .combo-btn{padding:0 10px;gap:6px}
+ .combo-pop{position:fixed;top:58px;left:12px;right:12px;min-width:0}
 }
