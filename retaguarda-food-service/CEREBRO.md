@@ -605,6 +605,16 @@ Situação: **Implementado → Testando em Teste** (não homologado). Arquivo pr
 - Telas: Matriz › Log de alterações (90 dias, filtros por tipo e loja, busca) e histórico dentro do painel de cada usuário.
 - Um registro de sonda (`action='teste_log'`) ficou no log; `docs/sql/02-limpar-dados-teste.sql` o remove.
 
+### Acessos sem "administrador" — 18/11/2026 (versão 1.3)
+
+**Pedido do usuário:** não existir o perfil "administrador" na tela; módulo liberado = pode usar e editar; escolher acesso à Matriz da mesma forma que às lojas.
+
+- Tela: seção **Acessos** com cartões **Matriz** + cada loja; **Módulos da Matriz** (Pedidos das lojas, Itens, Fornecedores, Usuários/acessos/log) e **Módulos das lojas** (valem para todas as lojas marcadas), cada módulo só liga/desliga. Sem distinção Ver/Editar (grava `can_view = can_edit`).
+- Painel e Unidades acompanham o acesso à Matriz. Você não pode remover o próprio acesso à Matriz nem o módulo de Usuários.
+- **Banco:** marcar a Matriz grava vínculo `matriz` com papel `matrix_admin`, porque as políticas atuais do banco liberam as telas da Matriz por esse papel; os módulos da Matriz limitam o que aparece no app. **Limitação de segurança:** quem tem a Matriz liberada, mesmo com poucos módulos, tem no banco o alcance de `matrix_admin` (inclusive leitura de todas as lojas via API). Para restringir no banco, é preciso ajustar as políticas RLS para considerar `user_tab_permissions` da Matriz (migração a planejar com acesso administrativo).
+- Lojas: papel interno `store_operator` (gerentes antigos mantidos); o app mostra ao usuário apenas as lojas com vínculo ativo (cadastro antigo de administrador sem vínculo de loja continua vendo todas).
+- Substitui a regra da v1.2 de "Administrador da Matriz" como opção na tela e os níveis Ver/Editar.
+
 ## 11. Diretrizes visuais e de experiência
 
 **Identidade (versão 1.0):** marca MFT — vinho #85071D (principal), grafite #595959, fundo claro; títulos Montserrat, texto Inter. Matriz com menu lateral grafite; Loja com barra vinho e navegação horizontal. Substitui grafite/cobre e verde do protótipo. Módulos sem flag liberada não aparecem no menu (sem rótulo "Aguardando liberação").
@@ -760,6 +770,7 @@ Depois:
 | Layout (18/11/2026, v1.1) | Estrutura única estilo Degust: menu lateral recolhível + barra com Ambiente e Loja pesquisável |
 | Acessos (18/11/2026, v1.2) | Lojas liberadas + um único conjunto de módulos para todas elas; módulos próprios da Matriz |
 | Auditoria (18/11/2026, v1.2) | Log de alterações gravado pelo app em audit_events, imutável pelo app |
+| Acessos (18/11/2026, v1.3) | Sem perfil administrador na tela: Matriz e lojas são acessos; módulo liberado = usar e editar |
 
 ---
 

@@ -4,14 +4,14 @@ import {e,initials,normalizeText} from "../core/format.js";
 import {icon} from "../core/icons.js";
 import {LOGO} from "./access.js";
 import {matrizEnabled} from "./matriz/shell.js";
-import {hasMatrix} from "../core/access.js";
+import {hasMatrix,storeAllowed} from "../core/access.js";
 import {enabledModules} from "./loja/shell.js";
 
 const COLLAPSE_KEY="rfs-sidebar-collapsed";
 function getPref(k){try{return localStorage.getItem(k)}catch{return null}}
 function setPref(k,v){try{localStorage.setItem(k,v)}catch{}}
 
-export function shops(app){return app.stores.filter(s=>s.store_type==="operational")}
+export function shops(app){return app.stores.filter(s=>s.store_type==="operational"&&storeAllowed(app,s.id))}
 
 export function appShell(app){
  const name=app.profile?.display_name||app.session?.user?.email||"";

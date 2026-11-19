@@ -2,6 +2,7 @@
 import {e,initials} from "../core/format.js";
 import {icon} from "../core/icons.js";
 import {btn,field,input,alertBox} from "../core/ui.js";
+import {hasMatrix,storeAllowed} from "../core/access.js";
 
 export const LOGO="./assets/brand/logo-mft.png";
 
@@ -36,11 +37,11 @@ export function userChip(app){
 }
 
 export function chooseView(app,message=""){
- const shops=app.stores.filter(s=>s.store_type==="operational"&&s.active!==false);
+ const shops=app.stores.filter(s=>s.store_type==="operational"&&s.active!==false&&storeAllowed(app,s.id));
  let html='<main class="choose"><header class="choose-top"><img src="'+LOGO+'" alt="MFT"><div class="user-chip">'+userChip(app)+
   btn("Sair",{variant:"ghost",icon:"logout",attrs:'data-signout'})+'</div></header><section class="choose-body">'+
   '<h1>Olá, '+e((app.profile?.display_name||"").split(" ")[0]||"bem-vindo")+'</h1><p>Escolha onde deseja trabalhar agora.</p>'+(message?alertBox(message,"warn"):"");
- if(app.isAdmin){
+ if(hasMatrix(app)){
   html+='<div class="choose-section"><h2>Administração</h2><div class="choose-grid"><a class="choose-card matriz" href="#/matriz">'+
    '<span class="kpi-icon">'+icon("grid",22)+'</span><strong>Matriz</strong><span>Itens, fornecedores, usuários e acompanhamento de todas as lojas.</span></a></div></div>';
  }

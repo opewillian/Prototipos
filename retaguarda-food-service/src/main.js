@@ -5,7 +5,7 @@ import {loading,alertBox,errorMessage,toast} from "./core/ui.js";
 import {loginView,chooseView,passwordResetView} from "./areas/access.js";
 import {matrizEnabled,matrizCanEdit} from "./areas/matriz/shell.js";
 import {enabledModules,lojaCanEdit} from "./areas/loja/shell.js";
-import {hasMatrix} from "./core/access.js";
+import {hasMatrix,storeAllowed} from "./core/access.js";
 import {setAuditUser} from "./core/audit.js";
 import {appShell,updateShell,bindAppShell,markStore} from "./areas/shell.js";
 
@@ -51,7 +51,7 @@ async function route(){
   if(seq!==renderSeq)return;
  }
  const {area,parts}=parseRoute();
- const shops=app.stores.filter(s=>s.store_type==="operational");
+ const shops=app.stores.filter(s=>s.store_type==="operational"&&storeAllowed(app,s.id));
  if(area==="matriz"){
   const mm=matrizEnabled(app);
   if(!mm.length)return go(shops[0]?"/loja/"+shops[0].id:"/escolher");
@@ -65,7 +65,7 @@ async function route(){
  if(area==="loja"){
   const storeId=parts[1];
   const store=shops.find(s=>s.id===storeId);
-  if(!store)return go(shops[0]?"/loja/"+shops[0].id:app.isAdmin?"/matriz":"/escolher");
+  if(!store)return go(shops[0]?"/loja/"+shops[0].id:hasMatrix(app)?"/matriz":"/escolher");
   const mods=enabledModules(app,storeId);
   const id=mods.some(m=>m.id===parts[2])?parts[2]:"inicio";
   ensureShell();updateShell(root,app,{area:"loja",storeId,moduleId:id});markStore(root,storeId);
@@ -74,7 +74,7 @@ async function route(){
   root.querySelector("#content").classList.toggle("read-only",!lojaCanEdit(app,storeId,id));
   return runModule(seq,mod,{area:"loja",params:parts.slice(3),storeId,store});
  }
- if(area==="escolher")return renderChoose(shops.length||app.isAdmin?"":"");
+ if(area==="escolher")return renderChoose();
  // Sem rota: volta ao último ambiente/loja usado.
  const last=lastRoute();
  if(last==="matriz"&&hasMatrix(app))return go("/matriz");
