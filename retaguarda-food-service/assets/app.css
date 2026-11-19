@@ -141,6 +141,22 @@ tr.is-saving{opacity:.6}
 .dialog h2{font-size:18px}
 .dialog p{color:var(--muted);margin:8px 0 0}
 .dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
+.overlay-modal{z-index:70}
+.dialog-wide{width:min(620px,100%);padding:0;display:flex;flex-direction:column}
+.dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line-2)}
+.dialog-head h2{font-size:17px}
+.dialog-body{padding:6px 0;overflow:auto;min-height:0}
+.dialog-wide{max-height:min(640px,calc(100dvh - 32px))}
+.hist-list{list-style:none;margin:0;padding:0}
+.hist-list>li{padding:12px 20px;border-bottom:1px solid var(--line-2)}
+.hist-list>li:last-child{border-bottom:0}
+.hist-list .hist-meta{font-size:12px;color:var(--muted);margin-bottom:4px}
+.h3-row{display:flex;align-items:center;gap:8px}
+.info-btn{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:0;background:var(--brand);color:#fff;font-weight:800;font-size:13px;line-height:1;cursor:pointer;font-family:var(--font)}
+.info-btn:hover{background:var(--brand-700)}
+.info-btn.empty{background:#d9d4d5;color:#fff}
+.info-btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.perm-grid.locked .perm{background:var(--surface-2)}
 .overlay-drawer{display:flex;justify-content:flex-end;align-items:stretch;padding:0}
 .drawer{background:#fff;width:min(520px,100vw);height:100vh;height:100dvh;max-height:100dvh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);animation:slide .2s ease-out}
 .drawer-wide{width:min(760px,100vw)}

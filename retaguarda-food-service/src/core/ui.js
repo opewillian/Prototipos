@@ -112,6 +112,19 @@ export function confirmDialog({title,text="",confirmLabel="Confirmar",danger=fal
  });
 }
 
+// ---- Janela de leitura (popin) ----
+export function openModal({title,body,wide=false}){
+ const wrap=document.createElement("div");wrap.className="overlay overlay-modal";
+ wrap.innerHTML='<div class="dialog'+(wide?" dialog-wide":"")+'" role="dialog" aria-modal="true" aria-labelledby="mdl-title"><div class="dialog-head"><h2 id="mdl-title">'+e(title)+'</h2><button type="button" class="icon-btn" data-x aria-label="Fechar">'+icon("x")+'</button></div><div class="dialog-body">'+body+'</div></div>';
+ const close=()=>{wrap.remove();document.removeEventListener("keydown",onKey,true)};
+ const onKey=ev=>{if(ev.key==="Escape"){ev.stopPropagation();close()}};
+ wrap.addEventListener("mousedown",ev=>{if(ev.target===wrap)close()});
+ wrap.querySelector("[data-x]").onclick=close;
+ document.addEventListener("keydown",onKey,true);document.body.appendChild(wrap);
+ wrap.querySelector("[data-x]").focus();
+ return {close};
+}
+
 // ---- Painel lateral (drawer) para formulários ----
 export function openDrawer({title,body,submitLabel="Salvar",onSubmit,wide=false,readOnly=false}){
  const wrap=document.createElement("div");wrap.className="overlay overlay-drawer";

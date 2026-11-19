@@ -4,7 +4,7 @@
 // próprios módulos. O banco guarda por loja (store_memberships + user_tab_permissions) e aplica RLS.
 import {list,insert,supabase} from "../../core/db.js";
 import {e,dateBR,dateTimeBR,initials} from "../../core/format.js";
-import {pageHead,dataTable,openDrawer,select,toggle,toast,emptyState,kpi,btn,searchBox,bindSearch,searchKey,alertBox} from "../../core/ui.js";
+import {pageHead,dataTable,openDrawer,openModal,select,toggle,toast,emptyState,kpi,btn,searchBox,bindSearch,searchKey,alertBox} from "../../core/ui.js";
 import {STORE_TABS,MATRIX_TABS} from "../../core/access.js";
 import {logEvent} from "../../core/audit.js";
 import {describe} from "./log.js";
@@ -69,7 +69,7 @@ export async function render(ctx){
 }
 
 function levelChips(prefix,tabs,values,disabled){
- return '<div class="perm-grid">'+tabs.map(([t,l])=>{const v=values[t]||"";
+ return '<div class="perm-grid'+(disabled?" locked":"")+'">'+tabs.map(([t,l])=>{const v=values[t]||"";
   return '<div class="perm"><span class="perm-name">'+e(l)+'</span><span class="perm-opts">'+
    '<label><input type="checkbox" name="'+prefix+'v:'+t+'"'+(v?" checked":"")+(disabled?" disabled":"")+'>Ver</label>'+
    '<label><input type="checkbox" name="'+prefix+'e:'+t+'"'+(v==="e"?" checked":"")+(disabled?" disabled":"")+'>Editar</label></span></div>'}).join("")+'</div>';
@@ -82,8 +82,9 @@ function manage(ctx,p,mem,perms,history,stores){
  const body=
   '<div class="form-section"><h3>Matriz</h3>'+
    (isSelf?'<label class="switch"><input type="checkbox" name="admin"'+(before.admin?" checked":"")+' disabled><span class="switch-track"></span><span>Administrador da Matriz</span></label><p class="field-hint" style="margin:6px 0 0">Você não pode alterar o próprio acesso administrativo.</p>'
-    :toggle("admin",before.admin,"Administrador da Matriz (acesso total)")+'<p class="field-hint" style="margin:6px 0 10px">Administrador vê e altera tudo, em todas as lojas. Sem marcar, libere só os módulos abaixo.</p>')+
-   '<div data-matrix-mods'+(before.admin?' hidden':'')+'>'+levelChips("m",MATRIX_TABS,before.matrixMods,isSelf)+'</div></div>'+
+    :toggle("admin",before.admin,"Administrador da Matriz (acesso total)")+'<p class="field-hint" style="margin:6px 0 0">Administrador vê e altera tudo, em todas as lojas.</p>')+
+   '<h3 style="margin-top:16px">Módulos de administração</h3><p class="field-hint" style="margin:-6px 0 10px" data-matrix-hint>'+(before.admin?'Liberados por completo para administradores. Desmarque "Administrador" para escolher módulo a módulo.':'Painel e Unidades acompanham qualquer módulo liberado.')+'</p>'+
+   '<div data-matrix-mods>'+levelChips("m",MATRIX_TABS,before.admin?Object.fromEntries(MATRIX_TABS.map(([t])=>[t,"e"])):before.matrixMods,isSelf||before.admin)+'</div></div>'+
   '<div class="form-section"><h3>Lojas liberadas</h3>'+
    '<div class="store-picks">'+stores.map(s=>'<label class="store-pick"><input type="checkbox" name="store:'+e(s.id)+'"'+(before.selected.includes(s.id)?" checked":"")+'><span>'+e(s.name)+'<small>'+e(s.code||"")+'</small></span></label>').join("")+'</div>'+
    (stores.length>3?'<div class="access-tools"><button type="button" class="btn btn-ghost btn-sm" data-stores="all">Marcar todas</button><button type="button" class="btn btn-ghost btn-sm" data-stores="none">Desmarcar todas</button></div>':'')+
@@ -92,7 +93,7 @@ function manage(ctx,p,mem,perms,history,stores){
    (before.differs?alertBox("As lojas desta pessoa tinham liberações diferentes. Ao salvar, todas passam a seguir os módulos abaixo.","warn"):'')+
    levelChips("s",STORE_TABS,before.storeMods,false)+
    '<div class="access-tools"><button type="button" class="btn btn-ghost btn-sm" data-all="e">Liberar tudo</button><button type="button" class="btn btn-ghost btn-sm" data-all="v">Somente consulta</button></div></div>'+
-  '<div class="form-section"><h3>Histórico de alterações</h3>'+(history.length?'<ul class="list-plain" style="border:1px solid var(--line);border-radius:var(--radius)">'+history.slice(0,12).map(h=>'<li style="display:block"><small>'+e(dateTimeBR(h.created_at))+' · '+e(h.details?.por||"")+'</small><ul class="log-changes">'+describe(h)+'</ul></li>').join("")+'</ul>':'<p class="muted" style="margin:0">Nenhuma alteração registrada.</p>')+'</div>';
+  '<div class="form-section"><h3 class="h3-row">Histórico de alterações <button type="button" class="info-btn'+(history.length?'':' empty')+'" data-history title="'+(history.length?history.length+' alteração(ões) registrada(s)':'Nenhuma alteração registrada')+'" aria-label="Ver histórico de alterações">!</button></h3></div>';
 
  const dr=openDrawer({title:p.display_name||"Usuário",wide:true,body,onSubmit:async form=>{
   const f=form.elements;
@@ -126,7 +127,15 @@ function manage(ctx,p,mem,perms,history,stores){
   toast(changes.length?"Acessos atualizados.":"Nenhuma alteração.");ctx.reload();
  }});
  const form=dr.el;
- form.querySelector('[name="admin"]')?.addEventListener("change",ev=>{form.querySelector("[data-matrix-mods]").hidden=ev.target.checked});
+ const saved=before.matrixMods;
+ form.querySelector('[name="admin"]:not([disabled])')?.addEventListener("change",ev=>{
+  const on=ev.target.checked;
+  form.querySelector("[data-matrix-mods]").innerHTML=levelChips("m",MATRIX_TABS,on?Object.fromEntries(MATRIX_TABS.map(([t])=>[t,"e"])):saved,on);
+  form.querySelector("[data-matrix-hint]").textContent=on?'Liberados por completo para administradores. Desmarque "Administrador" para escolher módulo a módulo.':"Painel e Unidades acompanham qualquer módulo liberado.";
+ });
+ form.querySelector("[data-history]").onclick=()=>openModal({title:"Histórico de alterações · "+(p.display_name||"Usuário"),wide:true,
+  body:history.length?'<ul class="hist-list">'+history.map(h=>'<li><div class="hist-meta">'+e(dateTimeBR(h.created_at))+(h.details?.por?' · '+e(h.details.por):'')+'</div><ul class="log-changes">'+describe(h)+'</ul></li>').join("")+'</ul>'
+   :'<p class="muted" style="padding:14px 20px;margin:0">Nenhuma alteração registrada para esta pessoa.</p>'});
  form.addEventListener("change",ev=>{
   const n=ev.target.name||"";const mt=n.match(/^([ms])([ve]):(.+)$/);if(!mt)return;
   const other=form.elements[mt[1]+(mt[2]==="v"?"e":"v")+":"+mt[3]];

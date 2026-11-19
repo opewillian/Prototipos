@@ -1,7 +1,7 @@
 // Permissões do usuário logado. Uma liberação de módulos vale para todas as lojas liberadas;
 // o banco guarda por loja (user_tab_permissions) e continua aplicando RLS.
 export const STORE_TABS=[["counts","Contagem"],["lists","Listas"],["orders","Pedidos de compra"],["notes","Notas fiscais"],["transfers","Transferências"],["losses","Perdas"],["cmv","CMV"]];
-export const MATRIX_TABS=[["orders","Pedidos das lojas"],["catalog","Itens"],["suppliers","Fornecedores"],["users","Usuários e log de alterações"]];
+export const MATRIX_TABS=[["orders","Pedidos das lojas"],["catalog","Itens"],["suppliers","Fornecedores"],["users","Usuários, acessos e log"]];
 
 export function storePerm(app,storeId,tab){
  if(app.isAdmin)return {v:true,e:true};
