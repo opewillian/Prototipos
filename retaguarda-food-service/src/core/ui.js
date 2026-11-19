@@ -70,6 +70,29 @@ export function searchBox(id,placeholder="Buscar",value=""){
 export function tabs(items,active){
  return '<nav class="tabs">'+items.map(([id,label,href])=>'<a class="tab'+(id===active?" active":"")+'" href="'+e(href)+'">'+e(label)+'</a>').join("")+'</nav>';
 }
+// ---- Skeleton loader: esboço da tela enquanto os dados chegam ----
+const sk=(cls,style="")=>'<span class="sk '+cls+'"'+(style?' style="'+style+'"':'')+'></span>';
+function skKpis(){return '<div class="kpis">'+Array.from({length:4},()=>'<div class="kpi sk-card">'+sk("sk-icon")+'<div style="flex:1">'+sk("sk-line","width:55%")+sk("sk-line sk-xl","width:70%")+sk("sk-line","width:40%")+'</div></div>').join("")+'</div>'}
+function skTable(rows=8,cols=5){
+ const widths=["32%","18%","14%","16%","12%","10%"];
+ return '<div class="sk-table"><div class="sk-thead">'+Array.from({length:cols},(_,i)=>sk("sk-line sk-th","width:"+widths[i%widths.length])).join("")+'</div>'+
+  Array.from({length:rows},(_,r)=>'<div class="sk-row">'+Array.from({length:cols},(_,i)=>sk("sk-line","width:"+(i===0?(40+((r*7)%30))+"%":widths[i%widths.length]))).join("")+'</div>').join("")+'</div>';
+}
+function skHead(){return '<div class="page-head"><div style="flex:1">'+sk("sk-line sk-title","width:260px")+sk("sk-line","width:min(420px,70%)")+'</div>'+sk("sk-btn")+'</div>'}
+/** kind: "list" | "detail" | "dashboard" | "app" (tela inteira, antes do menu existir). */
+export function skeleton(kind="list"){
+ let html;
+ if(kind==="detail")html=sk("sk-line","width:120px;margin-bottom:14px")+'<div class="page-head"><div style="flex:1">'+sk("sk-line sk-title","width:300px")+sk("sk-line","width:200px")+'</div>'+sk("sk-btn")+sk("sk-btn")+'</div>'+
+  '<div class="doc-meta">'+Array.from({length:4},()=>'<div>'+sk("sk-line","width:50%")+sk("sk-line sk-lg","width:70%")+'</div>').join("")+'</div>'+
+  '<section class="card">'+skTable(6,6)+'</section>';
+ else if(kind==="dashboard")html=skHead()+skKpis()+'<div class="grid-2">'+'<section class="card">'+skTable(5,3)+'</section>'.repeat(1)+'<section class="card">'+skTable(5,3)+'</section></div>';
+ else html=skHead()+skKpis()+'<section class="card"><div style="padding:14px 18px 0">'+sk("sk-input")+'</div>'+skTable(8,5)+'</section>';
+ html='<div class="skeleton" role="status" aria-live="polite" aria-busy="true"><span class="sr-only">Carregando...</span>'+html+'</div>';
+ if(kind==="app")return '<div class="app sk-app"><aside class="sb">'+'<div class="sb-brand">'+sk("sk-logo")+'<span style="flex:1">'+sk("sk-line sk-dark","width:70%")+sk("sk-line sk-dark","width:45%")+'</span></div>'+
+  '<div style="padding:8px 14px">'+Array.from({length:7},(_,i)=>sk("sk-line sk-dark sk-nav","width:"+(60+(i*9)%30)+"%")).join("")+'</div></aside>'+
+  '<div class="main"><header class="topbar">'+sk("sk-input","width:160px")+sk("sk-input","width:320px")+'</header><main class="content">'+html+'</main></div></div>';
+ return html;
+}
 export function loading(text="Carregando..."){
  return '<div class="loading-state"><span class="spinner"></span>'+e(text)+'</div>';
 }

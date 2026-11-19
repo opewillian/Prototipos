@@ -1,7 +1,7 @@
 // Retaguarda MFT — inicialização, sessão e rotas (#/matriz/... e #/loja/<loja>/...).
 import {supabase} from "./core/supabase.js";
 import {list} from "./core/db.js";
-import {loading,alertBox,errorMessage,toast} from "./core/ui.js";
+import {loading,skeleton,alertBox,errorMessage,toast} from "./core/ui.js";
 import {loginView,chooseView,passwordResetView} from "./areas/access.js";
 import {matrizEnabled,matrizCanEdit} from "./areas/matriz/shell.js";
 import {enabledModules,lojaCanEdit} from "./areas/loja/shell.js";
@@ -46,7 +46,7 @@ async function route(){
  if(recoveryMode)return renderReset();
  if(!app.session){shellKey="";return renderLogin()}
  if(!app.loaded){
-  root.innerHTML=loading("Preparando seu ambiente...");
+  root.innerHTML=skeleton("app");
   try{await loadContext()}catch(error){root.innerHTML='<div class="content">'+alertBox(errorMessage(error))+'</div>';return}
   if(seq!==renderSeq)return;
  }
@@ -60,7 +60,7 @@ async function route(){
   saveRoute("matriz");
   const mod=mm.find(m=>m.id===id).mod;
   root.querySelector("#content").classList.toggle("read-only",!matrizCanEdit(app,id));
-  return runModule(seq,mod,{area:"matriz",params:parts.slice(2),storeId:null,store:null});
+  return runModule(seq,mod,{area:"matriz",params:parts.slice(2),storeId:null,store:null,kind:parts[2]?"detail":id==="painel"?"dashboard":"list"});
  }
  if(area==="loja"){
   const storeId=parts[1];
@@ -72,7 +72,7 @@ async function route(){
   saveRoute("loja:"+storeId);
   const mod=mods.find(m=>m.id===id).mod;
   root.querySelector("#content").classList.toggle("read-only",!lojaCanEdit(app,storeId,id));
-  return runModule(seq,mod,{area:"loja",params:parts.slice(3),storeId,store});
+  return runModule(seq,mod,{area:"loja",params:parts.slice(3),storeId,store,kind:parts[3]?"detail":id==="inicio"?"dashboard":"list"});
  }
  if(area==="escolher")return renderChoose();
  // Sem rota: volta ao último ambiente/loja usado.
@@ -96,7 +96,7 @@ function ensureShell(){
 
 async function runModule(seq,mod,info){
  const el=root.querySelector("#content");
- el.innerHTML=loading();
+ el.innerHTML=skeleton(info.kind);
  window.scrollTo(0,0);
  const ctx={...info,app,el,userId:app.session.user.id,go,
   base:info.area==="matriz"?"#/matriz":"#/loja/"+encodeURIComponent(info.storeId),

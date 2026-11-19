@@ -19,7 +19,29 @@ h1,h2,h3{font-family:var(--font-title);color:var(--ink);letter-spacing:-.01em;ma
 .ic{flex:none;display:block}
 [hidden]{display:none!important}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-.boot{display:grid;place-items:center;min-height:100vh;color:var(--muted)}
+.boot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:100vh;color:var(--muted)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* ---------- Skeleton loader ---------- */
+.sk{display:block;background:linear-gradient(90deg,#ece8e9 0%,#f6f3f4 40%,#ece8e9 80%);background-size:300% 100%;animation:sk 1.3s ease-in-out infinite;border-radius:6px}
+.sk-line{height:11px;margin:7px 0}
+.sk-lg{height:15px}.sk-xl{height:22px;margin:9px 0}.sk-title{height:22px;margin:0 0 10px}
+.sk-th{height:9px;margin:0;background:rgba(255,255,255,.35);animation:none}
+.sk-icon{width:40px;height:40px;border-radius:10px;flex:none}
+.sk-btn{width:130px;height:38px;border-radius:8px}
+.sk-input{height:38px;width:min(320px,100%);border-radius:8px}
+.sk-logo{width:40px;height:40px;border-radius:10px}
+.sk-dark{background:linear-gradient(90deg,rgba(255,255,255,.08) 0%,rgba(255,255,255,.18) 40%,rgba(255,255,255,.08) 80%);background-size:300% 100%}
+.sk-nav{height:14px;margin:18px 6px}
+.sk-card{border-left-color:#e3dddf}
+.sk-table{overflow:hidden}
+.sk-thead{display:flex;gap:24px;align-items:center;padding:14px 16px;background:var(--brand);opacity:.85}
+.sk-row{display:flex;gap:24px;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line-2)}
+.sk-row:last-child{border-bottom:0}
+.sk-row .sk-line,.sk-thead .sk-line{margin:0;flex:none}
+.skeleton .doc-meta>div{min-height:62px}
+.sk-app .sb{pointer-events:none}
+@keyframes sk{0%{background-position:100% 0}100%{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
 
 /* ---------- Botões ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:var(--radius-sm);padding:9px 15px;font-weight:600;font-size:13.5px;line-height:1.2;white-space:nowrap;transition:background .15s,border-color .15s,box-shadow .15s}
