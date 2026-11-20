@@ -250,6 +250,7 @@ A linha layout-independent-components acima é apenas **descrição conceitual**
 - Nome = Fantasia do Everest; código = Fantasia (ou Fantasia-<empresa> quando a Fantasia se repete: 21 nomes duplicados, ex. DEL-NAT-CHE 58/80, DEL-BSB-NOR 69/3278 — provável CNPJ antigo × novo; conferir quais inativar). `id` = código em minúsculas; a Congonhas continua `id='teste'` e virou **DEL-CGH-PUB** (empresa 57).
 - Marcas pelo prefixo: DEL DeltaExpresso (59), SAL Salch&Pão (14), BIT Bitte Burger (10), BOL Boleria das Marias (3), CPQ Casa do Pão de Queijo (3), AVI Aviador (1). **Sem marca: ACB (17) e MFT-CVD-EST (1)** — nome da marca ACB pendente.
 - Lojas novas **sem módulos liberados** (`store_feature_flags`) e **sem usuários** (`store_memberships`): ninguém grava nelas até liberar. Só a CGH tem flags.
+- **DEL-VCP-C15** (empresa 36, Campinas, DeltaExpresso) liberada em 20/11/2026 para testar transferências com a CGH (`13-liberar-del-vcp-c15.sql`): copia da CGH 10 módulos, 1 usuário e 7 permissões.
 
 ### Feature flags
 
