@@ -426,6 +426,7 @@ Regras de UX já decididas:
 - Transferir item entre unidades distintas, com origem/destino, quantidades, custo e status.
 - Emissão aprovada gera saída na origem e entrada automática no destino; não duplicar manualmente.
 - Não permitir mesma loja como origem e destino.
+- **Numeração (20/11/2026):** `transfers.number` é único entre todas as lojas (as outras numerações são por loja). Novas transferências usam o código Everest da origem: **TR-<empresa>-0001** (ex. TR-36-0001). As antigas TR-0001/TR-0002 da CGH seguem como estão. Antes, a DEL-VCP-C15 tentava criar TR-0001 e o banco recusava ("já existe").
 - **Rascunho pode ser excluído** (botão Excluir no lugar de Cancelar; apaga itens e transferência, sem mexer em estoque). "Nova transferência" reabre um rascunho vazio da loja em vez de criar outro. Em 20/11/2026 os rascunhos de teste TR-0001…0006 foram apagados (`16-apagar-transferencias-rascunho.sql`). Confirmação de emissão em tópicos (Destino, Data, Itens, Valor + aviso de saldo negativo).
 - ~~Conferir estoque disponível antes da emissão~~ — **20/11/2026: não trava mais por estoque** (pedido do Willian). Tela só avisa na confirmação; banco: verificação "Insufficient stock" removida de `mft_private.post_transfer_movements()` por `15-transferencia-sem-trava-estoque.sql` (definição anterior guardada em `mft_private.function_backups`). A origem pode ficar negativa até a próxima contagem.
 - Em homologação, evitar transferir da Teste para lojas reais antes de liberação deliberada em **ambas**.

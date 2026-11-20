@@ -47,7 +47,8 @@ export async function render(ctx){
    // Se já existe um rascunho vazio desta loja, abre ele em vez de criar outro.
    const empty=out.find(r=>r.status==="draft"&&!lines.some(l=>l.transfer_id===r.id));
    if(empty)return ctx.go(ctx.base+"/transferencias/"+empty.id);
-   const number=await nextNumber("transfers","number","from_store_id",ctx.storeId,"TR");
+   // O número é único entre TODAS as lojas (transfers_number_key): leva o código Everest da origem, ex. TR-36-0001.
+   const number=await nextNumber("transfers","number","from_store_id",ctx.storeId,"TR-"+(ctx.store.everest_code||ctx.store.code));
    // O banco exige destino: começa com a primeira loja habilitada; a pessoa troca na própria transferência.
    const t=await insert("transfers",{number,from_store_id:ctx.storeId,to_store_id:others[0].id,transfer_date:today(),status:"draft",created_by:ctx.userId});
    toast("Transferência "+number+" criada.");ctx.go(ctx.base+"/transferencias/"+t.id);
