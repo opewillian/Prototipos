@@ -2,7 +2,7 @@
 // A biblioteca de planilha (SheetJS) só é baixada quando a pessoa usa uma dessas funções.
 import {insert,insertMany} from "../../core/db.js";
 import {e,normalizeText} from "../../core/format.js";
-import {openDrawer,field,input,select,alertBox,toast} from "../../core/ui.js";
+import {openDrawer,field,input,alertBox,toast} from "../../core/ui.js";
 
 const XLSX_URL="https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs";
 let xlsxLib=null;
@@ -50,14 +50,13 @@ function matchRows(rows,items){
  * Importa uma planilha. Sem `list`: cria uma lista nova. Com `list`: acrescenta os itens que ainda não estão nela.
  * `items` = itens da loja (já filtrados pela marca: os de fora vêm inativos). `existing` = ids já na lista.
  */
-export function importListDrawer(ctx,{items,list=null,existing=new Set(),startOrder=0,types=[]}){
+export function importListDrawer(ctx,{items,list=null,existing=new Set(),startOrder=0}){
  let parsed=null,book=null;
  const body='<div class="form-grid">'+
   '<div class="span-2">'+field("Planilha",'<input class="control" type="file" name="file" accept=".xlsx,.xls,.csv" required>',
    "Uma linha por item, na ordem da lista. Coluna \"Código\" (ou \"Nome\"); sem cabeçalho, a 1ª coluna é lida como código.")+'</div>'+
   '<div class="span-2" data-sheet-wrap hidden>'+field("Aba",'<select class="control" name="sheet"></select>')+'</div>'+
-  (list?'':'<div class="span-2">'+field("Nome da lista",input("name","",{required:true,placeholder:"Ex.: Contagem semanal"}))+'</div>'+
-   '<div class="span-2">'+field("Usar em",select("list_type",types,"both",{placeholder:false}))+'</div>')+
+  (list?'':'<div class="span-2">'+field("Nome da lista",input("name","",{required:true,placeholder:"Ex.: Contagem semanal"}))+'</div>')+
   '<div class="span-2" data-preview></div></div>';
  const drawer=openDrawer({title:list?"Importar itens para a lista":"Importar lista de planilha",body,submitLabel:list?"Adicionar itens":"Criar lista",
   onSubmit:async form=>{
@@ -67,7 +66,7 @@ export function importListDrawer(ctx,{items,list=null,existing=new Set(),startOr
    let listId=list?.id;
    if(!list){
     const f=form.elements;if(!f.name.value.trim())throw Error("Informe o nome da lista.");
-    listId=(await insert("purchase_lists",{name:f.name.value.trim(),list_type:f.list_type.value,active:true,store_id:ctx.storeId,created_by:ctx.userId})).id;
+    listId=(await insert("purchase_lists",{name:f.name.value.trim(),list_type:"count",active:true,store_id:ctx.storeId,created_by:ctx.userId})).id;
    }
    await insertMany("purchase_list_items",ids.map((item_id,i)=>({list_id:listId,store_id:ctx.storeId,item_id,sort_order:startOrder+i+1})));
    toast(ids.length+" item(ns) importado(s)."+(parsed.missing.length+parsed.blocked.length?" "+(parsed.missing.length+parsed.blocked.length)+" linha(s) não entraram.":""));

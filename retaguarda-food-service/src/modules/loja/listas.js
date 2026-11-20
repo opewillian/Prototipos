@@ -1,4 +1,4 @@
-// Loja · Listas: listas reutilizáveis de contagem e compra da unidade.
+// Loja · Listas: listas de itens para contagem (20/11/2026: listas são só de contagem; não há mais lista de compra).
 import {list,get,insert,insertMany,update,remove} from "../../core/db.js";
 import {e,dateBR} from "../../core/format.js";
 import {icon} from "../../core/icons.js";
@@ -6,8 +6,7 @@ import {pageHead,btn,dataTable,searchBox,openDrawer,field,input,select,toggle,to
 import {loadItems,byId} from "../shared/catalog.js";
 import {importListDrawer,exportList} from "./listas-planilha.js";
 
-export const LIST_TYPES=[["both","Contagem e compra"],["count","Contagem"],["order","Compra"]];
-const typeLabel=t=>(LIST_TYPES.find(x=>x[0]===t)||[,t])[1];
+export const LIST_TYPE="count";
 
 export async function render(ctx){
  if(ctx.params[0])return detail(ctx,ctx.params[0]);
@@ -17,10 +16,9 @@ export async function render(ctx){
  ]);
  if(!ctx.isCurrent())return;
  const n=id=>links.filter(l=>l.list_id===id).length;
- ctx.el.innerHTML=pageHead("Listas","Monte listas de itens para agilizar contagens e pedidos.",btn("Importar planilha",{variant:"secondary",icon:"upload",attrs:"data-import"})+btn("Nova lista",{icon:"plus",attrs:"data-new"}))+
+ ctx.el.innerHTML=pageHead("Listas","Monte listas com os itens de cada contagem.",btn("Importar planilha",{variant:"secondary",icon:"upload",attrs:"data-import"})+btn("Nova lista",{icon:"plus",attrs:"data-new"}))+
   card("",lists.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar lista")+'</div>'+dataTable([
    {label:"Lista",render:l=>'<span class="strong">'+e(l.name)+'</span>'},
-   {label:"Uso",render:l=>'<span class="tag">'+e(typeLabel(l.list_type))+'</span>'},
    {label:"Itens",cls:"num",render:l=>String(n(l.id))},
    {label:"Criada em",render:l=>dateBR(l.created_at)},
    {label:"Situação",render:l=>l.active!==false?'<span class="pill pill-ok">Ativa</span>':'<span class="pill pill-muted">Inativa</span>'}
@@ -30,19 +28,18 @@ export async function render(ctx){
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href.slice(1)));
  ctx.el.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>editList(ctx,null));
  ctx.el.querySelector("[data-import]").onclick=async()=>{
-  try{importListDrawer(ctx,{items:await loadItems({store:ctx.store}),types:LIST_TYPES})}catch(error){toast(errorMessage(error),"danger")}
+  try{importListDrawer(ctx,{items:await loadItems({store:ctx.store})})}catch(error){toast(errorMessage(error),"danger")}
  };
 }
 
 function editList(ctx,row){
- const l=row||{list_type:"both",active:true};
+ const l=row||{active:true};
  openDrawer({title:row?"Editar lista":"Nova lista",body:'<div class="form-grid">'+
   '<div class="span-2">'+field("Nome da lista",input("name",l.name,{required:true,placeholder:"Ex.: Contagem semanal – câmara fria"}))+'</div>'+
-  '<div class="span-2">'+field("Usar em",select("list_type",LIST_TYPES,l.list_type,{placeholder:false}))+'</div>'+
   '<div class="span-2">'+toggle("active",l.active!==false,"Lista ativa")+'</div></div>',
   submitLabel:row?"Salvar":"Criar lista",onSubmit:async form=>{
    const f=form.elements;if(!f.name.value.trim())throw Error("Informe o nome da lista.");
-   const data={name:f.name.value.trim(),list_type:f.list_type.value,active:f.active.checked};
+   const data={name:f.name.value.trim(),list_type:LIST_TYPE,active:f.active.checked};
    if(row){await update("purchase_lists",row.id,data);toast("Lista atualizada.");ctx.reload();}
    else{const s=await insert("purchase_lists",{...data,store_id:ctx.storeId,created_by:ctx.userId});toast("Lista criada. Agora inclua os itens.");ctx.go(ctx.base.slice(1)+"/listas/"+s.id);}
   }});
@@ -65,7 +62,7 @@ async function detail(ctx,id){
   const cats=[...new Set(available.map(i=>i.item_type||i.category||"Sem tipo"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
   const rows=lines.map(l=>({...l,item:map.get(l.item_id)||{name:"Item removido"}}));
   ctx.el.innerHTML=backLink(ctx.base+"/listas","Listas")+
-   '<div class="doc-head"><div><div class="doc-title"><h1>'+e(lst.name)+'</h1><span class="tag">'+e(typeLabel(lst.list_type))+'</span>'+(lst.active===false?'<span class="pill pill-muted">Inativa</span>':'')+'</div><p class="muted" style="margin:6px 0 0">'+lines.length+' item(ns) na lista</p></div>'+
+   '<div class="doc-head"><div><div class="doc-title"><h1>'+e(lst.name)+'</h1>'+(lst.active===false?'<span class="pill pill-muted">Inativa</span>':'')+'</div><p class="muted" style="margin:6px 0 0">'+lines.length+' item(ns) na lista</p></div>'+
    '<div class="page-actions">'+btn("Importar planilha",{variant:"secondary",icon:"upload",attrs:"data-import"})+btn("Exportar planilha",{variant:"secondary",icon:"download",attrs:"data-export"})+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+btn("Editar",{variant:"secondary",icon:"edit",attrs:"data-edit"})+btn("Excluir",{variant:"ghost",icon:"trash",attrs:"data-delete"})+'</div></div>'+
    '<section class="card"><div class="add-row no-print">'+
     field("Adicionar item",'<input class="control" id="add-item" list="dl-items" placeholder="Digite o nome ou código do item" autocomplete="off"><datalist id="dl-items">'+available.map(i=>'<option value="'+e(i.name+(i.code?" · "+i.code:""))+'">').join("")+'</datalist>')+

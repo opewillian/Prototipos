@@ -40,7 +40,7 @@ export async function render(ctx){
 }
 
 async function newCount(ctx){
- const lists=(await list("purchase_lists",{eq:{store_id:ctx.storeId,active:true},order:"name",asc:true})).filter(l=>l.list_type!=="order");
+ const lists=(await list("purchase_lists",{eq:{store_id:ctx.storeId,active:true},order:"name",asc:true}));
  openDrawer({title:"Nova contagem",submitLabel:"Iniciar contagem",body:'<div class="form-grid">'+
   field("Data da contagem",input("count_date",today(),{type:"date",required:true}))+
   field("Lista de itens",select("list_id",lists.map(l=>[l.id,l.name]),"",{placeholder:lists.length?"Sem lista (incluir itens depois)":"Nenhuma lista cadastrada"}))+
@@ -98,7 +98,7 @@ async function detail(ctx,id){
    (editable?btn("Cancelar contagem",{variant:"ghost",attrs:"data-cancel"})+btn("Finalizar contagem",{variant:"ok",icon:"check",attrs:"data-finalize"}):'')+'</div></div>'+
    (editable&&!rows.length?'':'')+
    '<section class="card">'+(editable?'<div class="add-row">'+
-    field("Carregar itens de uma lista",'<select class="control" id="load-list"><option value="">'+(lists.length?"Selecione a lista":"Nenhuma lista cadastrada")+'</option>'+lists.filter(l=>l.list_type!=="order").map(l=>'<option value="'+e(l.id)+'">'+e(l.name)+'</option>').join("")+'</select>')+
+    field("Carregar itens de uma lista",'<select class="control" id="load-list"><option value="">'+(lists.length?"Selecione a lista":"Nenhuma lista cadastrada")+'</option>'+lists.map(l=>'<option value="'+e(l.id)+'">'+e(l.name)+'</option>').join("")+'</select>')+
     btn("Carregar",{variant:"secondary",attrs:"data-load"})+
     field("Incluir item avulso",'<input class="control" id="add-item" list="dl-count" placeholder="Nome ou código" autocomplete="off"><datalist id="dl-count">'+activeItems.map(i=>'<option value="'+e(i.name+(i.code?" · "+i.code:""))+'">').join("")+'</datalist>')+
     btn("Incluir",{variant:"secondary",icon:"plus",attrs:"data-add"})+'</div>':'')+

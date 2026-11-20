@@ -38,22 +38,18 @@ export async function render(ctx){
 }
 
 async function newOrder(ctx){
- const [lists,counts]=await Promise.all([
-  list("purchase_lists",{eq:{store_id:ctx.storeId,active:true},order:"name",asc:true}),
+ const [counts]=await Promise.all([
   list("stock_counts",{select:"id,display_id,count_date,finalized_at",eq:{store_id:ctx.storeId,status:"finalized"},order:"count_date",order2:"finalized_at",limit:20})
  ]);
- const buyLists=lists.filter(l=>l.list_type!=="count");
  openDrawer({title:"Novo pedido de compra",submitLabel:"Criar e calcular sugestão",body:'<div class="form-grid">'+
   field("Entrega prevista",input("delivery_date",addDays(today(),2),{type:"date",required:true}))+
-  field("Contagem de referência",select("count_id",counts.map(c=>[c.id,c.display_id+" · "+dateBR(c.count_date)]),counts[0]?.id||"",{placeholder:counts.length?"Sem contagem":"Nenhuma contagem finalizada"}))+
-  '<div class="span-2">'+field("Lista de compra",select("list_id",buyLists.map(l=>[l.id,l.name]),buyLists[0]?.id||"",{placeholder:buyLists.length?"Sem lista (usar itens da contagem)":"Nenhuma lista de compra"}))+'</div>'+
+  field("Contagem de referência",select("count_id",counts.map(c=>[c.id,c.display_id+" · "+dateBR(c.count_date)]),counts[0]?.id||"",{placeholder:counts.length?"Sem contagem (incluir itens à mão)":"Nenhuma contagem finalizada"}))+
   '<div class="span-2">'+field("Observação",textarea("observation","",{rows:2}))+'</div></div>'+
   (counts.length?'':alertBox("Sem contagem finalizada a sugestão não pode ser calculada; você ainda pode informar as quantidades manualmente.","info")),
   onSubmit:async form=>{
    const f=form.elements;if(!f.delivery_date.value)throw Error("Informe a data de entrega.");
-   if(!f.list_id.value&&!f.count_id.value)throw Error("Escolha uma lista ou uma contagem para montar o pedido.");
    const number=await nextNumber("purchase_orders","number","store_id",ctx.storeId,"PC");
-   const o=await insert("purchase_orders",{store_id:ctx.storeId,number,delivery_date:f.delivery_date.value,list_id:f.list_id.value||null,count_id:f.count_id.value||null,observation:f.observation.value.trim()||null,status:"draft",created_by:ctx.userId});
+   const o=await insert("purchase_orders",{store_id:ctx.storeId,number,delivery_date:f.delivery_date.value,list_id:null,count_id:f.count_id.value||null,observation:f.observation.value.trim()||null,status:"draft",created_by:ctx.userId});
    await buildLines(ctx,o,{replace:false});
    toast("Pedido "+number+" criado com as sugestões.");ctx.go(ctx.base+"/pedidos/"+o.id);
   }});
