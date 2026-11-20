@@ -95,14 +95,16 @@ function ensureShell(){
  });
 }
 
+let softReload=false;
 async function runModule(seq,mod,info){
  const el=root.querySelector("#content");
- el.innerHTML=skeleton(info.kind);
- window.scrollTo(0,0);
+ // ctx.reload() (depois de salvar algo) não mostra o esqueleto nem volta ao topo: a tela só é atualizada.
+ const soft=softReload;softReload=false;
+ if(!soft){el.innerHTML=skeleton(info.kind);window.scrollTo(0,0)}
  const ctx={...info,app,el,userId:app.session.user.id,go,
   base:info.area==="matriz"?"#/matriz":"#/loja/"+encodeURIComponent(info.storeId),
   isCurrent:()=>seq===renderSeq,
-  reload:()=>route()};
+  reload:()=>{softReload=true;route()}};
  try{await mod.render(ctx)}
  catch(error){if(seq===renderSeq)el.innerHTML=alertBox(errorMessage(error))}
 }
