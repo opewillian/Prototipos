@@ -5,7 +5,8 @@ import {pageHead,btn,dataTable,searchBox,openDrawer,field,input,toggle,select,to
 import {loadItems} from "../shared/catalog.js";
 import {loadBrands,edit as editBrand} from "./marcas.js";
 
-const UNITS=[["un","un (unidade)"],["kg","kg"],["g","g"],["l","l (litro)"],["ml","ml"],["cx","cx (caixa)"],["pct","pct (pacote)"],["fd","fd (fardo)"],["dz","dz (dúzia)"],["pc","pc (peça)"],["par","par"]];
+// Só estas três: o banco também só aceita un, kg e l (items_base_unit_check, docs/sql/10-unidades-un-kg-l.sql).
+const UNITS=[["un","Unidade (un)"],["kg","Quilo (kg)"],["l","Litro (l)"]];
 // Mesmos valores aceitos pela coluna items.item_type (docs/sql/04-itens-marca-tipo.sql).
 export const ITEM_TYPES=["Matéria-prima","Revenda","Embalagem","Produto acabado","Uso e consumo","Outras","Ativo imobilizado"];
 

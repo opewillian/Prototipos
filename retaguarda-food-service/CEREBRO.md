@@ -293,6 +293,7 @@ Regras:
 ### 7.3 Itens
 
 - Código, nome, **tipo**, **marca**, unidade, custo padrão, estoque mínimo, ativo/inativo (status).
+- **Unidades (20/11/2026):** só `un` (unidade), `kg` (quilo) e `l` (litro) — regra `items_base_unit_check` no banco (`10-unidades-un-kg-l.sql`, executado). Convertidos: 1000491 PAÇOCA ROLHA 550G g→kg; 2000263 SACO VIAGEM DELTAEXPRESSO pct→un. Hoje: un 196, kg 40, l 11.
 - **Tipo** (20/11/2026) substitui categoria: Matéria-prima, Revenda, Embalagem, Produto acabado, Uso e consumo, Outras, Ativo imobilizado (check em `items.item_type`). `category` segue no banco só como legado; Contagem e Listas usam `item_type` com fallback para `category`.
 - Colunas `brand` e `item_type` criadas por `docs/sql/04-itens-marca-tipo.sql`; a tela de Itens só grava depois desse SQL rodar.
 - Migração do Everest: `05-importar-itens-cgh.sql` (247 itens "Sim" da CGH, emp 57) e `06-importar-itens-cgh-avaliar.sql` (91 "Avaliar"), origem `Documents/MFT/ITENS_CGH_EVEREST.xlsx`; pulam códigos já cadastrados. Marca vem vazia.
