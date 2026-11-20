@@ -343,6 +343,7 @@ Regras:
 
 ### 8.2 Listas de contagem e compras
 
+- **Sugestões ao digitar (20/11/2026, `src/core/suggest.js`, ligado em `main.js`):** todo `<input list>` do sistema (adicionar item em Listas, Contagem, Pedidos, Notas/Perdas/Transferências e vínculo de fornecedor) troca a lista nativa por uma lista própria: procura por partes do nome ou código, sem acento, até 40 resultados (começa-com primeiro), ↑ ↓ Enter Esc e toque; ao escolher dispara Enter, que cada tela já usa para adicionar.
 - **Planilhas (20/11/2026, `src/modules/loja/listas-planilha.js`):** *Importar planilha* (na tela de Listas cria lista nova; dentro de uma lista acrescenta itens) lê .xlsx/.xls/.csv, reconhece cabeçalho "Código"/"Nome" (sem cabeçalho = 1ª coluna é código), casa por código (sem zeros à esquerda) e depois por nome, mantém a ordem, ignora repetidos e mostra antes de gravar o que não foi achado ou não está liberado para a loja (marca/inativo). *Exportar planilha* gera .xlsx com Ordem, Código, Nome, Tipo, Unidade (mesmo formato aceito na importação). Biblioteca SheetJS 0.20.3 (cdn.sheetjs.com), carregada só ao usar.
 
 - Lista vinculada à loja, nome, tipo: contagem, compra ou ambos, status ativo.

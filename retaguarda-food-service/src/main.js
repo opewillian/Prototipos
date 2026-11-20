@@ -7,6 +7,7 @@ import {matrizEnabled,matrizCanEdit} from "./areas/matriz/shell.js";
 import {enabledModules,lojaCanEdit} from "./areas/loja/shell.js";
 import {hasMatrix,storeAllowed} from "./core/access.js";
 import {setAuditUser} from "./core/audit.js";
+import {enableSuggest} from "./core/suggest.js";
 import {appShell,updateShell,bindAppShell,markStore} from "./areas/shell.js";
 
 const LAST_KEY="rfs-last-route";
@@ -165,4 +166,5 @@ async function start(){
  window.addEventListener("hashchange",route);
  route();
 }
+enableSuggest();
 start();
