@@ -37,22 +37,19 @@ export async function render(ctx){
  ctx.el.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>newOrder(ctx));
 }
 
+// Sem formulário: cria o rascunho na hora (entrega em 2 dias, última contagem finalizada) e já calcula as sugestões.
+// Entrega, contagem de referência e observação ficam no próprio pedido.
+let creating=false;
 async function newOrder(ctx){
- const [counts]=await Promise.all([
-  list("stock_counts",{select:"id,display_id,count_date,finalized_at",eq:{store_id:ctx.storeId,status:"finalized"},order:"count_date",order2:"finalized_at",limit:20})
- ]);
- openDrawer({title:"Novo pedido de compra",submitLabel:"Criar e calcular sugestão",body:'<div class="form-grid">'+
-  field("Entrega prevista",input("delivery_date",addDays(today(),2),{type:"date",required:true}))+
-  field("Contagem de referência",select("count_id",counts.map(c=>[c.id,c.display_id+" · "+dateBR(c.count_date)]),counts[0]?.id||"",{placeholder:counts.length?"Sem contagem (incluir itens à mão)":"Nenhuma contagem finalizada"}))+
-  '<div class="span-2">'+field("Observação",textarea("observation","",{rows:2}))+'</div></div>'+
-  (counts.length?'':alertBox("Sem contagem finalizada a sugestão não pode ser calculada; você ainda pode informar as quantidades manualmente.","info")),
-  onSubmit:async form=>{
-   const f=form.elements;if(!f.delivery_date.value)throw Error("Informe a data de entrega.");
-   const number=await nextNumber("purchase_orders","number","store_id",ctx.storeId,"PC");
-   const o=await insert("purchase_orders",{store_id:ctx.storeId,number,delivery_date:f.delivery_date.value,list_id:null,count_id:f.count_id.value||null,observation:f.observation.value.trim()||null,status:"draft",created_by:ctx.userId});
-   await buildLines(ctx,o,{replace:false});
-   toast("Pedido "+number+" criado com as sugestões.");ctx.go(ctx.base+"/pedidos/"+o.id);
-  }});
+ if(creating)return;creating=true;
+ try{
+  const counts=await list("stock_counts",{select:"id",eq:{store_id:ctx.storeId,status:"finalized"},order:"count_date",order2:"finalized_at",limit:1});
+  const number=await nextNumber("purchase_orders","number","store_id",ctx.storeId,"PC");
+  const o=await insert("purchase_orders",{store_id:ctx.storeId,number,delivery_date:addDays(today(),2),list_id:null,count_id:counts[0]?.id||null,observation:null,status:"draft",created_by:ctx.userId});
+  await buildLines(ctx,o,{replace:false});
+  toast("Pedido "+number+" criado"+(counts[0]?" com as sugestões da última contagem.":"."));ctx.go(ctx.base+"/pedidos/"+o.id);
+ }catch(error){toast(errorMessage(error),"danger")}
+ finally{creating=false}
 }
 
 /** Monta/recalcula as linhas do pedido com base em lista, contagem e histórico. */
@@ -88,9 +85,10 @@ async function buildLines(ctx,order,{replace}){
 }
 
 async function detail(ctx,id){
- const [order,lines,items,suppliers,links,lastCosts]=await Promise.all([
+ const [order,lines,items,suppliers,links,lastCosts,counts]=await Promise.all([
   get("purchase_orders",id),list("purchase_order_items",{eq:{order_id:id},order:"created_at",asc:true}),
-  loadItems({store:ctx.store}),loadSuppliers(),list("store_item_suppliers",{eq:{store_id:ctx.storeId,active:true}}),loadLastCosts(ctx.storeId)
+  loadItems({store:ctx.store}),loadSuppliers(),list("store_item_suppliers",{eq:{store_id:ctx.storeId,active:true}}),loadLastCosts(ctx.storeId),
+  list("stock_counts",{select:"id,display_id,count_date,finalized_at",eq:{store_id:ctx.storeId,status:"finalized"},order:"count_date",order2:"finalized_at",limit:20})
  ]);
  if(!ctx.isCurrent())return;
  if(order.store_id!==ctx.storeId)throw Error("Este pedido pertence a outra loja.");
@@ -134,9 +132,13 @@ async function detail(ctx,id){
   }).join("");
   const available=items.filter(i=>i.active!==false&&!rows.some(r=>r.item_id===i.id));
   ctx.el.innerHTML=backLink(ctx.base+"/pedidos","Pedidos de compra")+
-   '<div class="doc-head"><div><div class="doc-title"><h1>Pedido '+e(order.number)+'</h1>'+statusPill(order.status)+'</div><p class="muted" style="margin:6px 0 0">'+(order.observation?e(order.observation):'Entrega prevista para '+dateBR(order.delivery_date))+'</p></div>'+
+   '<div class="doc-head"><div><div class="doc-title"><h1>Pedido '+e(order.number)+'</h1>'+statusPill(order.status)+'</div>'+(editable?'':'<p class="muted" style="margin:6px 0 0">'+(order.observation?e(order.observation):'Entrega prevista para '+dateBR(order.delivery_date))+'</p>')+'</div>'+
    '<div class="page-actions">'+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+
    (["draft","sent","realizing"].includes(order.status)?btn("Cancelar",{variant:"ghost",attrs:'data-status="cancelled"'}):'')+actions+'</div></div>'+
+   (editable?'<section class="card"><div class="card-body"><div class="form-grid order-head">'+
+    field("Entrega prevista",input("delivery_date",order.delivery_date,{type:"date",required:true,attrs:"data-head"}))+
+    field("Contagem de referência",'<select class="control" name="count_id" data-head><option value="">'+(counts.length?"Sem contagem (incluir itens à mão)":"Nenhuma contagem finalizada")+'</option>'+counts.map(c=>'<option value="'+e(c.id)+'"'+(c.id===order.count_id?" selected":"")+'>'+e(c.display_id+" · "+dateBR(c.count_date))+'</option>').join("")+'</select>')+
+    field("Observação",input("observation",order.observation||"",{placeholder:"Opcional",attrs:"data-head"}))+'</div></div></section>':'')+
    '<div class="doc-meta"><div><small>Entrega prevista</small><strong>'+dateBR(order.delivery_date)+'</strong></div><div><small>Contagem de referência</small><strong>'+(count?e(count.display_id)+' · '+dateBR(count.count_date):"—")+'</strong></div>'+
    '<div><small>Dias até a entrega</small><strong>'+(count?days:"—")+'</strong></div><div><small>Total do pedido</small><strong data-grand>'+money(total())+'</strong></div></div>'+
    '<section class="card">'+(editable?'<div class="add-row">'+field("Incluir item",'<input class="control" id="add-item" list="dl-po" placeholder="Nome ou código" autocomplete="off"><datalist id="dl-po">'+available.map(i=>'<option value="'+e(i.name+(i.code?" · "+i.code:""))+'">').join("")+'</datalist>')+
@@ -159,6 +161,16 @@ async function detail(ctx,id){
   const q=ctx.el.querySelector("#q");q?.addEventListener("input",()=>{const t=searchKey(q.value).trim();ctx.el.querySelectorAll("tr[data-search]").forEach(r=>r.hidden=!!t&&!r.dataset.search.includes(t))});
   ctx.el.querySelectorAll("[data-status]").forEach(b=>b.onclick=()=>changeStatus(b.dataset.status));
   if(!editable)return;
+  // Entrega e contagem mudam a sugestão: gravam e recalculam. Observação só grava.
+  ctx.el.querySelectorAll("[data-head]").forEach(el=>el.addEventListener("change",async()=>{
+   try{
+    if(el.name==="observation"){Object.assign(order,await update("purchase_orders",id,{observation:el.value.trim()||null},{status:"draft"}));return toast("Observação salva.")}
+    if(el.name==="delivery_date"&&!el.value){el.value=order.delivery_date;return toast("Informe a data de entrega.","danger")}
+    Object.assign(order,await update("purchase_orders",id,{[el.name]:el.value||null},{status:"draft"}));
+    await buildLines(ctx,order,{replace:el.name==="delivery_date"});
+    toast(el.name==="delivery_date"?"Entrega atualizada; sugestões recalculadas.":"Contagem trocada; sugestões recalculadas.");ctx.reload();
+   }catch(error){toast(errorMessage(error),"danger")}
+  }));
   ctx.el.querySelectorAll("tr[data-id] input").forEach(i=>{i.addEventListener("change",()=>saveLine(i.closest("tr")));i.addEventListener("focus",()=>i.select())});
   ctx.el.querySelectorAll("[data-sup]").forEach(s=>s.addEventListener("change",async()=>{
    const r=rows.find(x=>x.id===s.closest("tr").dataset.id);

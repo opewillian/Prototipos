@@ -381,3 +381,8 @@ tr.is-saving{opacity:.6}
 .fbar-clear:hover{color:var(--brand)}
 .fbar-result{flex:none;margin-left:auto;padding-left:4px;white-space:nowrap;color:var(--muted);font-size:12.5px;text-align:right;line-height:1.25}
 .fbar-result b{color:var(--ink)}
+
+/* Perda e pedido: dados do lançamento no topo */
+.loss-head{grid-template-columns:180px minmax(0,1fr) minmax(0,1.4fr)}
+.order-head{grid-template-columns:180px minmax(0,1fr) minmax(0,1.4fr)}
+@media (max-width:760px){.loss-head,.order-head{grid-template-columns:1fr}}

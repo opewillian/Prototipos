@@ -395,6 +395,8 @@ Regras:
 
 ### 8.5 Pedidos de compra
 
+- **20/11/2026:** sem formulário inicial — "Novo pedido" cria o rascunho (entrega em 2 dias, última contagem finalizada) e já calcula as sugestões; **Entrega prevista, Contagem de referência e Observação** ficam no topo do pedido; trocar entrega ou contagem grava e recalcula.
+
 Fluxo-alvo:
 
 1. Selecionar lista de compra existente da loja.
@@ -430,6 +432,8 @@ Regras de UX já decididas:
 - Registrar origem, destino, usuário, data e memória de movimentação.
 
 ### 8.7 Perdas
+
+- **20/11/2026:** sem formulário inicial — "Registrar perda" cria o rascunho (data de hoje, motivo vazio; reabre rascunho vazio existente) e abre o lançamento; **Data, Motivo e Detalhe** ficam no topo e gravam ao sair do campo (`losses.reason` = "Motivo — detalhe"). Registrar baixa exige motivo.
 
 - Registrar perda por motivo, data, itens, quantidade, custo e status.
 - Tipos usuais: validade, quebra, avaria, descarte (taxonomia a detalhar).
