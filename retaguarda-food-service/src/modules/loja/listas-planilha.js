@@ -27,20 +27,21 @@ function matchRows(rows,items){
   if(c>=0||n>=0){head=r;codeCol=c;nameCol=n===c?-1:n}
  }
  if(head<0){codeCol=0;nameCol=-1} // sem cabeçalho: 1ª coluna = código
- const byCode=new Map(),byName=new Map(),hidden=new Map();
- for(const i of items){
-  const target=i.active!==false?null:hidden;
-  if(target){if(i.code)hidden.set(normCode(i.code),i);continue}
-  if(i.code)byCode.set(normCode(i.code),i);byName.set(normName(i.name),i);
- }
- const found=[],missing=[],blocked=[],seen=new Set();let dup=0;
+ // Itens liberados para a loja e itens que existem mas estão bloqueados (outra marca ou inativos).
+ const ok={code:new Map(),name:new Map()},off={code:new Map(),name:new Map()};
+ for(const i of items){const t=i.active!==false?ok:off;if(i.code)t.code.set(normCode(i.code),i);t.name.set(normName(i.name),i)}
+ const look=(t,code,name)=>(String(code??"").trim()!==""&&t.code.get(normCode(code)))||(name&&t.name.get(normName(name)))||(codeCol===0&&head<0&&t.name.get(normName(code)))||null;
+ const found=[],missing=[],blocked=[],seen=new Set(),seenOther=new Set();let dup=0;
  for(const row of rows.slice(head+1)){
   const code=codeCol>=0?row?.[codeCol]:"",name=nameCol>=0?row?.[nameCol]:"";
   if(String(code??"").trim()===""&&String(name??"").trim()==="")continue;
-  const it=(code!==""&&byCode.get(normCode(code)))||(name&&byName.get(normName(name)))||(codeCol===0&&head<0&&byName.get(normName(code)));
+  const it=look(ok,code,name);
   if(it){if(seen.has(it.id)){dup++;continue}seen.add(it.id);found.push(it);continue}
-  const label=[String(code??"").trim(),String(name??"").trim()].filter(Boolean).join(" · ");
-  (hidden.has(normCode(code))?blocked:missing).push(label);
+  const other=look(off,code,name);
+  const key=other?"i:"+other.id:"t:"+normCode(code)+"|"+normName(name);
+  if(seenOther.has(key)){dup++;continue}seenOther.add(key);
+  if(other)blocked.push([other.code,other.name].filter(Boolean).join(" · "));
+  else missing.push([String(code??"").trim(),String(name??"").trim()].filter(Boolean).join(" · "));
  }
  return {found,missing,blocked,dup,hasHeader:head>=0};
 }
