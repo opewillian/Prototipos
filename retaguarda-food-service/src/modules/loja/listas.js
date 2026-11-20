@@ -70,8 +70,9 @@ async function detail(ctx,id){
    '<section class="card"><div class="add-row no-print">'+
     field("Adicionar item",'<input class="control" id="add-item" list="dl-items" placeholder="Digite o nome ou código do item" autocomplete="off"><datalist id="dl-items">'+available.map(i=>'<option value="'+e(i.name+(i.code?" · "+i.code:""))+'">').join("")+'</datalist>')+
     btn("Adicionar",{icon:"plus",attrs:"data-add"})+
-    (cats.length?field("Adicionar um tipo inteiro",'<select class="control" id="add-cat"><option value="">Selecione</option>'+cats.map(c=>'<option>'+e(c)+'</option>').join("")+'</select>'):'')+
-    (cats.length?btn("Adicionar todos",{variant:"secondary",attrs:"data-add-cat"}):'')+'</div>'+
+    // Sempre no mesmo lugar (desativado quando não sobra item), para a tela não mudar ao adicionar.
+    field("Adicionar um tipo inteiro",'<select class="control" id="add-cat"'+(cats.length?'':' disabled')+'><option value="">'+(cats.length?'Selecione':'Nenhum item disponível')+'</option>'+cats.map(c=>'<option>'+e(c)+'</option>').join("")+'</select>')+
+    btn("Adicionar todos",{variant:"secondary",attrs:"data-add-cat",disabled:!cats.length})+'</div>'+
    '<div class="print-only" style="padding:16px 18px"><h2>'+e(lst.name)+'</h2><p>Loja: '+e(ctx.store.name)+' · Data: ____/____/______ · Responsável: ______________________</p></div>'+
    // A busca fica sempre no mesmo lugar (mesmo com a lista vazia), para a tela não "pular" no primeiro item.
    '<div class="toolbar no-print" style="padding:14px 18px 0">'+searchBox("q","Buscar na lista")+'</div>'+
