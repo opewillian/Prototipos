@@ -1,0 +1,44 @@
+// Matriz · Marcas: cadastro central (tabela brands), usado no cadastro de itens.
+import {list,insert,update} from "../../core/db.js";
+import {e} from "../../core/format.js";
+import {pageHead,btn,dataTable,searchBox,openDrawer,field,input,toggle,toast,bindSearch,searchKey,emptyState,kpi} from "../../core/ui.js";
+import {loadItems} from "../shared/catalog.js";
+
+export async function loadBrands(){return list("brands",{order:"name",asc:true})}
+const dupMsg=err=>/brands_name_key|duplicate key/i.test(String(err?.message||err))?Error("Já existe uma marca com esse nome."):err;
+
+export async function render(ctx){
+ const [brands,items]=await Promise.all([loadBrands(),loadItems()]);
+ if(!ctx.isCurrent())return;
+ const nItems=id=>items.filter(i=>i.brand_id===id).length;
+ const active=brands.filter(b=>b.active!==false);
+ ctx.el.innerHTML=pageHead("Marcas","Cadastro central de marcas, usado nos itens.",btn("Nova marca",{icon:"plus",attrs:"data-new"}))+
+  '<div class="kpis">'+kpi("Marcas ativas",active.length,"",{icon:"list"})+kpi("Itens com marca",items.filter(i=>i.brand_id).length,"de "+items.length,{icon:"box",tone:"info"})+
+  kpi("Itens sem marca",items.filter(i=>!i.brand_id).length,"",{icon:"alert",tone:"warn"})+kpi("Inativas",brands.length-active.length,"",{icon:"archive",tone:"ok"})+'</div>'+
+  '<section class="card">'+(brands.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar marca")+'</div>'+dataTable([
+   {label:"Marca",render:b=>'<span class="strong">'+e(b.name)+'</span>'},
+   {label:"Itens",cls:"num",render:b=>String(nItems(b.id))},
+   {label:"Situação",render:b=>b.active!==false?'<span class="pill pill-ok">Ativa</span>':'<span class="pill pill-muted">Inativa</span>'},
+   {label:"",cls:"act",render:b=>btn("Editar",{variant:"secondary",sm:true,icon:"edit",attrs:'data-edit="'+e(b.id)+'"'})}
+  ],brands,{rowAttrs:b=>'data-search="'+e(searchKey(b.name))+'"'}).replace('class="table"','class="table stack"')
+  :emptyState("list","Nenhuma marca cadastrada","Cadastre as marcas e depois escolha a marca de cada item.",btn("Cadastrar marca",{icon:"plus",attrs:"data-new"})))+'</section>';
+ bindSearch(ctx.el,"q");
+ ctx.el.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>edit(ctx,null));
+ ctx.el.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>edit(ctx,brands.find(x=>x.id===b.dataset.edit)));
+}
+
+/** Também usado pela tela de Itens ("Nova marca" dentro do item). onSaved recebe a marca gravada. */
+export function edit(ctx,brand,onSaved){
+ const v=brand||{active:true};
+ openDrawer({title:brand?"Editar marca":"Nova marca",body:'<div class="form-grid">'+
+  '<div class="span-2">'+field("Nome da marca",input("name",v.name,{required:true,placeholder:"Ex.: Italac"}))+'</div>'+
+  '<div class="span-2">'+toggle("active",v.active!==false,"Marca ativa")+'</div></div>',
+  onSubmit:async form=>{const f=form.elements;const name=f.name.value.trim().replace(/\s+/g," ");
+   if(!name)throw Error("Informe o nome da marca.");
+   const row={name,active:f.active.checked};
+   let saved;
+   try{saved=brand?await update("brands",brand.id,{...row,updated_at:new Date().toISOString()}):await insert("brands",row)}catch(err){throw dupMsg(err)}
+   toast(brand?"Marca atualizada.":"Marca cadastrada.");
+   if(onSaved)onSaved(saved);else ctx.reload();
+  }});
+}

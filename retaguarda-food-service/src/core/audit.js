@@ -6,7 +6,7 @@ export function setAuditUser(id){currentUser=id}
 
 // Tabelas cujas gravações entram no log automaticamente (linhas de documento ficam de fora).
 export const TRACKED={
- items:"Item",suppliers:"Fornecedor",store_item_suppliers:"Vínculo de fornecedor",purchase_lists:"Lista",
+ items:"Item",brands:"Marca",suppliers:"Fornecedor",store_item_suppliers:"Vínculo de fornecedor",purchase_lists:"Lista",
  stock_counts:"Contagem",purchase_orders:"Pedido de compra",invoices:"Nota fiscal",invoice_payments:"Parcela",
  losses:"Perda",transfers:"Transferência",cmv_closings:"Fechamento de CMV",user_access:"Acessos de usuário"
 };

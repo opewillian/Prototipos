@@ -1,6 +1,7 @@
 // Ambiente Matriz: registro dos módulos e grupos do menu.
 import * as painel from "../../modules/matriz/painel.js";
 import * as itens from "../../modules/matriz/itens.js";
+import * as marcas from "../../modules/matriz/marcas.js";
 import * as fornecedores from "../../modules/matriz/fornecedores.js";
 import * as usuarios from "../../modules/matriz/usuarios.js";
 import * as pedidos from "../../modules/matriz/pedidos.js";
@@ -11,6 +12,7 @@ export const matrizModules=[
  {id:"painel",label:"Painel",icon:"home",mod:painel},
  {id:"pedidos",label:"Pedidos das lojas",icon:"cart",tab:"orders",mod:pedidos},
  {id:"itens",label:"Itens",icon:"box",group:"Cadastros",groupIcon:"edit",tab:"catalog",mod:itens},
+ {id:"marcas",label:"Marcas",icon:"list",group:"Cadastros",tab:"catalog",mod:marcas},
  {id:"fornecedores",label:"Fornecedores",icon:"truck",group:"Cadastros",tab:"suppliers",mod:fornecedores},
  {id:"usuarios",label:"Usuários e acessos",icon:"users",group:"Cadastros",tab:"users",mod:usuarios},
  {id:"log",label:"Log de alterações",icon:"layers",group:"Cadastros",tab:"users",mod:log}
