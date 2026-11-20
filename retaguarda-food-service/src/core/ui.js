@@ -120,10 +120,13 @@ export function errorMessage(error){
 }
 
 // ---- Diálogo de confirmação (sem window.confirm) ----
-export function confirmDialog({title,text="",confirmLabel="Confirmar",danger=false}){
+/** list: [[rótulo,valor],...] mostrado em tópicos; warn: aviso em destaque. */
+export function confirmDialog({title,text="",list=null,warn="",confirmLabel="Confirmar",danger=false}){
  return new Promise(resolve=>{
   const wrap=document.createElement("div");wrap.className="overlay";
-  wrap.innerHTML='<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title"><h2 id="dlg-title">'+e(title)+'</h2>'+(text?'<p>'+e(text)+'</p>':'')+
+  wrap.innerHTML='<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title"><h2 id="dlg-title">'+e(title)+'</h2>'+
+   (list?'<ul class="dlg-list">'+list.map(([k,v])=>'<li><span>'+e(k)+'</span><strong>'+e(v)+'</strong></li>').join("")+'</ul>':'')+
+   (warn?'<div class="dlg-warn">'+icon("alert",16)+'<span>'+e(warn)+'</span></div>':'')+(text?'<p>'+e(text)+'</p>':'')+
    '<div class="dialog-actions">'+btn("Cancelar",{variant:"ghost",attrs:"data-no"})+btn(confirmLabel,{variant:danger?"danger":"primary",attrs:"data-yes"})+'</div></div>';
   const done=v=>{wrap.remove();document.removeEventListener("keydown",onKey);resolve(v)};
   const onKey=ev=>{if(ev.key==="Escape")done(false)};

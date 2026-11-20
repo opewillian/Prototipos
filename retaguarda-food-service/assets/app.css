@@ -358,3 +358,12 @@ tr.is-saving{opacity:.6}
 /* Transferência: destino, data e observação no topo */
 .transfer-head{grid-template-columns:minmax(0,1.2fr) 200px minmax(0,1.6fr)}
 @media (max-width:760px){.transfer-head{grid-template-columns:1fr}}
+
+/* Confirmação com tópicos (confirmDialog list/warn) */
+.dlg-list{list-style:none;margin:14px 0 0;padding:0;border:1px solid var(--line-2);border-radius:10px}
+.dlg-list li{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid var(--line-2);font-size:14px}
+.dlg-list li:last-child{border-bottom:0}
+.dlg-list li span{color:var(--muted)}
+.dlg-list li strong{color:var(--ink);text-align:right}
+.dlg-warn{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--warn-50);color:#7a4900;font-size:13.5px}
+.dlg-warn svg{flex:none;margin-top:1px}
