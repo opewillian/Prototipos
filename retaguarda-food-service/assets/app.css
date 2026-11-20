@@ -309,3 +309,10 @@ tr.is-saving{opacity:.6}
 .th-btn{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:0}
 .th-btn:hover{text-decoration:underline}
 .dialog-count{width:min(720px,100%);max-height:min(760px,calc(100dvh - 32px))}
+
+/* Tabelas que não se adaptam ao celular: mantêm as colunas e ganham rolagem horizontal (contagem). */
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.table-scroll .table{min-width:560px;white-space:nowrap}
+.table-scroll .table td:first-child,.table-scroll .table th:first-child{position:sticky;left:0;z-index:1;background:#fff;white-space:normal;min-width:180px;max-width:260px}
+.table-scroll .table th:first-child{background:var(--brand)}
+.table-scroll tr.is-pending td:first-child{background:#fffaf2}

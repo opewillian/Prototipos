@@ -102,7 +102,7 @@ async function detail(ctx,id){
    (editable?btn("Cancelar contagem",{variant:"ghost",attrs:"data-cancel"})+btn("Finalizar contagem",{variant:"ok",icon:"check",attrs:"data-finalize"}):'')+'</div></div>'+
    '<section class="card">'+
    (rows.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item na contagem")+(editable?'<span class="muted">Digite a quantidade e tecle Enter para ir ao próximo. Vazio = não contado; 0 = sem estoque. O total soma a quantidade e as listas.</span>':'')+'</div>'+
-    '<div class="table-wrap"><table class="table stack"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Quantidade</th>'+
+    '<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Quantidade</th>'+
     cols.map(c=>'<th class="num">'+(editable?'<button class="th-btn" data-edit-col="'+e(c.id)+'" title="Editar as quantidades desta lista">'+e(c.name)+' '+icon("edit",13)+'</button>':e(c.name))+'</th>').join("")+
     '<th class="num">Total</th></tr></thead><tbody>'+rows.map(rowHTML).join("")+'</tbody></table></div>'
     :emptyState("clipboard","Nenhum item liberado para a loja","Os itens aparecem aqui quando tiverem a marca da loja ou a marca Global."))+summary()+'</section>';
@@ -160,7 +160,7 @@ async function detail(ctx,id){
     const all=(await list("purchase_list_items",{select:"item_id,sort_order",eq:{list_id:lid},order:"sort_order",asc:true})).map(r=>r.item_id);
     if(sel.value!==lid)return;
     ids=all.filter(x=>map.get(x)&&map.get(x).active!==false);skipped=all.length-ids.length;
-    body.innerHTML=(ids.length?'<div class="table-wrap"><table class="table stack"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Quantidade</th></tr></thead><tbody>'+
+    body.innerHTML=(ids.length?'<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Quantidade</th></tr></thead><tbody>'+
      ids.map(x=>{const it=map.get(x),v=partsOf(byItem.get(x))[lid];return '<tr data-vl="'+e(x)+'"><td data-label="Item"><span class="strong">'+e(it.name)+'</span><small class="sub">'+e(it.code||"")+'</small></td><td data-label="Unid.">'+e(it.base_unit||"")+'</td><td class="num" data-label="Quantidade"><input class="cell-input" data-vq inputmode="decimal" placeholder="—" value="'+e(v==null?"":inputNum(v))+'" aria-label="Quantidade de '+e(it.name)+'"></td></tr>'}).join("")+
      '</tbody></table></div>':'<p class="muted" style="padding:10px 20px">Esta lista não tem itens liberados para a loja.</p>')+
      (skipped?'<p class="muted" style="padding:8px 20px 0;font-size:12.5px">'+skipped+' item(ns) da lista não estão liberados para esta loja e ficaram de fora.</p>':'');
