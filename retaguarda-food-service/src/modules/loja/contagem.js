@@ -97,7 +97,7 @@ async function detail(ctx,id){
   const rows=rowItems();
   ctx.el.innerHTML=backLink(ctx.base+"/contagem","Contagens")+
    '<div class="doc-head"><div><div class="doc-title"><h1>Contagem '+e(count.display_id)+'</h1>'+statusPill(count.status)+'</div>'+(editable?'':'<p class="muted" style="margin:6px 0 0">'+e(dateBR(count.count_date))+(count.notes?' · '+e(count.notes):'')+'</p>')+'</div>'+
-   '<div class="page-actions">'+(editable?btn("Adicionar via lista",{variant:"secondary",icon:"list",attrs:"data-via-list"}):'')+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+
+   '<div class="page-actions">'+(editable?btn("Adicionar via lista",{variant:"secondary",icon:"list",attrs:"data-via-list"}):'')+
    (editable?btn("Cancelar contagem",{variant:"ghost",attrs:"data-cancel"})+btn("Finalizar contagem",{variant:"ok",icon:"check",attrs:"data-finalize"}):'')+'</div></div>'+
    (editable?'<section class="card"><div class="card-body"><div class="form-grid count-head">'+
     field("Data da contagem",input("count_date",count.count_date,{type:"date",required:true,attrs:"data-head"}))+
@@ -210,7 +210,6 @@ async function detail(ctx,id){
  };
 
  const bind=()=>{
-  ctx.el.querySelector("[data-print]").onclick=()=>window.print();
   // Data e observações gravam sozinhas ao sair do campo.
   ctx.el.querySelectorAll("[data-head]").forEach(el=>el.addEventListener("change",async()=>{
    const patch=el.name==="count_date"?{count_date:el.value}:{notes:el.value.trim()||null};
