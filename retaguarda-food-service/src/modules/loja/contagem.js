@@ -71,10 +71,10 @@ async function detail(ctx,id){
  const rowHTML=r=>{
   const it=map.get(r.item_id)||{name:"Item"};const saved=!!r.id;
   const c=saved?{cost:r.unit_cost}:unitCost(r.item_id,lastCosts,map);
-  const key=searchKey(it.name,it.code,it.category);
+  const key=searchKey(it.name,it.code,it.item_type||it.category);
   if(!editable)return '<tr><td data-label="Item"><span class="strong">'+e(it.name)+'</span><small class="sub">'+e(it.code||"")+'</small></td><td data-label="Unid.">'+e(it.base_unit||"")+'</td><td class="num" data-label="Quantidade">'+num(r.counted_quantity)+'</td><td class="num" data-label="Custo">'+money(r.unit_cost)+'</td><td class="num" data-label="Total">'+money(r.line_total)+'</td></tr>';
   return '<tr data-row="'+(saved?"line:"+e(r.id):"pending:"+e(r.item_id))+'" data-search="'+e(key)+'"'+(saved?'':' class="is-pending"')+'>'+
-   '<td data-label="Item"><span class="strong">'+e(it.name)+'</span><small class="sub">'+e(it.code||"")+(it.category?' · '+e(it.category):'')+'</small></td>'+
+   '<td data-label="Item"><span class="strong">'+e(it.name)+'</span><small class="sub">'+e(it.code||"")+((it.item_type||it.category)?' · '+e(it.item_type||it.category):'')+'</small></td>'+
    '<td data-label="Unid.">'+e(it.base_unit||"")+'</td>'+
    '<td class="num" data-label="Quantidade"><input class="cell-input" data-qty inputmode="decimal" placeholder="Não contado" value="'+e(saved?inputNum(r.counted_quantity):"")+'" aria-label="Quantidade de '+e(it.name)+'"></td>'+
    '<td class="num" data-label="Custo unit."><input class="cell-input" data-cost inputmode="decimal" value="'+e(inputNum(c.cost,4))+'" title="'+e(saved?"Custo gravado":c.source)+'" aria-label="Custo de '+e(it.name)+'"></td>'+

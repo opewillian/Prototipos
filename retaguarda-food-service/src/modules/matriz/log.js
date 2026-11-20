@@ -7,7 +7,7 @@ import {TRACKED} from "../../core/audit.js";
 const ACTIONS={insert:"Criou",update:"Alterou",delete:"Excluiu",access:"Alterou acessos"};
 const STATUS={draft:"rascunho",finalized:"finalizada",cancelled:"cancelado",pending:"pendente",received:"recebida",sent:"enviado",realizing:"em andamento",realized:"realizado",issued:"emitida",recorded:"registrada",paid:"paga"};
 const fmt=v=>v===null||v===undefined||v===""?"vazio":v===true?"sim":v===false?"não":String(STATUS[v]||v);
-const FIELDS={name:"nome",code:"código",category:"categoria",base_unit:"unidade",default_unit_cost:"custo padrão",minimum_stock:"estoque mínimo",composes_cmv:"compõe CMV",active:"situação",
+const FIELDS={name:"nome",code:"código",category:"categoria",item_type:"tipo",brand:"marca",base_unit:"unidade",default_unit_cost:"custo padrão",minimum_stock:"estoque mínimo",composes_cmv:"compõe CMV",active:"situação",
  tax_id:"CNPJ/CPF",phone:"telefone",email:"e-mail",preferred:"preferencial",list_type:"uso",status:"situação",delivery_date:"entrega",observation:"observação",notes:"observações",
  invoice_number:"número",supplier_id:"fornecedor",issue_date:"emissão",entry_date:"entrada",access_key:"chave",purchase_order_id:"pedido vinculado",amount:"valor",due_date:"vencimento",payment_method:"forma de pagamento",reason:"motivo",loss_date:"data",count_date:"data"};
 
