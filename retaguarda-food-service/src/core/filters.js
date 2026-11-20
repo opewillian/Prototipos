@@ -11,7 +11,7 @@ export function filterBar(cfg){
    s.options.map(([v,l])=>'<option value="'+e(v)+'">'+e(l)+'</option>').join("")+'</select>').join("")+
   (cfg.dates?'<input class="control fbar-date" type="date" id="fb-from" title="Data inicial" aria-label="Data inicial"><span class="fbar-sep">até</span><input class="control fbar-date" type="date" id="fb-to" title="Data final" aria-label="Data final">':'')+
   '<button type="button" class="fbar-clear" data-fclear title="Limpar filtros">Limpar</button>'+
-  '<span class="fbar-result"><b data-fcount>0</b>'+(cfg.money!==false?' · <b data-fsum>R$ 0,00</b>':'')+'</span></div></section>';
+  '<span class="fbar-result"><b data-fcount>0</b>'+(cfg.money!==false?'<br><b data-fsum>R$ 0,00</b>':'')+'</span></div></section>';
 }
 
 export function bindFilters(root,cfg){
