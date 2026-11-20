@@ -82,8 +82,8 @@ async function detail(ctx,id){
  };
  const cell=(it,key,p)=>{
   const v=p[key];
-  if(!editable||key!==MANUAL)return '<td class="num" data-label="'+e(key===MANUAL?"Quantidade":(cols.find(c=>c.id===key)?.name||"Lista"))+'">'+(v==null?'<span class="muted">—</span>':num(v))+'</td>';
-  return '<td class="num" data-label="Quantidade"><input class="cell-input" data-qty inputmode="decimal" placeholder="—" value="'+e(v==null?"":inputNum(v))+'" aria-label="Quantidade de '+e(it.name)+'"></td>';
+  if(!editable||key!==MANUAL)return '<td class="num" data-label="'+e(key===MANUAL?"Padrão":(cols.find(c=>c.id===key)?.name||"Lista"))+'">'+(v==null?'<span class="muted">—</span>':num(v))+'</td>';
+  return '<td class="num" data-label="Padrão"><input class="cell-input" data-qty inputmode="decimal" placeholder="—" value="'+e(v==null?"":inputNum(v))+'" aria-label="Quantidade de '+e(it.name)+'"></td>';
  };
  const rowHTML=it=>{
   const l=byItem.get(it.id),p=partsOf(l);
@@ -101,8 +101,8 @@ async function detail(ctx,id){
    '<div class="page-actions">'+(editable?btn("Adicionar via lista",{variant:"secondary",icon:"list",attrs:"data-via-list"}):'')+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+
    (editable?btn("Cancelar contagem",{variant:"ghost",attrs:"data-cancel"})+btn("Finalizar contagem",{variant:"ok",icon:"check",attrs:"data-finalize"}):'')+'</div></div>'+
    '<section class="card">'+
-   (rows.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item na contagem")+(editable?'<span class="muted">Digite a quantidade e tecle Enter para ir ao próximo. Vazio = não contado; 0 = sem estoque. O total soma a quantidade e as listas.</span>':'')+'</div>'+
-    '<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Total</th><th class="num">Quantidade</th>'+
+   (rows.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item na contagem")+(editable?'<span class="muted">Digite a quantidade e tecle Enter para ir ao próximo. Vazio = não contado; 0 = sem estoque. O total soma a coluna Padrão e as listas.</span>':'')+'</div>'+
+    '<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Total</th><th class="num">Padrão</th>'+
     cols.map(c=>'<th class="num">'+(editable?'<button class="th-btn" data-edit-col="'+e(c.id)+'" title="Editar as quantidades desta lista">'+e(c.name)+' '+icon("edit",13)+'</button>':e(c.name))+'</th>').join("")+
     '</tr></thead><tbody>'+rows.map(rowHTML).join("")+'</tbody></table></div>'
     :emptyState("clipboard","Nenhum item liberado para a loja","Os itens aparecem aqui quando tiverem a marca da loja ou a marca Global."))+summary()+'</section>';

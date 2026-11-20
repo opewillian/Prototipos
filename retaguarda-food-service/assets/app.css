@@ -320,3 +320,6 @@ tr.is-saving{opacity:.6}
 .table-scroll .table th:nth-child(-n+2){background:var(--brand)}
 .table-scroll tr.is-pending td:nth-child(-n+2){background:#fffaf2}
 @media (max-width:640px){.table-scroll .table td:first-child,.table-scroll .table th:first-child{width:150px;min-width:150px;max-width:150px}.table-scroll .table td:nth-child(2),.table-scroll .table th:nth-child(2){left:150px;width:56px;min-width:56px;max-width:56px}}
+
+/* Contagem: títulos das colunas só com a primeira letra maiúscula (como foram escritos). */
+.table-scroll .table th{text-transform:none;letter-spacing:0;font-size:12.5px}
