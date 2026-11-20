@@ -23,10 +23,6 @@ export async function render(ctx){
  const qn=id=>lines.filter(l=>l.count_id===id).length;
  const last=counts.find(c=>c.status==="finalized");const drafts=counts.filter(c=>c.status==="draft");
  ctx.el.innerHTML=pageHead("Contagem de estoque","Inventários da loja. A contagem finalizada atualiza o estoque.",btn("Nova contagem",{icon:"plus",attrs:"data-new"}))+
-  '<div class="kpis">'+kpi("Última contagem finalizada",last?dateBR(last.count_date):"—",last?last.display_id:"Nenhuma ainda",{icon:"clipboard"})+
-  kpi("Valor do último inventário",last?money(tot(last.id)):"—","",{icon:"cash",tone:"ok"})+
-  kpi("Em andamento",drafts.length,drafts.length?"Rascunhos abertos":"",{icon:"edit",tone:drafts.length?"warn":""})+
-  kpi("Total de contagens",counts.length,"",{icon:"layers",tone:"info"})+'</div>'+
   filterBar({search:"Número ou observação",dates:true,noun:["contagem","contagens"],selects:[{key:"st",all:"Todas as situações",options:[["draft","Rascunho"],["finalized","Finalizada"],["cancelled","Cancelada"]]}]})+
   '<section class="card">'+(counts.length?dataTable([
    {label:"Contagem",render:c=>'<span class="strong">'+e(c.display_id)+'</span>'+(c.notes?'<small class="sub">'+e(c.notes)+'</small>':'')},

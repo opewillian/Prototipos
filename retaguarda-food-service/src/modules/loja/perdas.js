@@ -18,9 +18,6 @@ export async function render(ctx){
  const byReason={};for(const r of monthRows){const k=String(r.reason).split(" — ")[0];byReason[k]=(byReason[k]||0)+tot(r.id)}
  const top=Object.entries(byReason).sort((a,b)=>b[1]-a[1])[0];
  ctx.el.innerHTML=pageHead("Perdas","Registro de perdas com baixa no estoque e valor para o CMV.",btn("Registrar perda",{icon:"plus",attrs:"data-new"}))+
-  '<div class="kpis">'+kpi("Perdas no mês",money(monthRows.reduce((s,r)=>s+tot(r.id),0)),monthRows.length+" registro(s)",{icon:"trash",tone:"warn"})+
-  kpi("Principal motivo",top?top[0]:"—",top?money(top[1]):"",{icon:"alert"})+
-  kpi("Rascunhos",rows.filter(r=>r.status==="draft").length,"",{icon:"edit",tone:"info"})+kpi("Total registrado",money(rec.reduce((s,r)=>s+tot(r.id),0)),"",{icon:"chart",tone:"ok"})+'</div>'+
   filterBar({search:"Motivo ou detalhe",dates:true,noun:["perda","perdas"],selects:[
    {key:"reason",all:"Todos os motivos",options:REASONS.map(r=>[r,r])},
    {key:"st",all:"Todas as situações",options:[["draft","Rascunho"],["recorded","Registrada"],["cancelled","Cancelada"]]}]})+
