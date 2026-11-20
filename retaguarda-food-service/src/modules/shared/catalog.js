@@ -2,8 +2,16 @@
 import {list} from "../../core/db.js";
 import {round2} from "../../core/format.js";
 
-export async function loadItems({activeOnly=false}={}){
- return list("items",{order:"name",asc:true,eq:activeOnly?{active:true}:{}});
+/**
+ * Itens do catálogo. Com `store` (tela de loja): a loja só usa itens da marca dela + da marca global; item sem marca
+ * não aparece em loja nenhuma. Os demais voltam marcados como inativos (_offBrand) — somem das escolhas, mas
+ * documentos antigos continuam achando o nome do item pelo id.
+ */
+export async function loadItems({activeOnly=false,store=null}={}){
+ const [items,brands]=await Promise.all([list("items",{order:"name",asc:true,eq:activeOnly?{active:true}:{}}),store&&store.store_type!=="matrix"?list("brands",{select:"id,is_global"}):null]);
+ if(!brands)return items;
+ const ok=new Set(brands.filter(b=>b.is_global).map(b=>b.id));if(store.brand_id)ok.add(store.brand_id);
+ return items.map(i=>ok.has(i.brand_id)?i:{...i,active:false,_offBrand:true});
 }
 export async function loadSuppliers({activeOnly=false}={}){
  return list("suppliers",{order:"name",asc:true,eq:activeOnly?{active:true}:{}});

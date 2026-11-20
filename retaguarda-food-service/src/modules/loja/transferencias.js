@@ -38,7 +38,7 @@ export async function render(ctx){
 }
 
 async function detail(ctx,id){
- const [t,lines,items,lastCosts,balances]=await Promise.all([get("transfers",id),list("transfer_items",{eq:{transfer_id:id}}),loadItems(),loadLastCosts(ctx.storeId),loadBalances(ctx.storeId)]);
+ const [t,lines,items,lastCosts,balances]=await Promise.all([get("transfers",id),list("transfer_items",{eq:{transfer_id:id}}),loadItems({store:ctx.store}),loadLastCosts(ctx.storeId),loadBalances(ctx.storeId)]);
  if(!ctx.isCurrent())return;
  if(t.from_store_id!==ctx.storeId&&t.to_store_id!==ctx.storeId)throw Error("Transferência de outra loja.");
  const name=sid=>ctx.app.stores.find(s=>s.id===sid)?.name||sid;

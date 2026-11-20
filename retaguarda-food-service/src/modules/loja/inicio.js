@@ -9,7 +9,7 @@ import {enabledModules} from "../../areas/loja/shell.js";
 export async function render(ctx){
  const on=new Set(enabledModules(ctx.app,ctx.storeId).map(m=>m.id));
  const [items,balances,lastCosts,counts,orders,invoices,pays,moves]=await Promise.all([
-  loadItems(),loadBalances(ctx.storeId),loadLastCosts(ctx.storeId),
+  loadItems({store:ctx.store}),loadBalances(ctx.storeId),loadLastCosts(ctx.storeId),
   list("stock_counts",{select:"id,display_id,count_date,status",eq:{store_id:ctx.storeId},order:"count_date",limit:20}),
   list("purchase_orders",{select:"id,number,delivery_date,status",eq:{store_id:ctx.storeId},in:{status:["draft","sent","realizing"]},order:"delivery_date",asc:true}),
   list("invoices",{select:"id,invoice_number,entry_date,status",eq:{store_id:ctx.storeId,status:"pending"}}),

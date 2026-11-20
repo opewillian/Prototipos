@@ -34,7 +34,7 @@ export async function render(ctx){
 }
 
 async function detail(ctx,id){
- const [loss,lines,items,lastCosts,balances]=await Promise.all([get("losses",id),list("loss_items",{eq:{loss_id:id}}),loadItems(),loadLastCosts(ctx.storeId),loadBalances(ctx.storeId)]);
+ const [loss,lines,items,lastCosts,balances]=await Promise.all([get("losses",id),list("loss_items",{eq:{loss_id:id}}),loadItems({store:ctx.store}),loadLastCosts(ctx.storeId),loadBalances(ctx.storeId)]);
  if(!ctx.isCurrent())return;
  if(loss.store_id!==ctx.storeId)throw Error("Registro de outra loja.");
  const editable=loss.status==="draft";const map=byId(items);

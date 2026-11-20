@@ -48,7 +48,7 @@ async function detail(ctx,id){
  const [lst,lines,items]=await Promise.all([
   get("purchase_lists",id),
   list("purchase_list_items",{eq:{list_id:id},order:"sort_order",asc:true,order2:"created_at",asc2:true}),
-  loadItems()
+  loadItems({store:ctx.store})
  ]);
  if(!ctx.isCurrent())return;
  if(lst.store_id!==ctx.storeId)throw Error("Esta lista pertence a outra loja.");

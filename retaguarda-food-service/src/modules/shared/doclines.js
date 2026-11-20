@@ -38,7 +38,7 @@ export function mountLines(cfg){
   cfg.el.innerHTML=html;bind();
  };
  const changed=()=>{cfg.onChange?.(lines);const g=cfg.el.querySelector("[data-grand]");if(g)g.textContent=money(total())};
- const findItem=v=>[...items.values()].find(i=>(i.name+(i.code?" · "+i.code:""))===v||(i.code&&i.code.toLowerCase()===v.toLowerCase())||i.name.toLowerCase()===v.toLowerCase());
+ const findItem=v=>[...items.values()].find(i=>i.active!==false&&((i.name+(i.code?" · "+i.code:""))===v||(i.code&&i.code.toLowerCase()===v.toLowerCase())||i.name.toLowerCase()===v.toLowerCase()));
  const bind=()=>{
   if(!cfg.editable)return;
   const ni=cfg.el.querySelector("[data-new-item]"),nq=cfg.el.querySelector("[data-new-qty]"),nc=cfg.el.querySelector("[data-new-cost]");

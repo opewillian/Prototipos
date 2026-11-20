@@ -59,7 +59,7 @@ async function newCount(ctx){
 
 async function detail(ctx,id){
  const [count,lines,items,lastCosts,lists]=await Promise.all([
-  get("stock_counts",id),list("stock_count_items",{eq:{count_id:id}}),loadItems(),loadLastCosts(ctx.storeId),
+  get("stock_counts",id),list("stock_count_items",{eq:{count_id:id}}),loadItems({store:ctx.store}),loadLastCosts(ctx.storeId),
   list("purchase_lists",{eq:{store_id:ctx.storeId,active:true},order:"name",asc:true})
  ]);
  if(!ctx.isCurrent())return;
@@ -162,7 +162,7 @@ async function detail(ctx,id){
   const addInp=ctx.el.querySelector("#add-item");
   const addOne=()=>{
    const v=addInp.value.trim();if(!v)return;
-   const it=items.find(i=>(i.name+(i.code?" · "+i.code:""))===v||(i.code&&i.code.toLowerCase()===v.toLowerCase()));
+   const it=items.find(i=>i.active!==false&&((i.name+(i.code?" · "+i.code:""))===v||(i.code&&i.code.toLowerCase()===v.toLowerCase())));
    if(!it)return toast("Item não encontrado. Escolha uma opção da lista.","danger");
    if(state.lines.some(l=>l.item_id===it.id)||state.pending.includes(it.id))return toast("Este item já está na contagem.","info");
    state.pending.push(it.id);save();draw();

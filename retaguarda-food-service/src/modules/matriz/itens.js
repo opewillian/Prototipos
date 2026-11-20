@@ -21,6 +21,7 @@ export async function render(ctx){
   kpi("Tipos",cats.length,"",{icon:"layers",tone:"ok"})+kpi("Inativos",items.length-active.length,"",{icon:"archive",tone:"warn"})+'</div>'+
   '<section class="card"><div class="card-body" style="padding-bottom:0"><div class="toolbar">'+searchBox("q","Buscar por nome, código ou marca")+
   '<select class="control" id="f-cat"><option value="">Todos os tipos</option>'+cats.map(c=>'<option>'+e(c)+'</option>').join("")+'</select>'+
+  '<select class="control" id="f-brand"><option value="">Todas as marcas</option><option value="-">Sem marca</option>'+brands.map(b=>'<option value="'+e(b.id)+'">'+e(b.name)+'</option>').join("")+'</select>'+
   '<select class="control" id="f-status"><option value="active">Ativos</option><option value="">Todos</option><option value="inactive">Inativos</option></select>'+
   '<span class="grow"></span><span class="muted"><b data-search-count>0</b> itens</span></div></div>'+
   (items.length?dataTable([
@@ -33,18 +34,18 @@ export async function render(ctx){
    {label:"CMV",render:i=>i.composes_cmv?'<span class="pill pill-info">Compõe</span>':'<span class="pill pill-muted">Não</span>'},
    {label:"Situação",render:i=>i.active!==false?'<span class="pill pill-ok">Ativo</span>':'<span class="pill pill-muted">Inativo</span>'},
    {label:"",cls:"act",render:i=>btn("Editar",{variant:"secondary",sm:true,icon:"edit",attrs:'data-edit="'+e(i.id)+'"'})}
-  ],items,{rowAttrs:i=>'data-search="'+e(searchKey(i.name,i.code,i._brand,i.item_type))+'" data-cat="'+e(i.item_type||"")+'" data-active="'+(i.active!==false)+'"'}).replace('class="table"','class="table stack"')
+  ],items,{rowAttrs:i=>'data-search="'+e(searchKey(i.name,i.code,i._brand,i.item_type))+'" data-cat="'+e(i.item_type||"")+'" data-brand="'+e(i.brand_id||"-")+'" data-active="'+(i.active!==false)+'"'}).replace('class="table"','class="table stack"')
   :emptyState("box","Nenhum item cadastrado","Cadastre os insumos e embalagens que as lojas vão contar e comprar.",btn("Cadastrar primeiro item",{icon:"plus",attrs:"data-new"})))+'</section>';
  const filter=()=>{
-  const q=searchKey(ctx.el.querySelector("#q")?.value||"").trim(),cat=ctx.el.querySelector("#f-cat")?.value,st=ctx.el.querySelector("#f-status")?.value;
+  const q=searchKey(ctx.el.querySelector("#q")?.value||"").trim(),cat=ctx.el.querySelector("#f-cat")?.value,br=ctx.el.querySelector("#f-brand")?.value,st=ctx.el.querySelector("#f-status")?.value;
   let shown=0;
   ctx.el.querySelectorAll("tr[data-search]").forEach(r=>{
-   const ok=(!q||r.dataset.search.includes(q))&&(!cat||r.dataset.cat===cat)&&(!st||(st==="active")===(r.dataset.active==="true"));
+   const ok=(!q||r.dataset.search.includes(q))&&(!cat||r.dataset.cat===cat)&&(!br||r.dataset.brand===br)&&(!st||(st==="active")===(r.dataset.active==="true"));
    r.hidden=!ok;if(ok)shown++;
   });
   const c=ctx.el.querySelector("[data-search-count]");if(c)c.textContent=shown;
  };
- ["#q","#f-cat","#f-status"].forEach(s=>ctx.el.querySelector(s)?.addEventListener("input",filter));filter();
+ ["#q","#f-cat","#f-brand","#f-status"].forEach(s=>ctx.el.querySelector(s)?.addEventListener("input",filter));filter();
  ctx.el.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>edit(ctx,null,brands));
  ctx.el.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>edit(ctx,items.find(i=>i.id===b.dataset.edit),brands));
 }

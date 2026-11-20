@@ -61,7 +61,7 @@ async function newOrder(ctx){
 
 /** Monta/recalcula as linhas do pedido com base em lista, contagem e histórico. */
 async function buildLines(ctx,order,{replace}){
- const [items,lastCosts,links,existing]=await Promise.all([loadItems(),loadLastCosts(ctx.storeId),
+ const [items,lastCosts,links,existing]=await Promise.all([loadItems({store:ctx.store}),loadLastCosts(ctx.storeId),
   list("store_item_suppliers",{eq:{store_id:ctx.storeId,active:true}}),list("purchase_order_items",{eq:{order_id:order.id}})]);
  const map=byId(items);
  let count=null,countLines=[];
@@ -94,7 +94,7 @@ async function buildLines(ctx,order,{replace}){
 async function detail(ctx,id){
  const [order,lines,items,suppliers,links,lastCosts]=await Promise.all([
   get("purchase_orders",id),list("purchase_order_items",{eq:{order_id:id},order:"created_at",asc:true}),
-  loadItems(),loadSuppliers(),list("store_item_suppliers",{eq:{store_id:ctx.storeId,active:true}}),loadLastCosts(ctx.storeId)
+  loadItems({store:ctx.store}),loadSuppliers(),list("store_item_suppliers",{eq:{store_id:ctx.storeId,active:true}}),loadLastCosts(ctx.storeId)
  ]);
  if(!ctx.isCurrent())return;
  if(order.store_id!==ctx.storeId)throw Error("Este pedido pertence a outra loja.");
@@ -180,7 +180,7 @@ async function detail(ctx,id){
   });
   const addInp=ctx.el.querySelector("#add-item");
   const add=async()=>{
-   const v=addInp.value.trim();const it=items.find(i=>(i.name+(i.code?" · "+i.code:""))===v||(i.code&&i.code.toLowerCase()===v.toLowerCase()));
+   const v=addInp.value.trim();const it=items.find(i=>i.active!==false&&((i.name+(i.code?" · "+i.code:""))===v||(i.code&&i.code.toLowerCase()===v.toLowerCase())));
    if(!it)return toast("Escolha um item da lista.","danger");
    const cost=unitCost(it.id,lastCosts,map).cost;const ls=links.filter(l=>l.item_id===it.id);
    try{rows.push(await insert("purchase_order_items",{order_id:id,store_id:ctx.storeId,item_id:it.id,requested_quantity:0,unit_cost:cost,line_total:0,supplier_id:(ls.find(l=>l.preferred)||ls[0])?.supplier_id||null}));

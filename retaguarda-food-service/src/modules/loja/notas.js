@@ -79,7 +79,7 @@ async function detail(ctx,id){
   get("invoices",id),list("invoice_items",{eq:{invoice_id:id},order:"created_at",asc:true}),
   list("invoice_payments",{eq:{invoice_id:id},order:"due_date",asc:true}),
   list("invoice_attachments",{eq:{invoice_id:id},order:"created_at",asc:true}).catch(()=>[]),
-  loadItems(),loadSuppliers(),loadLastCosts(ctx.storeId)
+  loadItems({store:ctx.store}),loadSuppliers(),loadLastCosts(ctx.storeId)
  ]);
  if(!ctx.isCurrent())return;
  if(inv.store_id!==ctx.storeId)throw Error("Esta nota pertence a outra loja.");
