@@ -118,7 +118,7 @@ async function detail(ctx,id){
   ctx.el.querySelectorAll("[data-remove]").forEach(b=>b.onclick=async()=>{
    try{await remove("purchase_list_items",b.dataset.remove);const k=lines.findIndex(l=>l.id===b.dataset.remove);if(k>=0)lines.splice(k,1);toast("Item removido da lista.");draw()}catch(error){toast(errorMessage(error),"danger")}
   });
-  ctx.el.querySelector("[data-print]").onclick=()=>window.print();
+  ctx.el.querySelector("[data-print]").onclick=()=>printList(lst,rows,ctx.store.name);
   ctx.el.querySelector("[data-import]").onclick=()=>importListDrawer(ctx,{items,list:lst,existing:inList,startOrder:lines.reduce((m,l)=>Math.max(m,Number(l.sort_order||0)),0)});
   ctx.el.querySelector("[data-export]").onclick=async()=>{
    if(!rows.length)return toast("A lista está vazia.","info");
@@ -134,4 +134,18 @@ async function detail(ctx,id){
   };
  };
  draw();
+}
+
+// Impressão da lista: monta uma folha só com o cabeçalho e a tabela (sem menu, botões ou campos da tela).
+function printList(lst,rows,storeName){
+ document.querySelector(".print-sheet")?.remove();
+ const sheet=document.createElement("div");sheet.className="print-sheet";
+ sheet.innerHTML='<h1>'+e(lst.name)+'</h1><p class="ps-meta">Loja: '+e(storeName)+' · Data: ____/____/______ · Responsável: ______________________</p>'+
+  '<table><thead><tr><th class="ps-n">#</th><th>Item</th><th>Tipo</th><th>Unidade</th><th>Quantidade</th></tr></thead><tbody>'+
+  rows.map((r,i)=>'<tr><td class="ps-n">'+(i+1)+'</td><td><strong>'+e(r.item.name)+'</strong><small>'+e(r.item.code||"")+'</small></td><td>'+e(r.item.item_type||r.item.category||"—")+'</td><td>'+e(r.item.base_unit||"")+'</td><td><span class="ps-blank"></span></td></tr>').join("")+
+  '</tbody></table>';
+ document.body.appendChild(sheet);document.body.classList.add("printing-sheet");
+ const done=()=>{document.body.classList.remove("printing-sheet");sheet.remove();removeEventListener("afterprint",done)};
+ addEventListener("afterprint",done);
+ window.print();
 }
