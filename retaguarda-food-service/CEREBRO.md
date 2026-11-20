@@ -109,7 +109,7 @@ O frontend usa a URL do Supabase e uma **chave publicável**; nunca usar service
 >     src/modules/matriz/  painel, pedidos, itens, fornecedores, unidades, usuarios
 >     src/modules/loja/    inicio, contagem, listas, pedidos, notas, transferencias, perdas, cmv
 >     src/modules/shared/  catalog (itens, saldos, custo), doclines (linhas de documento), demand (consumo e sugestão)
->     docs/sql/            01-anexos-storage.sql, 02-limpar-dados-teste.sql, 03…06 (CGH, marca/tipo, importação de itens) (executar como admin no Supabase)
+>     docs/sql/            01-anexos-storage.sql, 02-limpar-dados-teste.sql, 03…07 (CGH, marca/tipo, importação de itens, marcas) (executar como admin no Supabase)
 >
 > Rotas: `#/matriz/<módulo>[/<id>]` e `#/loja/<loja>/<módulo>[/<id>]`. Cada módulo exporta `render(ctx)`.
 > `npm run test` e `npm run build` validam sintaxe, imports e arquivos obrigatórios (os testes de interface do protótipo foram removidos a pedido do usuário).
@@ -188,7 +188,8 @@ A linha layout-independent-components acima é apenas **descrição conceitual**
 ### Domínios compartilhados da Matriz
 
 - stores: cadastro de unidades provisionadas externamente; na retaguarda, somente leitura.
-- items: catálogo central de produtos e insumos; código, nome, tipo (item_type), marca (brand), categoria (legado), unidade-base, custo padrão, estoque mínimo, ativo, composes_cmv.
+- brands: marcas (cadastro central da Matriz).
+- items: catálogo central de produtos e insumos; código, nome, tipo (item_type), marca (brand_id → brands; brand texto legado), categoria (legado), unidade-base, custo padrão, estoque mínimo, ativo, composes_cmv.
 - suppliers: fornecedores corporativos, cadastro central.
 - store_item_suppliers: vínculo específico **loja × item × fornecedor**, com múltiplos fornecedores possíveis por item e por loja; preferência e condições locais.
 - user_profiles, store_memberships e user_tab_permissions: identidade, associação usuário/loja, papéis e permissões por aba.
@@ -297,6 +298,7 @@ Regras:
 - Migração do Everest: `05-importar-itens-cgh.sql` (247 itens "Sim" da CGH, emp 57) e `06-importar-itens-cgh-avaliar.sql` (91 "Avaliar"), origem `Documents/MFT/ITENS_CGH_EVEREST.xlsx`; pulam códigos já cadastrados. Marca vem vazia.
 - **Executado em 20/11/2026** (SQL Editor, projeto Retaguarda MFT): 04 aplicado (colunas `brand`, `item_type`, check e índice) e 05 importado. Antes: `items` vazia (0). Depois: 247 itens ativos, 0 sem tipo — Matéria-prima 100, Revenda 82, Embalagem 48, Produto acabado 17. O 06 (91 "Avaliar") **não** foi rodado.
 - `items.category` é NOT NULL com default `''`: a tela nova não envia categoria (usa o default).
+- **Marcas (20/11/2026):** tabela `brands` (id, name único sem diferenciar maiúsculas, active, created_at, updated_at) criada por `docs/sql/07-marcas.sql` e executada; RLS igual a items (membro lê, admin da Matriz grava). `items.brand_id` → brands(id) (on delete restrict). Tabela vazia; `items.brand` (texto) fica como legado. Ainda **sem tela**: falta cadastro de Marcas e o seletor de marca no item.
 - Flag **compõe CMV** por item.
 - Cadastro corporativo; parametrização de fornecedor conforme loja.
 - Custo padrão é **fallback** quando ainda não existir compra/nota recebida.
