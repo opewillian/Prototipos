@@ -51,7 +51,7 @@ async function detail(ctx,id){
   '<div class="doc-head"><div><div class="doc-title"><h1>Perda de '+dateBR(loss.loss_date)+'</h1>'+statusPill(loss.status)+'</div>'+(editable?'':'<p class="muted" style="margin:6px 0 0">'+e(loss.reason||"Sem motivo")+'</p>')+'</div>'+
   '<div class="page-actions">'+(editable?btn("Cancelar",{variant:"ghost",attrs:"data-cancel"})+btn("Registrar baixa",{variant:"ok",icon:"check",attrs:"data-record"}):'')+'</div></div>'+
   (editable?(()=>{const [mot,...det]=String(loss.reason||"").split(" — ");return '<section class="card"><div class="card-body"><div class="form-grid loss-head">'+
-    field("Data da perda",input("loss_date",loss.loss_date,{type:"date",required:true,attrs:"data-head"}))+
+    field("Data da perda",input("loss_date",String(loss.loss_date||"").slice(0,10),{type:"date",required:true,attrs:"data-head"}))+
     field("Motivo",'<select class="control" name="motivo" data-head><option value="">Selecione</option>'+REASONS.map(r=>'<option'+(r===mot?" selected":"")+'>'+e(r)+'</option>').join("")+'</select>')+
     field("Detalhe (opcional)",input("detalhe",det.join(" — "),{placeholder:"Ex.: lote 123, freezer desligado",attrs:"data-head"}))+'</div></div></section>'})():'')+
   (loss.status==="recorded"?alertBox("Baixa registrada no estoque da loja.","ok"):'')+card("Itens perdidos",'<div data-lines></div>',{flush:true});
@@ -61,7 +61,7 @@ async function detail(ctx,id){
  const headVal=n=>ctx.el.querySelector('[data-head][name="'+n+'"]')?.value||"";
  ctx.el.querySelectorAll("[data-head]").forEach(el=>el.addEventListener("change",async()=>{
   try{
-   if(el.name==="loss_date"){if(!el.value){el.value=loss.loss_date;return toast("Informe a data.","danger")}
+   if(el.name==="loss_date"){if(!el.value){el.value=String(loss.loss_date||"").slice(0,10);return toast("Informe a data.","danger")}
     Object.assign(loss,await update("losses",id,{loss_date:el.value},{status:"draft"}));ctx.el.querySelector(".doc-title h1").textContent="Perda de "+dateBR(loss.loss_date);toast("Data atualizada.");return}
    const mot=headVal("motivo"),det=headVal("detalhe").trim();
    Object.assign(loss,await update("losses",id,{reason:mot?(mot+(det?" — "+det:"")):(det?"Outros — "+det:"")},{status:"draft"}));
