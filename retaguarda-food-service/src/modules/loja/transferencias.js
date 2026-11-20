@@ -23,17 +23,32 @@ export async function render(ctx){
  const others=destinations(ctx);
  ctx.el.innerHTML=pageHead("Transferências","Envio de mercadorias entre lojas, com saída e entrada automáticas no estoque.",
    btn("Imprimir formulário",{variant:"secondary",icon:"printer",attrs:"data-print-form"})+(others.length?btn("Nova transferência",{icon:"plus",attrs:"data-new"}):""))+
-  '<div class="kpis">'+kpi("Enviadas",out.filter(r=>r.status==="issued").length,money(out.filter(r=>r.status==="issued").reduce((s,r)=>s+tot(r.id),0)),{icon:"swap"})+
-  kpi("Recebidas",inn.filter(r=>r.status==="issued").length,money(inn.filter(r=>r.status==="issued").reduce((s,r)=>s+tot(r.id),0)),{icon:"box",tone:"ok"})+
-  kpi("Rascunhos",out.filter(r=>r.status==="draft").length,"",{icon:"edit",tone:"warn"})+kpi("Lojas habilitadas",others.length,"para receber/enviar",{icon:"store",tone:"info"})+'</div>'+
+  // Filtros no lugar dos cards: busca, direção, situação, loja e período (filtra na tela, sem ir ao banco).
+  '<section class="card"><div class="card-body" style="padding-bottom:0"><div class="toolbar tr-filters">'+searchBox("tq","Número ou observação")+
+   '<select class="control" id="f-dir"><option value="">Enviadas e recebidas</option><option value="out">Enviadas</option><option value="in">Recebidas</option></select>'+
+   '<select class="control" id="f-st"><option value="">Todas as situações</option><option value="draft">Rascunho</option><option value="issued">Emitida</option><option value="cancelled">Cancelada</option></select>'+
+   '<select class="control" id="f-store"><option value="">Todas as lojas</option>'+[...new Set(rows.map(r=>r.from_store_id===ctx.storeId?r.to_store_id:r.from_store_id))].map(id=>[id,name(id)]).sort((a,b)=>a[1].localeCompare(b[1],"pt-BR")).map(([id,n])=>'<option value="'+e(id)+'">'+e(n)+'</option>').join("")+'</select>'+
+   '<label class="tr-date">De <input class="control" type="date" id="f-from"></label><label class="tr-date">Até <input class="control" type="date" id="f-to"></label>'+
+   '<span class="grow"></span><span class="muted"><b data-count>0</b> · <b data-sum>R$ 0,00</b></span></div></div></section>'+
   (others.length?'':alertBox("Nenhuma outra loja está habilitada para transferências no momento.","info"))+
   '<section class="card">'+(rows.length?dataTable([
    {label:"Transferência",render:r=>'<span class="strong">'+e(r.number)+'</span>'+(r.observation?'<small class="sub">'+e(r.observation)+'</small>':'')},
    {label:"Direção",render:r=>r.from_store_id===ctx.storeId?'<span class="tag">Saída</span> para '+e(name(r.to_store_id)):'<span class="tag">Entrada</span> de '+e(name(r.from_store_id))},
    {label:"Data",render:r=>dateBR(r.transfer_date||r.issued_at||r.created_at)},
    {label:"Valor",cls:"num",render:r=>money(tot(r.id))},{label:"Situação",render:r=>statusPill(r.status)}
-  ],rows,{rowHref:r=>ctx.base+"/transferencias/"+r.id}).replace('class="table"','class="table stack"'):emptyState("swap","Nenhuma transferência","As transferências enviadas e recebidas pela loja aparecem aqui."))+'</section>';
+  ],rows,{rowHref:r=>ctx.base+"/transferencias/"+r.id,rowAttrs:r=>{const out=r.from_store_id===ctx.storeId;return 'data-search="'+e(searchKey(r.number,r.observation||""))+'" data-dir="'+(out?"out":"in")+'" data-st="'+e(r.status)+'" data-store="'+e(out?r.to_store_id:r.from_store_id)+'" data-date="'+e(String(r.transfer_date||r.created_at).slice(0,10))+'" data-total="'+tot(r.id)+'"'}}).replace('class="table"','class="table stack"'):emptyState("swap","Nenhuma transferência","As transferências enviadas e recebidas pela loja aparecem aqui."))+'</section>';
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
+ const v=sel=>ctx.el.querySelector(sel)?.value||"";
+ const filter=()=>{
+  const q=searchKey(v("#tq")).trim(),dir=v("#f-dir"),st=v("#f-st"),store=v("#f-store"),from=v("#f-from"),to=v("#f-to");
+  let n=0,sum=0;
+  ctx.el.querySelectorAll("tr[data-search]").forEach(r=>{const d=r.dataset;
+   const ok=(!q||d.search.includes(q))&&(!dir||d.dir===dir)&&(!st||d.st===st)&&(!store||d.store===store)&&(!from||d.date>=from)&&(!to||d.date<=to);
+   r.hidden=!ok;if(ok){n++;sum+=Number(d.total||0)}});
+  const c=ctx.el.querySelector("[data-count]");if(c)c.textContent=n+(n===1?" transferência":" transferências");
+  const m=ctx.el.querySelector("[data-sum]");if(m)m.textContent=money(round2(sum));
+ };
+ ["#tq","#f-dir","#f-st","#f-store","#f-from","#f-to"].forEach(sel=>ctx.el.querySelector(sel)?.addEventListener("input",filter));filter();
  ctx.el.querySelector("[data-print-form]").onclick=async()=>{
   try{printBlankForm(ctx,await loadItems({store:ctx.store}))}catch(error){toast(errorMessage(error),"danger")}
  };

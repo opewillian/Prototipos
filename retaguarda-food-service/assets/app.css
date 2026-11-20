@@ -367,3 +367,9 @@ tr.is-saving{opacity:.6}
 .dlg-list li strong{color:var(--ink);text-align:right}
 .dlg-warn{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--warn-50);color:#7a4900;font-size:13.5px}
 .dlg-warn svg{flex:none;margin-top:1px}
+
+/* Transferências: filtros */
+.tr-filters{flex-wrap:wrap;gap:10px}
+.tr-filters .control{width:auto}
+.tr-date{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
+.tr-date .control{width:150px}
