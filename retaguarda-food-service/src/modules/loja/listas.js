@@ -4,6 +4,7 @@ import {e,dateBR} from "../../core/format.js";
 import {icon} from "../../core/icons.js";
 import {pageHead,btn,dataTable,searchBox,openDrawer,field,input,select,toggle,toast,confirmDialog,bindSearch,searchKey,emptyState,backLink,errorMessage,card} from "../../core/ui.js";
 import {loadItems,byId} from "../shared/catalog.js";
+import {importListDrawer,exportList} from "./listas-planilha.js";
 
 export const LIST_TYPES=[["both","Contagem e compra"],["count","Contagem"],["order","Compra"]];
 const typeLabel=t=>(LIST_TYPES.find(x=>x[0]===t)||[,t])[1];
@@ -16,7 +17,7 @@ export async function render(ctx){
  ]);
  if(!ctx.isCurrent())return;
  const n=id=>links.filter(l=>l.list_id===id).length;
- ctx.el.innerHTML=pageHead("Listas","Monte listas de itens para agilizar contagens e pedidos.",btn("Nova lista",{icon:"plus",attrs:"data-new"}))+
+ ctx.el.innerHTML=pageHead("Listas","Monte listas de itens para agilizar contagens e pedidos.",btn("Importar planilha",{variant:"secondary",icon:"upload",attrs:"data-import"})+btn("Nova lista",{icon:"plus",attrs:"data-new"}))+
   card("",lists.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar lista")+'</div>'+dataTable([
    {label:"Lista",render:l=>'<span class="strong">'+e(l.name)+'</span>'},
    {label:"Uso",render:l=>'<span class="tag">'+e(typeLabel(l.list_type))+'</span>'},
@@ -28,6 +29,9 @@ export async function render(ctx){
  bindSearch(ctx.el,"q");
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href.slice(1)));
  ctx.el.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>editList(ctx,null));
+ ctx.el.querySelector("[data-import]").onclick=async()=>{
+  try{importListDrawer(ctx,{items:await loadItems({store:ctx.store}),types:LIST_TYPES})}catch(error){toast(errorMessage(error),"danger")}
+ };
 }
 
 function editList(ctx,row){
@@ -59,7 +63,7 @@ async function detail(ctx,id){
  const rows=lines.map(l=>({...l,item:map.get(l.item_id)||{name:"Item removido"}}));
  ctx.el.innerHTML=backLink(ctx.base+"/listas","Listas")+
   '<div class="doc-head"><div><div class="doc-title"><h1>'+e(lst.name)+'</h1><span class="tag">'+e(typeLabel(lst.list_type))+'</span>'+(lst.active===false?'<span class="pill pill-muted">Inativa</span>':'')+'</div><p class="muted" style="margin:6px 0 0">'+lines.length+' item(ns) na lista</p></div>'+
-  '<div class="page-actions">'+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+btn("Editar",{variant:"secondary",icon:"edit",attrs:"data-edit"})+btn("Excluir",{variant:"ghost",icon:"trash",attrs:"data-delete"})+'</div></div>'+
+  '<div class="page-actions">'+btn("Importar planilha",{variant:"secondary",icon:"upload",attrs:"data-import"})+btn("Exportar planilha",{variant:"secondary",icon:"download",attrs:"data-export"})+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+btn("Editar",{variant:"secondary",icon:"edit",attrs:"data-edit"})+btn("Excluir",{variant:"ghost",icon:"trash",attrs:"data-delete"})+'</div></div>'+
   '<section class="card"><div class="add-row no-print">'+
    field("Adicionar item",'<input class="control" id="add-item" list="dl-items" placeholder="Digite o nome ou código do item" autocomplete="off"><datalist id="dl-items">'+available.map(i=>'<option value="'+e(i.name+(i.code?" · "+i.code:""))+'">').join("")+'</datalist>')+
    btn("Adicionar",{icon:"plus",attrs:"data-add"})+
@@ -102,6 +106,11 @@ async function detail(ctx,id){
   try{await remove("purchase_list_items",b.dataset.remove);toast("Item removido da lista.");ctx.reload()}catch(error){toast(errorMessage(error),"danger")}
  });
  ctx.el.querySelector("[data-print]").onclick=()=>window.print();
+ ctx.el.querySelector("[data-import]").onclick=()=>importListDrawer(ctx,{items,list:lst,existing:inList,startOrder:lines.reduce((m,l)=>Math.max(m,Number(l.sort_order||0)),0)});
+ ctx.el.querySelector("[data-export]").onclick=async()=>{
+  if(!rows.length)return toast("A lista está vazia.","info");
+  try{await exportList(lst,rows,ctx.store.name);toast("Planilha gerada.")}catch(error){toast(errorMessage(error),"danger")}
+ };
  ctx.el.querySelector("[data-edit]").onclick=()=>editList(ctx,lst);
  ctx.el.querySelector("[data-delete]").onclick=async()=>{
   if(!await confirmDialog({title:"Excluir lista?",text:"A lista \""+lst.name+"\" e seus itens serão removidos. Contagens e pedidos já feitos não são afetados.",confirmLabel:"Excluir",danger:true}))return;

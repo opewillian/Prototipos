@@ -343,6 +343,8 @@ Regras:
 
 ### 8.2 Listas de contagem e compras
 
+- **Planilhas (20/11/2026, `src/modules/loja/listas-planilha.js`):** *Importar planilha* (na tela de Listas cria lista nova; dentro de uma lista acrescenta itens) lê .xlsx/.xls/.csv, reconhece cabeçalho "Código"/"Nome" (sem cabeçalho = 1ª coluna é código), casa por código (sem zeros à esquerda) e depois por nome, mantém a ordem, ignora repetidos e mostra antes de gravar o que não foi achado ou não está liberado para a loja (marca/inativo). *Exportar planilha* gera .xlsx com Ordem, Código, Nome, Tipo, Unidade (mesmo formato aceito na importação). Biblioteca SheetJS 0.20.3 (cdn.sheetjs.com), carregada só ao usar.
+
 - Lista vinculada à loja, nome, tipo: contagem, compra ou ambos, status ativo.
 - Itens selecionados do catálogo central, organizados e pesquisáveis.
 - Evitar item duplicado dentro da mesma lista.
