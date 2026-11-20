@@ -360,6 +360,8 @@ Regras:
 
 ### 8.3 Contagem
 
+- **Nova contagem (20/11/2026, `11-contagem-por-lista.sql` executado):** ao abrir, **todos os itens liberados para a loja** já são linhas (não precisa lista). Colunas: Item, Unid., **Quantidade** (digitada na tela), **uma coluna por lista** adicionada e **Total** (= soma). Botão **Adicionar via lista** abre uma janela: escolhe a lista, aparecem os itens dela (só os liberados) com Unid. e Quantidade; Salvar grava e cria a coluna com o nome da lista. Clicar no título da coluna reabre a janela para editar; apagar todas as quantidades da lista tira a coluna. Banco: `stock_counts.list_columns` (jsonb `[{id,name}]`) e `stock_count_items.parts` (jsonb `{manual, <list_id>}`); `counted_quantity` = total, então estoque/pedidos/CMV não mudam. Custo não aparece mais na tela: `unit_cost` = última compra (ou custo padrão) no momento de gravar. Saíram "Carregar itens de uma lista", "Incluir item avulso" e o × de remover (apagar a quantidade = não contado).
+
 - Data da contagem, ID amigável e simples, status rascunho/finalizada/cancelada conforme banco.
 - Cada linha com item, quantidade, custo unitário, total e ação remover X enquanto editável.
 - **Zero é contagem válida; vazio é item NÃO contado**. Não converter vazio em zero automaticamente.

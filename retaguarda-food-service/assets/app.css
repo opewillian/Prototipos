@@ -304,3 +304,8 @@ tr.is-saving{opacity:.6}
 .suggest-pop li.hl,.suggest-pop li[data-i]:hover{background:var(--brand-50);color:var(--brand-700)}
 .suggest-pop li.suggest-more{cursor:default;color:var(--muted);font-size:12.5px}
 .suggest-pop li.suggest-more:hover{background:none}
+
+/* Contagem: título de coluna de lista clicável e janela "Adicionar via lista" */
+.th-btn{border:0;background:transparent;color:inherit;font:inherit;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:0}
+.th-btn:hover{text-decoration:underline}
+.dialog-count{width:min(720px,100%);max-height:min(760px,calc(100dvh - 32px))}
