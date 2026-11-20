@@ -313,6 +313,10 @@ tr.is-saving{opacity:.6}
 /* Tabelas que não se adaptam ao celular: mantêm as colunas e ganham rolagem horizontal (contagem). */
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .table-scroll .table{min-width:560px;white-space:nowrap}
-.table-scroll .table td:first-child,.table-scroll .table th:first-child{position:sticky;left:0;z-index:1;background:#fff;white-space:normal;min-width:180px;max-width:260px}
-.table-scroll .table th:first-child{background:var(--brand)}
-.table-scroll tr.is-pending td:first-child{background:#fffaf2}
+/* Item e Unid. ficam travados à esquerda ao rolar (larguras fixas para a 2ª coluna saber onde parar). */
+.table-scroll .table td:nth-child(-n+2),.table-scroll .table th:nth-child(-n+2){position:sticky;z-index:1;background:#fff}
+.table-scroll .table td:first-child,.table-scroll .table th:first-child{left:0;white-space:normal;width:220px;min-width:220px;max-width:220px}
+.table-scroll .table td:nth-child(2),.table-scroll .table th:nth-child(2){left:220px;width:64px;min-width:64px;max-width:64px;box-shadow:inset -1px 0 0 var(--line)}
+.table-scroll .table th:nth-child(-n+2){background:var(--brand)}
+.table-scroll tr.is-pending td:nth-child(-n+2){background:#fffaf2}
+@media (max-width:640px){.table-scroll .table td:first-child,.table-scroll .table th:first-child{width:150px;min-width:150px;max-width:150px}.table-scroll .table td:nth-child(2),.table-scroll .table th:nth-child(2){left:150px;width:56px;min-width:56px;max-width:56px}}

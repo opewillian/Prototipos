@@ -90,8 +90,8 @@ async function detail(ctx,id){
   return '<tr data-item="'+e(it.id)+'" data-search="'+e(searchKey(it.name,it.code,it.item_type||it.category))+'"'+(l?'':' class="is-pending"')+'>'+
    '<td data-label="Item"><span class="strong">'+e(it.name)+'</span><small class="sub">'+e(it.code||"")+'</small></td>'+
    '<td data-label="Unid.">'+e(it.base_unit||"")+'</td>'+
-   cell(it,MANUAL,p)+cols.map(c=>cell(it,c.id,p)).join("")+
-   '<td class="num strong" data-label="Total" data-total>'+(l?num(l.counted_quantity):'<span class="muted">—</span>')+'</td></tr>';
+   '<td class="num strong" data-label="Total" data-total>'+(l?num(l.counted_quantity):'<span class="muted">—</span>')+'</td>'+
+   cell(it,MANUAL,p)+cols.map(c=>cell(it,c.id,p)).join("")+'</tr>';
  };
  const draw=()=>{
   const q=ctx.el.querySelector("#q")?.value||"";
@@ -102,9 +102,9 @@ async function detail(ctx,id){
    (editable?btn("Cancelar contagem",{variant:"ghost",attrs:"data-cancel"})+btn("Finalizar contagem",{variant:"ok",icon:"check",attrs:"data-finalize"}):'')+'</div></div>'+
    '<section class="card">'+
    (rows.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item na contagem")+(editable?'<span class="muted">Digite a quantidade e tecle Enter para ir ao próximo. Vazio = não contado; 0 = sem estoque. O total soma a quantidade e as listas.</span>':'')+'</div>'+
-    '<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Quantidade</th>'+
+    '<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Total</th><th class="num">Quantidade</th>'+
     cols.map(c=>'<th class="num">'+(editable?'<button class="th-btn" data-edit-col="'+e(c.id)+'" title="Editar as quantidades desta lista">'+e(c.name)+' '+icon("edit",13)+'</button>':e(c.name))+'</th>').join("")+
-    '<th class="num">Total</th></tr></thead><tbody>'+rows.map(rowHTML).join("")+'</tbody></table></div>'
+    '</tr></thead><tbody>'+rows.map(rowHTML).join("")+'</tbody></table></div>'
     :emptyState("clipboard","Nenhum item liberado para a loja","Os itens aparecem aqui quando tiverem a marca da loja ou a marca Global."))+summary()+'</section>';
   bind();
   const qi=ctx.el.querySelector("#q");if(q&&qi){qi.value=q;qi.dispatchEvent(new Event("input"))}
