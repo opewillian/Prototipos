@@ -41,10 +41,13 @@ export async function render(ctx){
  ctx.el.querySelector("[data-new]")?.addEventListener("click",async()=>{
   if(creating)return;creating=true;
   try{
+   // Se já existe um rascunho vazio desta loja, abre ele em vez de criar outro.
+   const empty=out.find(r=>r.status==="draft"&&!lines.some(l=>l.transfer_id===r.id));
+   if(empty)return ctx.go(ctx.base+"/transferencias/"+empty.id);
    const number=await nextNumber("transfers","number","from_store_id",ctx.storeId,"TR");
    // O banco exige destino: começa com a primeira loja habilitada; a pessoa troca na própria transferência.
    const t=await insert("transfers",{number,from_store_id:ctx.storeId,to_store_id:others[0].id,transfer_date:today(),status:"draft",created_by:ctx.userId});
-   toast("Transferência "+number+" criada. Confira a loja de destino.");ctx.go(ctx.base+"/transferencias/"+t.id);
+   toast("Transferência "+number+" criada.");ctx.go(ctx.base+"/transferencias/"+t.id);
   }catch(error){toast(errorMessage(error),"danger")}
   finally{creating=false}
  });
@@ -62,7 +65,7 @@ async function detail(ctx,id){
  ctx.el.innerHTML=backLink(ctx.base+"/transferencias","Transferências")+
   '<div class="doc-head"><div><div class="doc-title"><h1>Transferência '+e(t.number)+'</h1>'+statusPill(t.status)+'</div>'+
   (editable?'':'<p class="muted" style="margin:6px 0 0">'+e(name(t.from_store_id))+' → '+e(name(t.to_store_id))+' · '+e(dateBR(t.transfer_date||t.created_at))+'</p>')+'</div>'+
-  '<div class="page-actions">'+(editable?btn("Cancelar",{variant:"ghost",attrs:"data-cancel"})+btn("Emitir transferência",{variant:"ok",icon:"check",attrs:"data-issue"}):'')+'</div></div>'+
+  '<div class="page-actions">'+(editable?btn("Excluir",{variant:"ghost",icon:"trash",attrs:"data-delete"})+btn("Emitir transferência",{variant:"ok",icon:"check",attrs:"data-issue"}):'')+'</div></div>'+
   (editable?'<section class="card"><div class="card-body"><div class="form-grid transfer-head">'+
     field("Loja de destino",'<select class="control" name="to_store_id" data-head>'+dest.map(s=>'<option value="'+e(s.id)+'"'+(s.id===t.to_store_id?" selected":"")+'>'+e(storeLabel(s))+'</option>').join("")+'</select>')+
     field("Data da transferência",input("transfer_date",t.transfer_date||today(),{type:"date",required:true,attrs:"data-head"}))+
@@ -98,9 +101,12 @@ async function detail(ctx,id){
    text:"O estoque sai desta loja e entra no destino na hora.",confirmLabel:"Emitir"}))return;
   try{await update("transfers",id,{status:"issued",issued_at:new Date().toISOString()},{status:"draft"});toast("Transferência emitida.");ctx.reload()}catch(error){toast(errorMessage(error),"danger")}
  };
- ctx.el.querySelector("[data-cancel]").onclick=async()=>{
-  if(!await confirmDialog({title:"Cancelar transferência?",confirmLabel:"Cancelar transferência",danger:true}))return;
-  try{await update("transfers",id,{status:"cancelled"},{status:"draft"});toast("Transferência cancelada.");ctx.reload()}catch(error){toast(errorMessage(error),"danger")}
+ // Rascunho não mexe em estoque: pode ser excluído de vez (itens e transferência).
+ ctx.el.querySelector("[data-delete]").onclick=async()=>{
+  const n=ui.lines.length;
+  if(!await confirmDialog({title:"Excluir transferência "+t.number+"?",list:[["Destino",name(t.to_store_id)],["Itens lançados",String(n)]],text:"O rascunho é apagado de vez. O estoque não é afetado.",confirmLabel:"Excluir",danger:true}))return;
+  try{for(const l of ui.lines)await remove("transfer_items",l.id);await remove("transfers",id);toast("Transferência "+t.number+" excluída.");ctx.go(ctx.base+"/transferencias")}
+  catch(error){toast(errorMessage(error),"danger")}
  };
 }
 
