@@ -90,9 +90,9 @@ async function detail(ctx,id){
   if(document.activeElement?.matches?.("[data-head]"))document.activeElement.blur();
   await new Promise(r=>setTimeout(r,250));
   if(!ui.lines.length)return toast("Inclua itens antes de emitir.","danger");
+  // Não trava por estoque (pedido de 20/11/2026): só avisa; a origem pode ficar negativa até a próxima contagem.
   const short=ui.lines.filter(l=>(balances.get(l.item_id)??0)<Number(l.quantity));
-  if(short.length)return toast(short.length+" item(ns) com quantidade maior que o estoque disponível.","danger");
-  if(!await confirmDialog({title:"Emitir transferência para "+name(t.to_store_id)+"?",text:ui.lines.length+" item(ns), "+money(ui.total())+", data "+dateBR(t.transfer_date)+". O estoque sai desta loja e entra no destino imediatamente.",confirmLabel:"Emitir"}))return;
+  if(!await confirmDialog({title:"Emitir transferência para "+name(t.to_store_id)+"?",text:ui.lines.length+" item(ns), "+money(ui.total())+", data "+dateBR(t.transfer_date)+". O estoque sai desta loja e entra no destino imediatamente."+(short.length?" Atenção: "+short.length+" item(ns) com quantidade maior que o estoque registrado; o saldo desta loja ficará negativo.":""),confirmLabel:"Emitir"}))return;
   try{await update("transfers",id,{status:"issued",issued_at:new Date().toISOString()},{status:"draft"});toast("Transferência emitida.");ctx.reload()}catch(error){toast(errorMessage(error),"danger")}
  };
  ctx.el.querySelector("[data-cancel]").onclick=async()=>{

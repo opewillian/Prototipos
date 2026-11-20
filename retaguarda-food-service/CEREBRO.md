@@ -423,7 +423,7 @@ Regras de UX já decididas:
 - Transferir item entre unidades distintas, com origem/destino, quantidades, custo e status.
 - Emissão aprovada gera saída na origem e entrada automática no destino; não duplicar manualmente.
 - Não permitir mesma loja como origem e destino.
-- Conferir estoque disponível antes da emissão; não criar saldo negativo indevido.
+- ~~Conferir estoque disponível antes da emissão~~ — **20/11/2026: não trava mais por estoque** (pedido do Willian). Tela só avisa na confirmação; banco: verificação "Insufficient stock" removida de `mft_private.post_transfer_movements()` por `15-transferencia-sem-trava-estoque.sql` (definição anterior guardada em `mft_private.function_backups`). A origem pode ficar negativa até a próxima contagem.
 - Em homologação, evitar transferir da Teste para lojas reais antes de liberação deliberada em **ambas**.
 - Registrar origem, destino, usuário, data e memória de movimentação.
 
