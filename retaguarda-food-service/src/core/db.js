@@ -67,6 +67,19 @@ export async function remove(table,id){
  trackWrite("delete",table,data[0]);
 }
 /** Próximo número sequencial amigável por loja (ex.: CT-0007). */
+/** Código aleatório em hexadecimal (números e letras A–F), ex.: TR-7F3A9C. 6 dígitos = 16,7 milhões de combinações. */
+export function randomCode(prefix,digits=6){
+ const b=new Uint8Array(Math.ceil(digits/2));crypto.getRandomValues(b);
+ return prefix+"-"+[...b].map(x=>x.toString(16).padStart(2,"0")).join("").slice(0,digits).toUpperCase();
+}
+/** Insere gerando um código aleatório na coluna; se por acaso já existir (erro de duplicado), sorteia outro. */
+export async function insertWithCode(table,column,prefix,row,tries=5){
+ for(let i=0;i<tries;i++){
+  try{return await insert(table,{...row,[column]:randomCode(prefix)})}
+  catch(error){if(!(error?.code==="23505"||/duplicate key/i.test(String(error?.message))))throw error}
+ }
+ throw Error("Não foi possível gerar um código único. Tente de novo.");
+}
 export async function nextNumber(table,column,storeColumn,storeId,prefix){
  const {data,error}=await supabase.from(table).select(column).eq(storeColumn,storeId).ilike(column,prefix+"-%").order("created_at",{ascending:false}).limit(200);
  if(error)throw error;

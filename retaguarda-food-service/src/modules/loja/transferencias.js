@@ -1,7 +1,7 @@
 // Loja · Transferências entre lojas. Emitir gera saída na origem e entrada no destino (gatilho do banco).
 // "Nova transferência" cria o rascunho na hora; destino, data e observação ficam na própria transferência.
 // Custo unitário = última compra recebida na loja de origem; sem compra, custo padrão do item (não é digitado).
-import {list,get,insert,update,remove,nextNumber} from "../../core/db.js";
+import {list,get,insert,update,remove,insertWithCode} from "../../core/db.js";
 import {e,money,num,inputNum,parseNum,dateBR,round2,today} from "../../core/format.js";
 import {pageHead,btn,dataTable,field,input,toast,confirmDialog,statusPill,emptyState,backLink,errorMessage,card,kpi,alertBox,searchKey,searchBox} from "../../core/ui.js";
 import {loadItems,byId,loadLastCosts,loadBalances,unitCost,lineTotal} from "../shared/catalog.js";
@@ -47,11 +47,10 @@ export async function render(ctx){
    // Se já existe um rascunho vazio desta loja, abre ele em vez de criar outro.
    const empty=out.find(r=>r.status==="draft"&&!lines.some(l=>l.transfer_id===r.id));
    if(empty)return ctx.go(ctx.base+"/transferencias/"+empty.id);
-   // O número é único entre TODAS as lojas (transfers_number_key): leva o código Everest da origem, ex. TR-36-0001.
-   const number=await nextNumber("transfers","number","from_store_id",ctx.storeId,"TR-"+(ctx.store.everest_code||ctx.store.code));
+   // Número único entre TODAS as lojas (transfers_number_key): código aleatório hexadecimal, ex. TR-7F3A9C (sorteia de novo se repetir).
    // O banco exige destino: começa com a primeira loja habilitada; a pessoa troca na própria transferência.
-   const t=await insert("transfers",{number,from_store_id:ctx.storeId,to_store_id:others[0].id,transfer_date:today(),status:"draft",created_by:ctx.userId});
-   toast("Transferência "+number+" criada.");ctx.go(ctx.base+"/transferencias/"+t.id);
+   const t=await insertWithCode("transfers","number","TR",{from_store_id:ctx.storeId,to_store_id:others[0].id,transfer_date:today(),status:"draft",created_by:ctx.userId});
+   toast("Transferência "+t.number+" criada.");ctx.go(ctx.base+"/transferencias/"+t.id);
   }catch(error){toast(errorMessage(error),"danger")}
   finally{creating=false}
  });
