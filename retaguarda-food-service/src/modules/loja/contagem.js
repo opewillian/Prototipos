@@ -7,7 +7,7 @@
 import {list,get,insert,update,remove,nextNumber} from "../../core/db.js";
 import {e,money,num,inputNum,parseNum,dateBR,today,round2} from "../../core/format.js";
 import {icon} from "../../core/icons.js";
-import {pageHead,btn,dataTable,openDrawer,field,input,textarea,toast,confirmDialog,statusPill,emptyState,backLink,errorMessage,searchBox,searchKey,kpi,alertBox} from "../../core/ui.js";
+import {pageHead,btn,dataTable,field,input,toast,confirmDialog,statusPill,emptyState,backLink,errorMessage,searchBox,searchKey,kpi,alertBox} from "../../core/ui.js";
 import {loadItems,byId,loadLastCosts,unitCost,lineTotal} from "../shared/catalog.js";
 
 
@@ -38,17 +38,16 @@ export async function render(ctx){
  ctx.el.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>newCount(ctx));
 }
 
+// "Nova contagem" cria o rascunho na hora (data de hoje) e abre a contagem; data e observações se ajustam lá dentro.
+let creating=false;
 async function newCount(ctx){
- openDrawer({title:"Nova contagem",submitLabel:"Iniciar contagem",body:'<div class="form-grid">'+
-  field("Data da contagem",input("count_date",today(),{type:"date",required:true}))+'<div></div>'+
-  '<div class="span-2">'+field("Observações",textarea("notes","",{rows:2,placeholder:"Ex.: contagem mensal, estoque seco"}))+'</div>'+
-  '<p class="muted span-2" style="margin:0">Todos os itens liberados para a loja já entram na contagem. Para contar por setor, use "Adicionar via lista".</p></div>',
-  onSubmit:async form=>{
-   const f=form.elements;if(!f.count_date.value)throw Error("Informe a data.");
-   const display_id=await nextNumber("stock_counts","display_id","store_id",ctx.storeId,"CT");
-   const c=await insert("stock_counts",{store_id:ctx.storeId,display_id,count_date:f.count_date.value,notes:f.notes.value.trim()||null,status:"draft",created_by:ctx.userId});
-   toast("Contagem "+display_id+" iniciada.");ctx.go(ctx.base+"/contagem/"+c.id);
-  }});
+ if(creating)return;creating=true;
+ try{
+  const display_id=await nextNumber("stock_counts","display_id","store_id",ctx.storeId,"CT");
+  const c=await insert("stock_counts",{store_id:ctx.storeId,display_id,count_date:today(),status:"draft",created_by:ctx.userId});
+  toast("Contagem "+display_id+" iniciada.");ctx.go(ctx.base+"/contagem/"+c.id);
+ }catch(error){toast(errorMessage(error),"danger")}
+ finally{creating=false}
 }
 
 // Quantidades por coluna. Linha antiga (antes das colunas por lista) vira só "Quantidade".
@@ -97,9 +96,12 @@ async function detail(ctx,id){
   const q=ctx.el.querySelector("#q")?.value||"";
   const rows=rowItems();
   ctx.el.innerHTML=backLink(ctx.base+"/contagem","Contagens")+
-   '<div class="doc-head"><div><div class="doc-title"><h1>Contagem '+e(count.display_id)+'</h1>'+statusPill(count.status)+'</div><p class="muted" style="margin:6px 0 0">'+e(dateBR(count.count_date))+(count.notes?' · '+e(count.notes):'')+'</p></div>'+
+   '<div class="doc-head"><div><div class="doc-title"><h1>Contagem '+e(count.display_id)+'</h1>'+statusPill(count.status)+'</div>'+(editable?'':'<p class="muted" style="margin:6px 0 0">'+e(dateBR(count.count_date))+(count.notes?' · '+e(count.notes):'')+'</p>')+'</div>'+
    '<div class="page-actions">'+(editable?btn("Adicionar via lista",{variant:"secondary",icon:"list",attrs:"data-via-list"}):'')+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+
    (editable?btn("Cancelar contagem",{variant:"ghost",attrs:"data-cancel"})+btn("Finalizar contagem",{variant:"ok",icon:"check",attrs:"data-finalize"}):'')+'</div></div>'+
+   (editable?'<section class="card"><div class="card-body"><div class="form-grid count-head">'+
+    field("Data da contagem",input("count_date",count.count_date,{type:"date",required:true,attrs:"data-head"}))+
+    field("Observações",input("notes",count.notes||"",{placeholder:"Ex.: contagem mensal, estoque seco",attrs:"data-head"}))+'</div></div></section>':'')+
    '<section class="card">'+
    (rows.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item na contagem")+(editable?'<span class="muted">Digite a quantidade e tecle Enter para ir ao próximo. Vazio = não contado; 0 = sem estoque. O total soma a coluna Padrão e as listas.</span>':'')+'</div>'+
     '<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Total</th><th class="num">Padrão</th>'+
@@ -209,6 +211,13 @@ async function detail(ctx,id){
 
  const bind=()=>{
   ctx.el.querySelector("[data-print]").onclick=()=>window.print();
+  // Data e observações gravam sozinhas ao sair do campo.
+  ctx.el.querySelectorAll("[data-head]").forEach(el=>el.addEventListener("change",async()=>{
+   const patch=el.name==="count_date"?{count_date:el.value}:{notes:el.value.trim()||null};
+   if(el.name==="count_date"&&!el.value){el.value=count.count_date;return toast("Informe a data.","danger")}
+   try{Object.assign(count,await update("stock_counts",id,patch,{status:"draft"}));toast(el.name==="count_date"?"Data atualizada.":"Observações salvas.")}
+   catch(error){toast(errorMessage(error),"danger")}
+  }));
   const q=ctx.el.querySelector("#q");
   q?.addEventListener("input",()=>{const t=searchKey(q.value).trim();ctx.el.querySelectorAll("tr[data-search]").forEach(r=>r.hidden=!!t&&!r.dataset.search.includes(t))});
   if(!editable)return;
