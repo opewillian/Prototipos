@@ -103,7 +103,7 @@ async function detail(ctx,id){
    '<section class="card">'+
    (rows.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item na contagem")+(editable?'<span class="muted">Digite a quantidade e tecle Enter para ir ao próximo. Vazio = não contado; 0 = sem estoque. O total soma a coluna Padrão e as listas.</span>':'')+'</div>'+
     '<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Total</th><th class="num">Padrão</th>'+
-    cols.map(c=>'<th class="num">'+(editable?'<button class="th-btn" data-edit-col="'+e(c.id)+'" title="Editar as quantidades desta lista">'+e(c.name)+' '+icon("edit",13)+'</button>':e(c.name))+'</th>').join("")+
+    cols.map(c=>'<th class="num">'+(editable?'<span class="th-col"><button class="th-btn" data-edit-col="'+e(c.id)+'" title="Editar as quantidades desta lista">'+e(c.name)+' '+icon("edit",13)+'</button><button class="th-x" data-remove-col="'+e(c.id)+'" title="Remover a lista da contagem" aria-label="Remover a lista '+e(c.name)+' da contagem">'+icon("x",13)+'</button></span>':e(c.name))+'</th>').join("")+
     '</tr></thead><tbody>'+rows.map(rowHTML).join("")+'</tbody></table></div>'
     :emptyState("clipboard","Nenhum item liberado para a loja","Os itens aparecem aqui quando tiverem a marca da loja ou a marca Global."))+summary()+'</section>';
   bind();
@@ -193,6 +193,20 @@ async function detail(ctx,id){
   };
  };
 
+ /** Tira a coluna da lista: apaga as quantidades dela em todos os itens (o total é recalculado) e some a coluna. */
+ const removeCol=async lid=>{
+  const col=cols.find(c=>c.id===lid);if(!col)return;
+  const affected=[...byItem.values()].filter(l=>partsOf(l)[lid]!=null);
+  if(!await confirmDialog({title:"Remover a lista \""+col.name+"\"?",text:"As quantidades desta lista saem da contagem"+(affected.length?" ("+affected.length+" item(ns))":"")+" e o total de cada item é recalculado. A lista em si não é apagada.",confirmLabel:"Remover lista",danger:true}))return;
+  try{
+   for(const l of affected){const p=partsOf(l);p[lid]=null;await persist(l.item_id,p)}
+   const next=cols.filter(c=>c.id!==lid);
+   await update("stock_counts",id,{list_columns:next},{status:"draft"});cols=next;
+   toast("Lista \""+col.name+"\" removida da contagem.");
+  }catch(error){toast(errorMessage(error),"danger")}
+  draw();
+ };
+
  const bind=()=>{
   ctx.el.querySelector("[data-print]").onclick=()=>window.print();
   const q=ctx.el.querySelector("#q");
@@ -200,6 +214,7 @@ async function detail(ctx,id){
   if(!editable)return;
   ctx.el.querySelector("[data-via-list]").onclick=()=>viaList();
   ctx.el.querySelectorAll("[data-edit-col]").forEach(b=>b.onclick=()=>viaList(b.dataset.editCol));
+  ctx.el.querySelectorAll("[data-remove-col]").forEach(b=>b.onclick=()=>removeCol(b.dataset.removeCol));
   ctx.el.querySelectorAll("tr[data-item] [data-qty]").forEach(inp=>{
    inp.addEventListener("change",()=>saveManual(inp));
    inp.addEventListener("focus",()=>inp.select());

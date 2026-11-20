@@ -323,3 +323,11 @@ tr.is-saving{opacity:.6}
 
 /* Contagem: títulos das colunas só com a primeira letra maiúscula (como foram escritos). */
 .table-scroll .table th{text-transform:none;letter-spacing:0;font-size:12.5px}
+
+/* Contagem: só o Item à esquerda; o resto centralizado. */
+.table-scroll .table th,.table-scroll .table td,.table-scroll .table td.num,.table-scroll .table th.num{text-align:center}
+.table-scroll .table th:first-child,.table-scroll .table td:first-child{text-align:left}
+.table-scroll .cell-input{text-align:center}
+.th-col{display:inline-flex;align-items:center;gap:6px}
+.th-x{display:inline-grid;place-items:center;width:20px;height:20px;border:0;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;cursor:pointer;padding:0}
+.th-x:hover{background:rgba(255,255,255,.35)}
