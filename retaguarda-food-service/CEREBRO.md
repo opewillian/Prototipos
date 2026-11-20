@@ -295,6 +295,8 @@ Regras:
 - **Tipo** (20/11/2026) substitui categoria: Matéria-prima, Revenda, Embalagem, Produto acabado, Uso e consumo, Outras, Ativo imobilizado (check em `items.item_type`). `category` segue no banco só como legado; Contagem e Listas usam `item_type` com fallback para `category`.
 - Colunas `brand` e `item_type` criadas por `docs/sql/04-itens-marca-tipo.sql`; a tela de Itens só grava depois desse SQL rodar.
 - Migração do Everest: `05-importar-itens-cgh.sql` (247 itens "Sim" da CGH, emp 57) e `06-importar-itens-cgh-avaliar.sql` (91 "Avaliar"), origem `Documents/MFT/ITENS_CGH_EVEREST.xlsx`; pulam códigos já cadastrados. Marca vem vazia.
+- **Executado em 20/11/2026** (SQL Editor, projeto Retaguarda MFT): 04 aplicado (colunas `brand`, `item_type`, check e índice) e 05 importado. Antes: `items` vazia (0). Depois: 247 itens ativos, 0 sem tipo — Matéria-prima 100, Revenda 82, Embalagem 48, Produto acabado 17. O 06 (91 "Avaliar") **não** foi rodado.
+- `items.category` é NOT NULL com default `''`: a tela nova não envia categoria (usa o default).
 - Flag **compõe CMV** por item.
 - Cadastro corporativo; parametrização de fornecedor conforme loja.
 - Custo padrão é **fallback** quando ainda não existir compra/nota recebida.
