@@ -368,8 +368,15 @@ tr.is-saving{opacity:.6}
 .dlg-warn{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--warn-50);color:#7a4900;font-size:13.5px}
 .dlg-warn svg{flex:none;margin-top:1px}
 
-/* Transferências: filtros */
-.tr-filters{flex-wrap:wrap;gap:10px}
-.tr-filters .control{width:auto}
-.tr-date{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
-.tr-date .control{width:150px}
+/* Barra de filtros em uma linha (src/core/filters.js). Se não couber, rola para o lado em vez de quebrar. */
+.fbar-card{margin-bottom:14px}
+.fbar{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:10px 12px;overflow-x:auto;scrollbar-width:thin}
+.fbar .fbar-search{flex:1 1 220px;min-width:170px;min-height:38px}
+.fbar .fbar-sel{flex:0 0 auto;width:auto;max-width:200px;height:38px;padding-right:28px}
+.fbar .fbar-date{flex:0 0 auto;width:142px;height:38px}
+.fbar-sep{flex:none;color:var(--muted);font-size:13px}
+.fbar-clear{flex:none;border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;cursor:pointer;padding:6px 4px;visibility:hidden}
+.fbar-clear.on{visibility:visible}
+.fbar-clear:hover{color:var(--brand)}
+.fbar-result{flex:none;margin-left:auto;padding-left:6px;white-space:nowrap;color:var(--muted);font-size:13px}
+.fbar-result b{color:var(--ink)}

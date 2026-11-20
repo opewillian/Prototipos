@@ -9,6 +9,7 @@ import {e,money,num,inputNum,parseNum,dateBR,today,round2} from "../../core/form
 import {icon} from "../../core/icons.js";
 import {pageHead,btn,dataTable,field,input,toast,confirmDialog,statusPill,emptyState,backLink,errorMessage,searchBox,searchKey,kpi,alertBox} from "../../core/ui.js";
 import {loadItems,byId,loadLastCosts,unitCost,lineTotal} from "../shared/catalog.js";
+import {filterBar,bindFilters} from "../../core/filters.js";
 
 
 export async function render(ctx){
@@ -26,16 +27,18 @@ export async function render(ctx){
   kpi("Valor do último inventário",last?money(tot(last.id)):"—","",{icon:"cash",tone:"ok"})+
   kpi("Em andamento",drafts.length,drafts.length?"Rascunhos abertos":"",{icon:"edit",tone:drafts.length?"warn":""})+
   kpi("Total de contagens",counts.length,"",{icon:"layers",tone:"info"})+'</div>'+
+  filterBar({search:"Número ou observação",dates:true,noun:["contagem","contagens"],selects:[{key:"st",all:"Todas as situações",options:[["draft","Rascunho"],["finalized","Finalizada"],["cancelled","Cancelada"]]}]})+
   '<section class="card">'+(counts.length?dataTable([
    {label:"Contagem",render:c=>'<span class="strong">'+e(c.display_id)+'</span>'+(c.notes?'<small class="sub">'+e(c.notes)+'</small>':'')},
    {label:"Data",render:c=>dateBR(c.count_date)},
    {label:"Itens",cls:"num",render:c=>String(qn(c.id))},
    {label:"Valor",cls:"num",render:c=>money(tot(c.id))},
    {label:"Situação",render:c=>statusPill(c.status)}
-  ],counts,{rowHref:c=>ctx.base+"/contagem/"+c.id}).replace('class="table"','class="table stack"')
+  ],counts,{rowHref:c=>ctx.base+"/contagem/"+c.id,rowAttrs:c=>'data-search="'+e(searchKey(c.display_id,c.notes||""))+'" data-st="'+e(c.status)+'" data-date="'+e(String(c.count_date).slice(0,10))+'" data-total="'+tot(c.id)+'"'}).replace('class="table"','class="table stack"')
   :emptyState("clipboard","Nenhuma contagem registrada","Ao iniciar, todos os itens da loja já aparecem para contar.",btn("Nova contagem",{icon:"plus",attrs:"data-new"})))+'</section>';
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
  ctx.el.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>newCount(ctx));
+ bindFilters(ctx.el,{noun:["contagem","contagens"]});
 }
 
 // "Nova contagem" cria o rascunho na hora (data de hoje) e abre a contagem; data e observações se ajustam lá dentro.
