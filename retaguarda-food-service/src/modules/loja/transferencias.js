@@ -1,10 +1,10 @@
 // Loja · Transferências entre lojas. Emitir gera saída na origem e entrada no destino (gatilho do banco).
 // "Nova transferência" cria o rascunho na hora; destino, data e observação ficam na própria transferência.
 // Custo unitário = última compra recebida na loja de origem; sem compra, custo padrão do item (não é digitado).
-import {list,get,insert,update,nextNumber} from "../../core/db.js";
-import {e,money,dateBR,round2,today} from "../../core/format.js";
-import {pageHead,btn,dataTable,field,input,toast,confirmDialog,statusPill,emptyState,backLink,errorMessage,card,kpi,alertBox} from "../../core/ui.js";
-import {loadItems,byId,loadLastCosts,loadBalances,unitCost} from "../shared/catalog.js";
+import {list,get,insert,update,remove,nextNumber} from "../../core/db.js";
+import {e,money,num,inputNum,parseNum,dateBR,round2,today} from "../../core/format.js";
+import {pageHead,btn,dataTable,field,input,toast,confirmDialog,statusPill,emptyState,backLink,errorMessage,card,kpi,alertBox,searchKey,searchBox} from "../../core/ui.js";
+import {loadItems,byId,loadLastCosts,loadBalances,unitCost,lineTotal} from "../shared/catalog.js";
 import {mountLines} from "../shared/doclines.js";
 
 const destinations=ctx=>ctx.app.stores.filter(s=>s.store_type==="operational"&&s.id!==ctx.storeId&&(ctx.app.flags[s.id]||{}).transfers);
@@ -70,18 +70,17 @@ async function detail(ctx,id){
    :(t.observation?alertBox(t.observation,"info"):''))+
   (t.status==="issued"?alertBox("Emitida em "+dateBR(t.issued_at)+". Saída registrada em "+name(t.from_store_id)+" e entrada em "+name(t.to_store_id)+".","ok"):'')+
   card("Itens",'<div data-lines></div>',{flush:true});
- // extra é lido a cada linha nova: trocar o destino aqui já vale para os próximos itens.
+ const costFor=itemId=>unitCost(itemId,lastCosts,map);
+ if(!editable){mountLines({el:ctx.el.querySelector("[data-lines]"),table:"transfer_items",parentKey:"transfer_id",parentId:id,extra:{},lines,items:map,editable:false,fixedCost:true,costFor});return}
  const extra={from_store_id:t.from_store_id,to_store_id:t.to_store_id};
- const ui=mountLines({el:ctx.el.querySelector("[data-lines]"),table:"transfer_items",parentKey:"transfer_id",parentId:id,extra,
-  lines,items:map,editable,fixedCost:true,balances:editable?balances:null,costFor:itemId=>unitCost(itemId,lastCosts,map)});
- if(!editable)return;
+ const ui=allItemsTable(ctx,ctx.el.querySelector("[data-lines]"),{id,lines,items,map,balances,costFor,extra});
  // Destino, data e observação gravam ao sair do campo. Trocar o destino também atualiza as linhas já lançadas.
  ctx.el.querySelectorAll("[data-head]").forEach(el=>el.addEventListener("change",async()=>{
   const k=el.name;
   if(k==="transfer_date"&&!el.value){el.value=t.transfer_date;return toast("Informe a data da transferência.","danger")}
   const patch=k==="observation"?{observation:el.value.trim()||null}:{[k]:el.value};
   try{
-   if(k==="to_store_id")for(const l of ui.lines)Object.assign(l,await update("transfer_items",l.id,{to_store_id:el.value}));
+   if(k==="to_store_id")for(const l of ui.lines)await update("transfer_items",l.id,{to_store_id:el.value});
    Object.assign(t,await update("transfers",id,patch,{status:"draft"}));
    if(k==="to_store_id")extra.to_store_id=el.value;
    toast(k==="to_store_id"?"Destino: "+name(el.value)+".":k==="transfer_date"?"Data atualizada.":"Observação salva.");
@@ -117,4 +116,47 @@ function printBlankForm(ctx,items){
  const done=()=>{document.body.classList.remove("printing-sheet");sheet.remove();removeEventListener("afterprint",done)};
  addEventListener("afterprint",done);
  window.print();
+}
+
+// Rascunho: todos os itens liberados para a loja já aparecem (como no formulário impresso).
+// Digitar a quantidade grava a linha; apagar ou zerar tira o item da transferência.
+function allItemsTable(ctx,el,{id,lines,items,map,balances,costFor,extra}){
+ const byItem=new Map(lines.map(l=>[l.item_id,l]));
+ const rowsItems=()=>{const ids=new Set(items.filter(i=>i.active!==false).map(i=>i.id));for(const l of byItem.values())ids.add(l.item_id);
+  return [...ids].map(x=>map.get(x)||{id:x,name:"Item"}).sort((a,b)=>String(a.name).localeCompare(String(b.name),"pt-BR"))};
+ const total=()=>round2([...byItem.values()].reduce((s,l)=>s+Number(l.line_total||0),0));
+ const foot=()=>'Total ('+byItem.size+' '+(byItem.size===1?"item":"itens")+')';
+ const rows=rowsItems();
+ el.innerHTML=(rows.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("tq","Buscar item")+
+  '<span class="muted">Digite a quantidade e tecle Enter para ir ao próximo. Vazio ou 0 = não transferir.</span></div>'+
+  '<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Em estoque</th><th class="num">Quantidade</th><th class="num">Custo unit.</th><th class="num">Total</th></tr></thead><tbody>'+
+  rows.map(it=>{const l=byItem.get(it.id),bal=balances.get(it.id)??0,c=costFor(it.id);
+   return '<tr data-item="'+e(it.id)+'" data-search="'+e(searchKey(it.name,it.code))+'"'+(l?'':' class="is-pending"')+'><td><span class="strong">'+e(it.name)+'</span><small class="sub">'+e(it.code||"")+'</small></td><td>'+e(it.base_unit||"")+'</td>'+
+    '<td class="num" data-bal>'+num(bal)+'</td><td class="num"><input class="cell-input" data-qty inputmode="decimal" placeholder="—" value="'+e(l?inputNum(l.quantity):"")+'" aria-label="Quantidade de '+e(it.name)+'"></td>'+
+    '<td class="num" title="'+e(c.source)+'">'+money(l?l.unit_cost:c.cost)+'</td><td class="num" data-total>'+(l?money(l.line_total):'<span class="muted">—</span>')+'</td></tr>'}).join("")+
+  '</tbody><tfoot><tr><td colspan="5" data-foot>'+foot()+'</td><td class="num" data-grand>'+money(total())+'</td></tr></tfoot></table></div>'
+  :emptyState("box","Nenhum item liberado para a loja","Os itens aparecem aqui quando tiverem a marca da loja ou a marca Global."));
+ const q=el.querySelector("#tq");
+ q?.addEventListener("input",()=>{const k=searchKey(q.value).trim();el.querySelectorAll("tr[data-search]").forEach(r=>r.hidden=!!k&&!r.dataset.search.includes(k))});
+ const refresh=tr=>{const l=byItem.get(tr.dataset.item);tr.classList.toggle("is-pending",!l);tr.querySelector("[data-total]").innerHTML=l?money(l.line_total):'<span class="muted">—</span>';
+  const bal=balances.get(tr.dataset.item)??0;tr.querySelector("[data-bal]").innerHTML=l&&bal<Number(l.quantity)?'<span class="text-warn">'+num(bal)+'</span>':num(bal);
+  el.querySelector("[data-grand]").textContent=money(total());el.querySelector("[data-foot]").textContent=foot()};
+ const save=async inp=>{
+  const tr=inp.closest("tr"),itemId=tr.dataset.item,v=parseNum(inp.value),l=byItem.get(itemId);
+  inp.classList.toggle("is-invalid",Number.isNaN(v));if(Number.isNaN(v))return toast("Use números não negativos (vírgula para decimais).","danger");
+  const qty=v||null;if((l?Number(l.quantity):null)===qty)return;
+  tr.classList.add("is-saving");
+  try{
+   if(!qty){if(l){await remove("transfer_items",l.id);byItem.delete(itemId)}inp.value=""}
+   else{const cost=Number(costFor(itemId).cost||0),row={quantity:qty,unit_cost:cost,line_total:lineTotal(qty,cost)};
+    byItem.set(itemId,l?await update("transfer_items",l.id,row):await insert("transfer_items",{...extra,transfer_id:id,item_id:itemId,...row}));inp.value=inputNum(qty)}
+   refresh(tr);
+  }catch(error){toast(errorMessage(error),"danger")}
+  finally{tr.classList.remove("is-saving")}
+ };
+ el.querySelectorAll("[data-qty]").forEach(inp=>{
+  inp.addEventListener("change",()=>save(inp));inp.addEventListener("focus",()=>inp.select());
+  inp.addEventListener("keydown",ev=>{if(ev.key!=="Enter")return;ev.preventDefault();const all=[...el.querySelectorAll("tr[data-item]:not([hidden]) [data-qty]")];const n=all[all.indexOf(inp)+1];inp.blur();if(n)n.focus()});
+ });
+ return {get lines(){return [...byItem.values()]},total};
 }
