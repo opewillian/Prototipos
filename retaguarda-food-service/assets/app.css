@@ -354,3 +354,7 @@ tr.is-saving{opacity:.6}
  .print-sheet .ps-n{width:28px;color:#777}
  .print-sheet .ps-blank{display:inline-block;width:120px;border-bottom:1px solid #999;height:16px}
 }
+
+/* Transferência: destino, data e observação no topo */
+.transfer-head{grid-template-columns:minmax(0,1.2fr) 200px minmax(0,1.6fr)}
+@media (max-width:760px){.transfer-head{grid-template-columns:1fr}}

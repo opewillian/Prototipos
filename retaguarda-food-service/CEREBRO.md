@@ -418,6 +418,8 @@ Regras de UX já decididas:
 
 ### 8.6 Transferências
 
+- **20/11/2026:** sem formulário inicial — "Nova transferência" cria o rascunho (destino = 1ª loja habilitada) e abre a transferência; **Loja de destino, Data da transferência (`transfers.transfer_date`, `14-transferencia-data.sql`) e Observação** ficam no topo e gravam ao sair do campo (trocar destino atualiza `transfer_items.to_store_id`). **Custo unitário não é digitado:** última compra da loja de origem ou custo padrão (`mountLines({fixedCost:true})`). Botão **Imprimir formulário** na lista: folha em branco com todos os itens liberados da loja (item, unidade, quantidade) e campos de destino, data, responsável e recebido por.
+
 - Transferir item entre unidades distintas, com origem/destino, quantidades, custo e status.
 - Emissão aprovada gera saída na origem e entrada automática no destino; não duplicar manualmente.
 - Não permitir mesma loja como origem e destino.
