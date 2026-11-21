@@ -402,5 +402,18 @@ body.is-dragging{user-select:none;cursor:grabbing}
 .dp-conv .dp-factor{width:110px;text-align:center}
 
 /* Nota: itens da NF-e importados (só leitura) */
-.nfe-sum{padding:12px 18px;font-size:13px}
+.nfe-sum{padding:12px 18px;font-size:13px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.nfe-badge{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12.5px;padding:4px 10px;border-radius:999px}
+.nfe-badge.ok{background:var(--ok-50,#e8f6ee);color:var(--ok,#1c7c4a)}
+.nfe-badge.warn{background:var(--warn-50,#fff4e0);color:var(--warn,#a86500)}
+.nfe-st{width:34px}
+.nfe-dot{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%}
+.nfe-dot.ok{background:var(--ok,#1c7c4a);color:#fff}
+.nfe-dot.warn{background:var(--warn,#d98a00);color:#fff}
+.nfe-table tr.row-click{cursor:pointer}
+.nfe-table tr.row-click:hover td{background:var(--brand-soft,#f7e6e9)}
+.nfe-todo{color:var(--warn,#a86500);font-weight:700;font-size:13px;text-decoration:underline}
+.nfe-ro{border:1px solid var(--line,#e5e5e5);border-radius:10px;padding:12px 14px;background:var(--surface-2,#fafafa)}
+.nfe-ro-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--muted);margin-bottom:10px}
+.ro-field .ro-value{padding:8px 0 2px;font-size:14px;color:var(--ink)}
 .nfe-table td,.nfe-table th{vertical-align:top}

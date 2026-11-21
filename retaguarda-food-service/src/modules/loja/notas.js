@@ -6,6 +6,7 @@ import {icon} from "../../core/icons.js";
 import {pageHead,btn,dataTable,openDrawer,field,input,select,textarea,toast,confirmDialog,statusPill,emptyState,backLink,errorMessage,card,kpi,searchBox,searchKey,alertBox} from "../../core/ui.js";
 import {loadItems,loadSuppliers,byId,loadLastCosts,unitCost,lineTotal} from "../shared/catalog.js";
 import {mountLines} from "../shared/doclines.js";
+import {loadMaps,syncNfe,nfeItemsCard,openNfeDepara} from "../shared/nfe.js";
 
 export const ATTACH_BUCKET="retaguarda-anexos";
 const PAY={pending:"pending",paid:"paid"};
@@ -87,6 +88,14 @@ async function detail(ctx,id){
  const map=byId(items);const editable=inv.status==="pending";
  const supplier=suppliers.find(s=>s.id===inv.supplier_id);
  let order=null;if(inv.purchase_order_id){try{order=await get("purchase_orders",inv.purchase_order_id)}catch{}}
+ // Nota vinda de NF-e: os itens da nota saem das linhas da NF-e pelo de-para (automático quando já cadastrado).
+ const nfeMode=nfe.length>0;
+ const maps=nfeMode?await loadMaps(inv.supplier_id):[];
+ if(nfeMode&&editable){
+  try{const r=await syncNfe({inv,nfe,lines,maps,storeId:ctx.storeId});lines.splice(0,lines.length,...r.lines)}
+  catch(error){toast("Não foi possível aplicar o de-para: "+errorMessage(error),"danger")}
+ }
+ if(!ctx.isCurrent())return;
  let currentLines=lines;
  const payTotal=()=>round2(pays.reduce((s,p)=>s+Number(p.amount||0),0));
  const itemsTotal=()=>round2(currentLines.reduce((s,l)=>s+Number(l.line_total||0),0));
@@ -96,13 +105,13 @@ async function detail(ctx,id){
   '<div class="doc-meta"><div><small>Emissão</small><strong>'+dateBR(inv.issue_date)+'</strong></div><div><small>Entrada</small><strong>'+dateBR(inv.entry_date)+'</strong></div>'+
   '<div><small>Pedido vinculado</small><strong>'+(order?'<a href="'+ctx.base+'/pedidos/'+order.id+'">'+e(order.number)+'</a>':"—")+'</strong></div><div><small>Valor dos itens</small><strong data-items-total>'+money(itemsTotal())+'</strong></div></div>'+
   (inv.access_key?'<p class="muted" style="margin:-8px 0 16px;font-size:12px">'+(inv.series?'Série '+e(inv.series)+' · ':'')+'Chave: '+e(inv.access_key)+(inv.origin==="everest"?' · importada do Everest':'')+'</p>':'')+
-  nfeCard(inv,nfe,map)+
+
   (inv.status==="received"?alertBox("Entrada registrada em "+dateBR(inv.received_at)+". Os itens já compõem o estoque da loja.","ok"):'')+
-  card("Itens da nota",'<div data-lines></div>',{flush:true,actions:editable&&order?btn("Importar itens do pedido "+order.number,{variant:"secondary",sm:true,icon:"download",attrs:"data-import"}):''})+
+  (nfeMode?nfeItemsCard({inv,nfe,lines,items:map,maps}):card("Itens da nota",'<div data-lines></div>',{flush:true,actions:editable&&order?btn("Importar itens do pedido "+order.number,{variant:"secondary",sm:true,icon:"download",attrs:"data-import"}):''}))+
   '<div class="grid-2">'+card("Pagamentos",'<div data-pays></div>',{flush:true,actions:btn("Parcela",{variant:"secondary",sm:true,icon:"plus",attrs:"data-add-pay"})+btn("Gerar parcelas",{variant:"ghost",sm:true,attrs:"data-gen-pay"})})+
   card("Anexos",'<div data-atts></div>',{flush:true,actions:'<label class="btn btn-secondary btn-sm">'+icon("paperclip",16)+'<span>Anexar</span><input type="file" data-file hidden multiple accept=".pdf,.xml,.jpg,.jpeg,.png"></label>'})+'</div>';
 
- const linesUI=mountLines({el:ctx.el.querySelector("[data-lines]"),table:"invoice_items",parentKey:"invoice_id",parentId:id,extra:{store_id:ctx.storeId},
+ const linesUI=nfeMode?{lines:currentLines,addMany:async()=>0}:mountLines({el:ctx.el.querySelector("[data-lines]"),table:"invoice_items",parentKey:"invoice_id",parentId:id,extra:{store_id:ctx.storeId},
   lines,items:map,editable,costFor:itemId=>unitCost(itemId,lastCosts,map),emptyText:"Nenhum item lançado nesta nota",
   onChange:ls=>{currentLines=ls;ctx.el.querySelector("[data-items-total]").textContent=money(itemsTotal());drawPays()}});
 
@@ -184,7 +193,17 @@ async function detail(ctx,id){
   const n=await linesUI.addMany(ol.filter(l=>Number(l.requested_quantity)>0).map(l=>({item_id:l.item_id,quantity:l.requested_quantity,unit_cost:l.unit_cost,line_total:lineTotal(l.requested_quantity,l.unit_cost),purchase_order_item_id:l.id})));
   toast(n?n+" item(ns) importado(s). Confira as quantidades e custos recebidos.":"Os itens do pedido já estão na nota.",n?"ok":"info");
  });
+ // Clique no item da NF-e: abre o de-para (cadastrar ou conferir).
+ ctx.el.querySelectorAll("tr[data-nfe]").forEach(tr=>{
+  const open=()=>openNfeDepara({inv,line:nfe.find(l=>l.id===tr.dataset.nfe),supplier,maps,items,onSaved:()=>ctx.reload()});
+  tr.addEventListener("click",open);tr.addEventListener("keydown",ev=>{if(ev.key==="Enter")open()});
+ });
+ ctx.el.querySelector("[data-receive]")?.addEventListener("click",ev=>{
+  const miss=nfe.filter(l=>!l.invoice_item_id).length;
+  if(nfeMode&&miss){ev.stopImmediatePropagation();toast("Faça o de-para de "+miss+" item(ns) antes de dar entrada no estoque.","danger")}
+ },{capture:true});
  ctx.el.querySelector("[data-receive]").onclick=async()=>{
+  if(nfeMode&&nfe.some(l=>!l.invoice_item_id))return;
   if(!linesUI.lines.length)return toast("Inclua os itens antes de dar entrada.","danger");
   const diff=round2(itemsTotal()-payTotal());
   if(!await confirmDialog({title:"Dar entrada da nota "+inv.invoice_number+"?",text:"Os "+linesUI.lines.length+" itens ("+money(itemsTotal())+") entrarão no estoque da loja e a nota ficará bloqueada para edição."+(pays.length&&Math.abs(diff)>=0.01?" Atenção: as parcelas não fecham com o valor dos itens.":""),confirmLabel:"Dar entrada"}))return;
@@ -198,23 +217,3 @@ async function detail(ctx,id){
 }
 export {num};
 
-// Itens da NF-e como vieram do fornecedor (invoice_nfe_items): só leitura. Mostra o vínculo que o Everest tinha
-// (código do item no Everest e quantidade em estoque) e se já existe o nosso item. A entrada no estoque continua
-// sendo pelos "Itens da nota" (invoice_items); a conversão automática virá do De-para.
-function nfeCard(inv,nfe,map){
- if(!nfe.length)return "";
- const sum=round2(nfe.reduce((s,l)=>s+Number(l.total||0),0));
- const ok=nfe.filter(l=>l.item_id).length;
- const diff=inv.total_amount!=null?round2(Number(inv.total_amount)-sum):0;
- return card("Itens da NF-e ("+nfe.length+")",
-  '<div class="nfe-sum muted">'+ok+' de '+nfe.length+' itens já ligados a um item nosso · soma dos itens '+money(sum)+(inv.total_amount!=null?' · valor da nota '+money(inv.total_amount):'')+'</div>'+
-  (Math.abs(diff)>=0.01?'<div style="padding:0 18px 10px">'+alertBox("A soma dos itens difere do valor da nota em "+money(Math.abs(diff))+(diff<0?" (provável desconto no total da nota).":"."),"warn")+'</div>':'')+
-  '<div class="table-wrap"><table class="table nfe-table"><thead><tr><th class="num">#</th><th>Produto do fornecedor</th><th>Unid.</th><th class="num">Qtd</th><th class="num">V. unit.</th><th class="num">Total</th><th>Item no Everest</th><th>Nosso item</th></tr></thead><tbody>'+
-  nfe.map(l=>{const it=l.item_id?map.get(l.item_id):null;
-   return '<tr><td class="num">'+l.seq+'</td><td><span class="strong">'+e(l.description||"")+'</span><small class="sub">Cód. '+e(l.supplier_item_code||"—")+(l.cfop?' · CFOP '+e(l.cfop):'')+'</small></td>'+
-    '<td>'+e(l.supplier_unit||"")+(l.package_desc?'<small class="sub">'+e(l.package_desc)+'</small>':'')+'</td>'+
-    '<td class="num">'+num(l.quantity,4)+'</td><td class="num">'+money(l.unit_price)+'</td><td class="num">'+money(l.total)+'</td>'+
-    '<td>'+(l.everest_item_code?e(l.everest_item_code)+'<small class="sub">'+e(l.everest_item_name||"")+(l.everest_stock_qty!=null?' · '+num(l.everest_stock_qty,4)+' no estoque':'')+'</small>':'<span class="pill pill-muted">Sem vínculo</span>')+'</td>'+
-    '<td>'+(it?'<span class="strong">'+e(it.name)+'</span><small class="sub">'+e(it.code||"")+' · '+e(it.base_unit||"")+'</small>':(l.item_id?'<span class="muted">Item fora da marca da loja</span>':'<span class="pill pill-warn">Falta de-para</span>'))+'</td></tr>'}).join("")+
-  '</tbody></table></div>',{flush:true});
-}
