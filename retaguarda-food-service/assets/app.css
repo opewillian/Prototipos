@@ -386,3 +386,10 @@ tr.is-saving{opacity:.6}
 .loss-head{grid-template-columns:180px minmax(0,1fr) minmax(0,1.4fr)}
 .order-head{grid-template-columns:180px minmax(0,1fr) minmax(0,1.4fr)}
 @media (max-width:760px){.loss-head,.order-head{grid-template-columns:1fr}}
+
+/* Listas: arrastar para mudar a posição */
+.drag-col{width:34px;padding-right:0!important}
+.drag-handle{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;color:var(--muted);cursor:grab;touch-action:none;user-select:none}
+.drag-handle:hover{background:var(--line,#eee);color:var(--ink)}
+tr.dragging{background:var(--brand-soft,#f7e6e9);box-shadow:0 2px 10px rgba(0,0,0,.12)}
+tr.dragging .drag-handle{cursor:grabbing}

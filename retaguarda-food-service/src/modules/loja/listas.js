@@ -74,19 +74,51 @@ async function detail(ctx,id){
    // A busca fica sempre no mesmo lugar (mesmo com a lista vazia), para a tela não "pular" no primeiro item.
    '<div class="toolbar no-print" style="padding:14px 18px 0">'+searchBox("q","Buscar na lista")+'</div>'+
    (rows.length?dataTable([
-    {label:"#",cls:"num",render:r=>String(rows.indexOf(r)+1)},
+    {label:"",cls:"drag-col no-print",render:r=>'<span class="drag-handle" data-drag title="Arraste para mudar a posição" aria-label="Mover '+e(r.item.name)+'">'+icon("grip",16)+'</span>'},
+    {label:"#",cls:"num",render:r=>'<span data-pos>'+(rows.indexOf(r)+1)+'</span>'},
     {label:"Item",render:r=>'<span class="strong">'+e(r.item.name)+'</span><small class="sub">'+e(r.item.code||"")+'</small>'},
     {label:"Tipo",render:r=>e(r.item.item_type||r.item.category||"—")},
     {label:"Unidade",render:r=>e(r.item.base_unit||"")},
     {label:"Quantidade",cls:"print-only-col",render:()=>'<span class="print-blank"></span>'},
     {label:"",cls:"act no-print",render:r=>'<button class="icon-btn danger" data-remove="'+e(r.id)+'" aria-label="Remover '+e(r.item.name)+'">'+icon("x",16)+'</button>'}
-   ],rows,{rowAttrs:r=>'data-search="'+e(searchKey(r.item.name,r.item.code,r.item.item_type||r.item.category))+'"'})
+   ],rows,{rowAttrs:r=>'data-lid="'+e(r.id)+'" data-search="'+e(searchKey(r.item.name,r.item.code,r.item.item_type||r.item.category))+'"'})
    :emptyState("list","Lista vazia","Adicione itens pelo campo acima."))+'</section>'+
    '<style>.print-only-col{display:none}@media print{.print-only-col{display:table-cell}.print-blank{display:inline-block;width:120px;border-bottom:1px solid #999;height:18px}}</style>';
   const qi=ctx.el.querySelector("#q");
   bindSearch(ctx.el,"q");if(q&&qi){qi.value=q;qi.dispatchEvent(new Event("input"))}
   bind(available,rows,inList);
+  bindDrag();
   if(focusAdd)ctx.el.querySelector("#add-item")?.focus();
+ };
+ // Arrastar pela alça (⋮⋮) muda a posição do item; ao soltar grava a nova ordem (sort_order) só das linhas que mudaram.
+ // Funciona com mouse e toque (pointer events). Desligado enquanto a busca filtra a lista.
+ const bindDrag=()=>{
+  const tbody=ctx.el.querySelector("tr[data-lid]")?.parentElement;if(!tbody)return;
+  tbody.querySelectorAll("[data-drag]").forEach(h=>h.addEventListener("pointerdown",ev=>{
+   if(ctx.el.querySelector("#q")?.value.trim())return toast("Limpe a busca para mudar a posição dos itens.","info");
+   ev.preventDefault();
+   const tr=h.closest("tr");tr.classList.add("dragging");h.setPointerCapture(ev.pointerId);
+   const move=e2=>{
+    const y=e2.clientY;
+    const over=[...tbody.querySelectorAll("tr[data-lid]")].find(r=>{if(r===tr)return false;const b=r.getBoundingClientRect();return y>=b.top&&y<=b.bottom});
+    if(over){const b=over.getBoundingClientRect();(y<b.top+b.height/2)?over.before(tr):over.after(tr)}
+    const sc=document.scrollingElement;if(y<60)sc.scrollBy(0,-12);else if(y>innerHeight-60)sc.scrollBy(0,12);
+   };
+   const up=async()=>{
+    h.removeEventListener("pointermove",move);h.removeEventListener("pointerup",up);h.removeEventListener("pointercancel",up);
+    tr.classList.remove("dragging");
+    const order=[...tbody.querySelectorAll("tr[data-lid]")].map(r=>r.dataset.lid);
+    tbody.querySelectorAll("tr[data-lid]").forEach((r,i)=>{const p=r.querySelector("[data-pos]");if(p)p.textContent=i+1});
+    const changed=order.map((lid,i)=>({l:lines.find(x=>x.id===lid),pos:i+1})).filter(x=>x.l&&Number(x.l.sort_order)!==x.pos);
+    if(!changed.length)return;
+    try{
+     await Promise.all(changed.map(x=>update("purchase_list_items",x.l.id,{sort_order:x.pos})));
+     changed.forEach(x=>x.l.sort_order=x.pos);lines.sort((a,b)=>Number(a.sort_order)-Number(b.sort_order));
+     toast("Posição atualizada.");
+    }catch(error){toast(errorMessage(error),"danger");draw()}
+   };
+   h.addEventListener("pointermove",move);h.addEventListener("pointerup",up);h.addEventListener("pointercancel",up);
+  }));
  };
  let busy=false;
  const addIds=async ids=>{

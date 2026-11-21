@@ -29,6 +29,7 @@ const P={
  swapStore:'<path d="M3 7h13l-3-3M21 17H8l3 3"/>',
  shield:'<path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6l-8-3Z"/>',
  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+ grip:'<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
  download:'<path d="M12 4v11m0 0-4-4m4 4 4-4"/><path d="M4 19h16"/>',
  upload:'<path d="M12 15V4m0 0-4 4m4-4 4 4"/><path d="M4 19h16"/>',
  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".6"/>',
