@@ -391,6 +391,8 @@ tr.is-saving{opacity:.6}
 .drag-col{width:34px;padding-right:0!important}
 .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;color:var(--muted);cursor:grab;touch-action:none;user-select:none}
 .drag-handle:hover{background:var(--line,#eee);color:var(--ink)}
-tr.dragging{background:var(--brand-soft,#f7e6e9);box-shadow:0 2px 10px rgba(0,0,0,.12)}
+tr[data-lid]{position:relative;will-change:transform}
+tr.dragging{z-index:5;scale:1.015;box-shadow:0 10px 24px rgba(0,0,0,.18),0 2px 6px rgba(0,0,0,.08)}
+tr.dragging td{background:var(--surface,#fff)!important}
 tr.dragging .drag-handle{cursor:grabbing}
 body.is-dragging{user-select:none;cursor:grabbing}

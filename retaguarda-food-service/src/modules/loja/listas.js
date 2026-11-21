@@ -94,19 +94,42 @@ async function detail(ctx,id){
  // Funciona com mouse e toque (pointer events). Desligado enquanto a busca filtra a lista.
  const bindDrag=()=>{
   const tbody=ctx.el.querySelector("tr[data-lid]")?.parentElement;if(!tbody)return;
+  // Animação: ao pegar, o item "levanta" (sombra e leve aumento) e acompanha o ponteiro; os outros deslizam para abrir espaço;
+  // ao soltar, ele assenta suavemente na nova posição.
+  const others=tr=>[...tbody.querySelectorAll("tr[data-lid]")].filter(r=>r!==tr);
+  // Posição de layout (sem a animação/transform aplicados), em coordenadas da tela.
+  const layoutTop=r=>tbody.getBoundingClientRect().top+r.offsetTop-tbody.offsetTop;
+  const flip=(rows,mutate)=>{ // FLIP: guarda a posição, muda o DOM e anima o deslocamento das outras linhas
+   const before=new Map(rows.map(r=>[r,r.getBoundingClientRect().top]));
+   mutate();
+   rows.forEach(r=>{const d=before.get(r)-layoutTop(r);if(Math.abs(d)<1)return;
+    r.style.transition="none";r.style.transform="translateY("+d+"px)";r.getBoundingClientRect();
+    r.style.transition="transform .18s ease";r.style.transform=""});
+  };
   tbody.querySelectorAll("[data-drag]").forEach(h=>h.addEventListener("pointerdown",ev=>{
    if(ctx.el.querySelector("#q")?.value.trim())return toast("Limpe a busca para mudar a posição dos itens.","info");
    ev.preventDefault();
-   const tr=h.closest("tr");tr.classList.add("dragging");document.body.classList.add("is-dragging");
+   const tr=h.closest("tr");
+   let lastY=ev.clientY;
+   const grab=ev.clientY-tr.getBoundingClientRect().top;
+   tr.style.transition="box-shadow .15s ease, scale .15s ease";
+   tr.classList.add("dragging");document.body.classList.add("is-dragging");
+   const place=()=>{tr.style.transform="translateY("+(lastY-grab-layoutTop(tr))+"px)"};
    const move=e2=>{
-    const y=e2.clientY;
-    const over=[...tbody.querySelectorAll("tr[data-lid]")].find(r=>{if(r===tr)return false;const b=r.getBoundingClientRect();return y>=b.top&&y<=b.bottom});
-    if(over){const b=over.getBoundingClientRect();(y<b.top+b.height/2)?over.before(tr):over.after(tr)}
-    const sc=document.scrollingElement;if(y<60)sc.scrollBy(0,-12);else if(y>innerHeight-60)sc.scrollBy(0,12);
+    lastY=e2.clientY;
+    const center=lastY-grab+tr.offsetHeight/2;
+    const rows=others(tr);
+    // Vai para antes da primeira linha cujo meio está abaixo do centro do item arrastado.
+    const want=rows.find(r=>center<layoutTop(r)+r.offsetHeight/2)||null;
+    if(want!==tr.nextElementSibling)flip(rows,()=>{want?want.before(tr):tbody.appendChild(tr)});
+    place();
+    const sc=document.scrollingElement;if(lastY<60)sc.scrollBy(0,-12);else if(lastY>innerHeight-60)sc.scrollBy(0,12);
    };
    const up=async()=>{
     removeEventListener("pointermove",move);removeEventListener("pointerup",up);removeEventListener("pointercancel",up);
-    tr.classList.remove("dragging");document.body.classList.remove("is-dragging");
+    document.body.classList.remove("is-dragging");
+    tr.style.transition="transform .18s ease, box-shadow .18s ease, scale .18s ease";tr.style.transform="";tr.classList.remove("dragging");
+    setTimeout(()=>{tr.style.transition=""},200);
     const order=[...tbody.querySelectorAll("tr[data-lid]")].map(r=>r.dataset.lid);
     tbody.querySelectorAll("tr[data-lid]").forEach((r,i)=>{const p=r.querySelector("[data-pos]");if(p)p.textContent=i+1});
     const changed=order.map((lid,i)=>({l:lines.find(x=>x.id===lid),pos:i+1})).filter(x=>x.l&&Number(x.l.sort_order)!==x.pos);

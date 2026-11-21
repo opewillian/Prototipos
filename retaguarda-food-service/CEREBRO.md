@@ -352,7 +352,7 @@ Regras:
 
 ### 8.2 Listas de contagem e compras
 
-- **20/11/2026:** arrastar pela alça (⋮⋮) muda a posição do item na lista (mouse e toque); ao soltar grava `purchase_list_items.sort_order` só das linhas que mudaram. Desligado enquanto a busca está preenchida.
+- **20/11/2026:** arrastar pela alça (⋮⋮) muda a posição do item na lista (mouse e toque); ao soltar grava `purchase_list_items.sort_order` só das linhas que mudaram. Desligado enquanto a busca está preenchida. Animação: o item levanta (sombra, leve aumento) e segue o ponteiro; as outras linhas deslizam (FLIP) e ao soltar ele assenta na posição.
 - **Listas são só de contagem (20/11/2026):** sai o "Usar em" (contagem/compra/ambos) e a coluna "Uso". Novas listas gravam `list_type='count'` (coluna mantida no banco). Contagem oferece todas as listas ativas. **Pedido de compra não usa mais lista**: nasce da contagem de referência (ou vazio, para incluir itens à mão); pedidos antigos com `list_id` continuam recalculando pela lista.
 
 - **Filtros em uma linha (20/11/2026, `src/core/filters.js`):** `filterBar`/`bindFilters` — busca, selects, período (de/até) e "Limpar", com contagem e soma do que está filtrado; filtra na tela. Usado em Transferências (direção, situação, loja), Contagens (situação) e Perdas (motivo, situação); nessas três telas os cards de resumo saíram e a barra não mostra contagem/soma. Se não couber, a barra rola para o lado.
