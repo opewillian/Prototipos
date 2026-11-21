@@ -97,7 +97,7 @@ async function detail(ctx,id){
   tbody.querySelectorAll("[data-drag]").forEach(h=>h.addEventListener("pointerdown",ev=>{
    if(ctx.el.querySelector("#q")?.value.trim())return toast("Limpe a busca para mudar a posição dos itens.","info");
    ev.preventDefault();
-   const tr=h.closest("tr");tr.classList.add("dragging");h.setPointerCapture(ev.pointerId);
+   const tr=h.closest("tr");tr.classList.add("dragging");document.body.classList.add("is-dragging");
    const move=e2=>{
     const y=e2.clientY;
     const over=[...tbody.querySelectorAll("tr[data-lid]")].find(r=>{if(r===tr)return false;const b=r.getBoundingClientRect();return y>=b.top&&y<=b.bottom});
@@ -105,8 +105,8 @@ async function detail(ctx,id){
     const sc=document.scrollingElement;if(y<60)sc.scrollBy(0,-12);else if(y>innerHeight-60)sc.scrollBy(0,12);
    };
    const up=async()=>{
-    h.removeEventListener("pointermove",move);h.removeEventListener("pointerup",up);h.removeEventListener("pointercancel",up);
-    tr.classList.remove("dragging");
+    removeEventListener("pointermove",move);removeEventListener("pointerup",up);removeEventListener("pointercancel",up);
+    tr.classList.remove("dragging");document.body.classList.remove("is-dragging");
     const order=[...tbody.querySelectorAll("tr[data-lid]")].map(r=>r.dataset.lid);
     tbody.querySelectorAll("tr[data-lid]").forEach((r,i)=>{const p=r.querySelector("[data-pos]");if(p)p.textContent=i+1});
     const changed=order.map((lid,i)=>({l:lines.find(x=>x.id===lid),pos:i+1})).filter(x=>x.l&&Number(x.l.sort_order)!==x.pos);
@@ -117,7 +117,7 @@ async function detail(ctx,id){
      toast("Posição atualizada.");
     }catch(error){toast(errorMessage(error),"danger");draw()}
    };
-   h.addEventListener("pointermove",move);h.addEventListener("pointerup",up);h.addEventListener("pointercancel",up);
+   addEventListener("pointermove",move);addEventListener("pointerup",up);addEventListener("pointercancel",up);
   }));
  };
  let busy=false;

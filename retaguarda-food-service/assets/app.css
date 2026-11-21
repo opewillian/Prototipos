@@ -393,3 +393,4 @@ tr.is-saving{opacity:.6}
 .drag-handle:hover{background:var(--line,#eee);color:var(--ink)}
 tr.dragging{background:var(--brand-soft,#f7e6e9);box-shadow:0 2px 10px rgba(0,0,0,.12)}
 tr.dragging .drag-handle{cursor:grabbing}
+body.is-dragging{user-select:none;cursor:grabbing}
