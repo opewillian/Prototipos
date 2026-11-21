@@ -12,6 +12,10 @@ export const ATTACH_BUCKET="retaguarda-anexos";
 const PAY={pending:"pending",paid:"paid"};
 const METHODS=[["boleto","Boleto"],["pix","PIX"],["transferencia","Transferência"],["cartao","Cartão"],["dinheiro","Dinheiro"],["cheque","Cheque"]];
 const methodLabel=m=>(METHODS.find(x=>x[0]===m)||[,m||"—"])[1];
+// Tipo do anexo da parcela (invoice_attachments.doc_type).
+const DOC_TYPES=[["boleto","Boleto"],["comprovante","Comprovante de pagamento"],["nota","Nota / fatura"],["outro","Outro"]];
+const docLabel=t=>(DOC_TYPES.find(x=>x[0]===t)||[,"Anexo"])[1];
+const safeName=n=>String(n).replace(/[^\w.\-]+/g,"_");
 function payState(p){if(p.paid_at||p.status===PAY.paid)return "paid";return p.due_date&&p.due_date<today()?"overdue":"open"}
 
 export async function render(ctx){
@@ -125,8 +129,12 @@ async function detail(ctx,id){
   const box=ctx.el.querySelector("[data-pays]");
   const diff=round2(itemsTotal()-payTotal());
   box.innerHTML=(pays.length?'<ul class="list-plain">'+pays.map(p=>{const st=payState(p);
-   return '<li data-pay="'+e(p.id)+'"><div><span class="label">'+money(p.amount)+'</span><small> · '+e(methodLabel(p.payment_method))+'</small><br><small>Vence '+dateBR(p.due_date)+(p.paid_at?' · pago em '+dateBR(p.paid_at):'')+'</small></div>'+
-    '<div style="display:flex;gap:6px;align-items:center">'+statusPill(st)+(st!=="paid"?btn("Pagar",{variant:"secondary",sm:true,attrs:"data-pay-ok"}):'')+'<button class="icon-btn danger" data-pay-del aria-label="Excluir parcela">'+icon("x",16)+'</button></div></li>'}).join("")+'</ul>'
+   const pa=atts.filter(a=>a.payment_id===p.id);
+   return '<li data-pay="'+e(p.id)+'" class="pay-item"><div class="pay-main"><div><span class="label">'+money(p.amount)+'</span><small> · '+e(methodLabel(p.payment_method))+'</small><br><small>Vence '+dateBR(p.due_date)+(p.paid_at?' · pago em '+dateBR(p.paid_at):'')+'</small></div>'+
+    '<div style="display:flex;gap:6px;align-items:center">'+statusPill(st)+(st!=="paid"?btn("Pagar",{variant:"secondary",sm:true,attrs:"data-pay-ok"}):'')+'<button class="icon-btn danger" data-pay-del aria-label="Excluir parcela">'+icon("x",16)+'</button></div></div>'+
+    // Anexos da parcela (boleto, comprovante...): base para a visão de parcelas do financeiro.
+    '<div class="pay-atts">'+pa.map(a=>'<span class="pay-att" data-att="'+e(a.id)+'">'+icon("paperclip",13)+'<button type="button" class="link-btn" data-att-open title="Abrir '+e(a.file_name)+'"><b>'+e(docLabel(a.doc_type))+'</b> '+e(a.file_name)+'</button><button type="button" class="icon-btn danger sm" data-att-del aria-label="Excluir anexo">'+icon("x",12)+'</button></span>').join("")+
+    '<button type="button" class="pay-att-add'+(pa.length?'':' warn')+'" data-pay-att>'+icon("plus",13)+' '+(pa.length?'Anexar':(st==="paid"?'Anexar comprovante':'Anexar boleto'))+'</button></div></li>'}).join("")+'</ul>'
    :emptyState("cash","Nenhuma parcela","Registre as condições de pagamento da nota."))+
    (currentLines.length&&Math.abs(diff)>=0.01?'<div style="padding:0 18px 14px">'+alertBox((diff>0?"Faltam ":"Parcelas excedem em ")+money(Math.abs(diff))+" em relação ao valor dos itens.","warn")+'</div>':'');
   box.querySelectorAll("[data-pay-ok]").forEach(b=>b.onclick=async()=>{
@@ -134,10 +142,31 @@ async function detail(ctx,id){
    try{const s=await update("invoice_payments",pid,{paid_at:today(),status:PAY.paid});Object.assign(pays.find(p=>p.id===pid),s);toast("Pagamento registrado.");drawPays()}catch(error){toast(errorMessage(error),"danger")}
   });
   box.querySelectorAll("[data-pay-del]").forEach(b=>b.onclick=async()=>{
-   const pid=b.closest("li").dataset.pay;
-   if(!await confirmDialog({title:"Excluir parcela?",confirmLabel:"Excluir",danger:true}))return;
-   try{await remove("invoice_payments",pid);pays.splice(pays.findIndex(p=>p.id===pid),1);drawPays()}catch(error){toast(errorMessage(error),"danger")}
+   const pid=b.closest("li").dataset.pay;const pa=atts.filter(a=>a.payment_id===pid);
+   if(!await confirmDialog({title:"Excluir parcela?",text:pa.length?"Os "+pa.length+" anexo(s) desta parcela também serão excluídos.":"",confirmLabel:"Excluir",danger:true}))return;
+   try{
+    if(pa.length)await supabase.storage.from(ATTACH_BUCKET).remove(pa.map(a=>a.storage_path));
+    await remove("invoice_payments",pid);pays.splice(pays.findIndex(p=>p.id===pid),1);
+    for(const a of pa)atts.splice(atts.indexOf(a),1);drawPays();
+   }catch(error){toast(errorMessage(error),"danger")}
   });
+  box.querySelectorAll("[data-pay-att]").forEach(b=>b.onclick=()=>{
+   const p=pays.find(x=>x.id===b.closest("li").dataset.pay);const paid=payState(p)==="paid";
+   openDrawer({title:"Anexar na parcela de "+money(p.amount),submitLabel:"Enviar",body:'<div class="form-grid">'+
+    '<div class="span-2">'+field("Tipo do documento",select("doc_type",DOC_TYPES,paid?"comprovante":"boleto",{placeholder:false}))+'</div>'+
+    '<div class="span-2">'+field("Arquivo",'<input class="control" type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.xml" required>',"PDF ou imagem, até 15 MB.")+'</div>'+
+    '<p class="muted span-2" style="margin:0">Parcela com vencimento em '+dateBR(p.due_date)+' · '+e(methodLabel(p.payment_method))+'</p></div>',
+    onSubmit:async form=>{const f=form.elements;const file=f.file.files[0];
+     if(!file)throw Error("Escolha o arquivo.");if(file.size>15*1024*1024)throw Error("Limite de 15 MB por arquivo.");
+     const path=ctx.storeId+"/"+id+"/parcela-"+p.id+"/"+Date.now()+"-"+safeName(file.name);
+     const up=await supabase.storage.from(ATTACH_BUCKET).upload(path,file,{contentType:file.type||"application/octet-stream"});
+     if(up.error)throw Error(errorMessage(up.error));
+     try{atts.push(await insert("invoice_attachments",{invoice_id:id,store_id:ctx.storeId,payment_id:p.id,doc_type:f.doc_type.value,file_name:file.name,mime_type:file.type||null,byte_size:file.size,storage_path:path,uploaded_by:ctx.userId}))}
+     catch(error){await supabase.storage.from(ATTACH_BUCKET).remove([path]);throw error}
+     toast(docLabel(f.doc_type.value)+" anexado à parcela.");drawPays();
+    }});
+  });
+  bindAttActions(box,drawPays);
  };
  drawPays();
  const addPay=()=>openDrawer({title:"Nova parcela",body:'<div class="form-grid">'+
@@ -163,30 +192,33 @@ async function detail(ctx,id){
    drawPays();toast(n+" parcela(s) gerada(s).")}});
 
  // Anexos (Supabase Storage)
- const drawAtts=()=>{
-  const box=ctx.el.querySelector("[data-atts]");
-  box.innerHTML=atts.length?'<ul class="list-plain">'+atts.map(a=>'<li data-att="'+e(a.id)+'"><div style="display:flex;gap:10px;align-items:center">'+icon("paperclip",16)+'<span class="label">'+e(a.file_name)+'</span></div><div style="display:flex;gap:6px">'+
-   btn("Abrir",{variant:"secondary",sm:true,attrs:"data-att-open"})+'<button class="icon-btn danger" data-att-del aria-label="Excluir anexo">'+icon("x",16)+'</button></div></li>').join("")+'</ul>'
-   :emptyState("paperclip","Nenhum anexo","Anexe o XML, o PDF da nota ou boletos.");
+ function bindAttActions(box,redraw){
   box.querySelectorAll("[data-att-open]").forEach(b=>b.onclick=async()=>{
-   const a=atts.find(x=>x.id===b.closest("li").dataset.att);
+   const a=atts.find(x=>x.id===b.closest("[data-att]").dataset.att);
    const {data,error}=await supabase.storage.from(ATTACH_BUCKET).createSignedUrl(a.storage_path,300);
    if(error)return toast(errorMessage(error),"danger");window.open(data.signedUrl,"_blank","noopener");
   });
   box.querySelectorAll("[data-att-del]").forEach(b=>b.onclick=async()=>{
-   const a=atts.find(x=>x.id===b.closest("li").dataset.att);
+   const a=atts.find(x=>x.id===b.closest("[data-att]").dataset.att);
    if(!await confirmDialog({title:"Excluir anexo?",text:a.file_name,confirmLabel:"Excluir",danger:true}))return;
-   try{await supabase.storage.from(ATTACH_BUCKET).remove([a.storage_path]);await remove("invoice_attachments",a.id);atts.splice(atts.indexOf(a),1);drawAtts()}catch(error){toast(errorMessage(error),"danger")}
+   try{await supabase.storage.from(ATTACH_BUCKET).remove([a.storage_path]);await remove("invoice_attachments",a.id);atts.splice(atts.indexOf(a),1);redraw()}catch(error){toast(errorMessage(error),"danger")}
   });
+ }
+ const drawAtts=()=>{
+  const box=ctx.el.querySelector("[data-atts]");const noteAtts=atts.filter(a=>!a.payment_id);
+  box.innerHTML=noteAtts.length?'<ul class="list-plain">'+noteAtts.map(a=>'<li data-att="'+e(a.id)+'"><div style="display:flex;gap:10px;align-items:center">'+icon("paperclip",16)+'<span class="label">'+e(a.file_name)+'</span></div><div style="display:flex;gap:6px">'+
+   btn("Abrir",{variant:"secondary",sm:true,attrs:"data-att-open"})+'<button class="icon-btn danger" data-att-del aria-label="Excluir anexo">'+icon("x",16)+'</button></div></li>').join("")+'</ul>'
+   :emptyState("paperclip","Nenhum anexo","Anexe o XML ou o PDF da nota. Boletos e comprovantes vão na própria parcela.");
+  bindAttActions(box,drawAtts);
  };
  drawAtts();
  ctx.el.querySelector("[data-file]").addEventListener("change",async ev=>{
   for(const file of ev.target.files){
    if(file.size>15*1024*1024){toast(file.name+": limite de 15 MB.","danger");continue}
-   const path=ctx.storeId+"/"+id+"/"+Date.now()+"-"+file.name.replace(/[^\w.\-]+/g,"_");
+   const path=ctx.storeId+"/"+id+"/"+Date.now()+"-"+safeName(file.name);
    const up=await supabase.storage.from(ATTACH_BUCKET).upload(path,file,{contentType:file.type||"application/octet-stream"});
    if(up.error){toast(/bucket not found/i.test(up.error.message)?"O armazenamento de anexos ainda não foi ativado no servidor.":errorMessage(up.error),"danger");continue}
-   try{atts.push(await insert("invoice_attachments",{invoice_id:id,store_id:ctx.storeId,file_name:file.name,mime_type:file.type||null,storage_path:path,uploaded_by:ctx.userId}));toast("Anexo enviado.")}
+   try{atts.push(await insert("invoice_attachments",{invoice_id:id,store_id:ctx.storeId,file_name:file.name,mime_type:file.type||null,byte_size:file.size,storage_path:path,uploaded_by:ctx.userId}));toast("Anexo enviado.")}
    catch(error){toast(errorMessage(error),"danger")}
   }
   ev.target.value="";drawAtts();

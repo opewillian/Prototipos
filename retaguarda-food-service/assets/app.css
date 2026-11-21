@@ -429,3 +429,14 @@ body.is-dragging{user-select:none;cursor:grabbing}
 .oc-row.oc-ok b{color:var(--ok,#1c7c4a)}
 .oc-neg{color:var(--ok,#1c7c4a)}
 .oc-pos{color:var(--ink)}
+/* Parcela com anexos (boleto, comprovante) */
+.list-plain li.pay-item{display:block}
+.pay-main{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pay-atts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pay-att{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line,#e5e5e5);border-radius:999px;padding:2px 4px 2px 9px;font-size:12px;background:var(--surface-2,#fafafa);max-width:100%}
+.pay-att .link-btn{border:0;background:none;padding:0;cursor:pointer;color:var(--ink);font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pay-att .link-btn:hover{color:var(--brand);text-decoration:underline}
+.pay-att .icon-btn.sm{width:20px;height:20px;min-width:20px;padding:0}
+.pay-att-add{display:inline-flex;align-items:center;gap:4px;border:1px dashed var(--line,#ccc);border-radius:999px;padding:3px 10px;font-size:12px;background:none;cursor:pointer;color:var(--muted)}
+.pay-att-add:hover{color:var(--brand);border-color:var(--brand)}
+.pay-att-add.warn{color:var(--warn,#a86500);border-color:var(--warn,#d98a00)}
