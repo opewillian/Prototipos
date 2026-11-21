@@ -98,7 +98,8 @@ async function detail(ctx,id){
  if(!ctx.isCurrent())return;
  let currentLines=lines;
  const payTotal=()=>round2(pays.reduce((s,p)=>s+Number(p.amount||0),0));
- const itemsTotal=()=>round2(currentLines.reduce((s,l)=>s+Number(l.line_total||0),0));
+ // Nota de NF-e: valor dos itens = soma de todas as linhas da NF-e (com ou sem de-para).
+ const itemsTotal=()=>round2(nfeMode?nfe.reduce((s,l)=>s+Number(l.total||0),0):currentLines.reduce((s,l)=>s+Number(l.line_total||0),0));
  ctx.el.innerHTML=backLink(ctx.base+"/notas","Notas fiscais")+
   '<div class="doc-head"><div><div class="doc-title"><h1>Nota nº '+e(inv.invoice_number)+'</h1>'+statusPill(inv.status)+'</div><p class="muted" style="margin:6px 0 0">'+e(supplier?.name||"Sem fornecedor")+'</p></div>'+
   '<div class="page-actions">'+(editable?btn("Editar dados",{variant:"secondary",icon:"edit",attrs:"data-edit"})+btn("Cancelar nota",{variant:"ghost",attrs:"data-cancel"})+btn("Dar entrada no estoque",{variant:"ok",icon:"check",attrs:"data-receive"}):'')+'</div></div>'+

@@ -55,18 +55,23 @@ export function nfeItemsCard({inv,nfe,lines,items,maps}){
  return card("Itens da nota ("+nfe.length+")",
   '<div class="nfe-sum"><span class="nfe-badge '+(done===nfe.length?"ok":"warn")+'">'+icon(done===nfe.length?"check":"alert",14)+' '+done+' de '+nfe.length+' com de-para</span>'+
   '<span class="muted">Itens vindos da NF-e do fornecedor. '+(received?'Clique em um item para ver o de-para.':'Clique em um item para fazer ou conferir o de-para.')+'</span></div>'+
-  (Math.abs(diff)>=0.01?'<div style="padding:0 18px 10px">'+alertBox("A soma dos itens ("+money(sum)+") difere do valor da nota ("+money(inv.total_amount)+") em "+money(Math.abs(diff))+(diff<0?" — provável desconto no total da nota.":"."),"warn")+'</div>':'')+
-  '<div class="table-wrap"><table class="table nfe-table"><thead><tr><th class="nfe-st"></th><th class="num">#</th><th>Produto do fornecedor</th><th class="num">Qtd na nota</th><th class="num">Total</th><th>Nosso item</th></tr></thead><tbody>'+
+  // Com de-para: mostra o NOSSO item (código, nome, nossa unidade, qtd convertida, custo convertido).
+  // Sem de-para: mostra o item do FORNECEDOR com o símbolo de atenção. Todas as linhas abrem o de-para ao clicar.
+  '<div class="table-wrap"><table class="table nfe-table"><thead><tr><th class="nfe-st"></th><th>Código</th><th>Nome</th><th>Unid.</th><th class="num">Qtd</th><th class="num">Valor unit.</th><th class="num">Valor total</th></tr></thead><tbody>'+
   nfe.map(l=>{const il=l.invoice_item_id?lineBy.get(l.invoice_item_id):null;const it=il?items.get(il.item_id):null;const m=activeMap(maps,l.supplier_item_code);
    const ok=!!il;
-   return '<tr class="row-click" data-nfe="'+e(l.id)+'" tabindex="0" title="'+(ok?"De-para feito — clique para conferir":"Falta de-para — clique para cadastrar")+'">'+
+   const cells=ok
+    ?'<td><span class="strong">'+e(it?.code||"—")+'</span></td><td><span class="strong">'+e(it?.name||"Item")+'</span><small class="sub">Fornecedor: '+e(l.supplier_item_code||"")+' · '+e(l.description||"")+'</small></td>'+
+     '<td>'+e(m?.item_unit||it?.base_unit||"")+'</td><td class="num">'+num(il.quantity,4)+'</td><td class="num">'+money(il.unit_cost)+'</td>'
+    :'<td><span class="strong">'+e(l.supplier_item_code||"—")+'</span></td><td><span class="strong">'+e(l.description||"")+'</span><small class="sub nfe-todo">Item do fornecedor · falta de-para</small></td>'+
+     '<td>'+e(l.supplier_unit||"")+(l.package_desc?'<small class="sub">'+e(l.package_desc)+'</small>':'')+'</td><td class="num">'+num(l.quantity,4)+'</td><td class="num">'+money(l.unit_price)+'</td>';
+   return '<tr class="row-click'+(ok?'':' nfe-pending')+'" data-nfe="'+e(l.id)+'" tabindex="0" title="'+(ok?"De-para feito — clique para ver ou editar":"Falta de-para — clique para fazer")+'">'+
     '<td class="nfe-st"><span class="nfe-dot '+(ok?"ok":"warn")+'" aria-label="'+(ok?"De-para feito":"Falta de-para")+'">'+icon(ok?"check":"alert",14)+'</span></td>'+
-    '<td class="num">'+l.seq+'</td>'+
-    '<td><span class="strong">'+e(l.description||"")+'</span><small class="sub">Cód. '+e(l.supplier_item_code||"—")+' · '+e(l.supplier_unit||"")+(l.package_desc?' ('+e(l.package_desc)+')':'')+'</small></td>'+
-    '<td class="num">'+num(l.quantity,4)+' '+e(l.supplier_unit||"")+'</td><td class="num">'+money(l.total)+'</td>'+
-    '<td>'+(ok?'<span class="strong">'+e(it?.name||"Item")+'</span><small class="sub">'+num(il.quantity,4)+' '+e(m?.item_unit||it?.base_unit||"")+' · '+money(il.unit_cost)+' cada</small>'
-     :'<span class="nfe-todo">Fazer de-para</span>')+'</td></tr>'}).join("")+
-  '</tbody></table></div>',{flush:true});
+    cells+'<td class="num strong">'+money(l.total)+'</td></tr>'}).join("")+
+  '</tbody><tfoot><tr><td colspan="6" class="num">Total dos itens</td><td class="num strong">'+money(sum)+'</td></tr>'+
+  (inv.total_amount!=null?'<tr><td colspan="6" class="num">Valor da nota</td><td class="num strong">'+money(inv.total_amount)+'</td></tr>'+
+   (Math.abs(diff)>=0.01?'<tr class="nfe-diff"><td colspan="6" class="num">Diferença'+(diff<0?' (provável desconto no total da nota)':'')+'</td><td class="num strong">'+money(diff)+'</td></tr>':''):'')+
+  '</tfoot></table></div>',{flush:true});
 }
 
 /** Tela do de-para a partir de uma linha da nota. onSaved() recarrega a nota. */

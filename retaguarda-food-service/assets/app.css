@@ -417,3 +417,7 @@ body.is-dragging{user-select:none;cursor:grabbing}
 .nfe-ro-title{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--muted);margin-bottom:10px}
 .ro-field .ro-value{padding:8px 0 2px;font-size:14px;color:var(--ink)}
 .nfe-table td,.nfe-table th{vertical-align:top}
+.nfe-table tfoot td{font-size:13px;padding:8px 12px;border-top:1px solid var(--line,#e5e5e5);background:var(--surface-2,#fafafa)}
+.nfe-table tfoot .nfe-diff td{color:var(--warn,#a86500)}
+.nfe-table tr.nfe-pending td{background:#fffaf0}
+.nfe-table small.nfe-todo{text-decoration:none;font-weight:600}
