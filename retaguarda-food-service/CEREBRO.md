@@ -435,6 +435,7 @@ Regras de UX já decididas:
 ### 8.7 Perdas
 
 - **20/11/2026:** sem formulário inicial — "Registrar perda" cria o rascunho (data de hoje, motivo vazio; reabre rascunho vazio existente) e abre o lançamento; **Data, Motivo e Detalhe** ficam no topo e gravam ao sair do campo (`losses.reason` = "Motivo — detalhe"). Registrar baixa exige motivo.
+- **20/11/2026:** botão **Imprimir formulário** na lista de perdas (como em Transferências): folha em branco com todos os itens liberados para a loja, colunas quantidade e motivo (nº da legenda), cabeçalho com loja, data e responsável. O **custo unitário** não é mais digitado: vem da última compra da loja ou do custo padrão do item (`mountLines` com `fixedCost`).
 
 - Registrar perda por motivo, data, itens, quantidade, custo e status.
 - Tipos usuais: validade, quebra, avaria, descarte (taxonomia a detalhar).

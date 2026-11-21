@@ -17,7 +17,7 @@ export async function render(ctx){
  const monthRows=rec.filter(r=>String(r.loss_date).startsWith(month));
  const byReason={};for(const r of monthRows){const k=String(r.reason).split(" — ")[0];byReason[k]=(byReason[k]||0)+tot(r.id)}
  const top=Object.entries(byReason).sort((a,b)=>b[1]-a[1])[0];
- ctx.el.innerHTML=pageHead("Perdas","Registro de perdas com baixa no estoque e valor para o CMV.",btn("Registrar perda",{icon:"plus",attrs:"data-new"}))+
+ ctx.el.innerHTML=pageHead("Perdas","Registro de perdas com baixa no estoque e valor para o CMV.",btn("Imprimir formulário",{variant:"secondary",icon:"printer",attrs:"data-print-form"})+btn("Registrar perda",{icon:"plus",attrs:"data-new"}))+
   filterBar({search:"Motivo ou detalhe",dates:true,noun:["perda","perdas"],selects:[
    {key:"reason",all:"Todos os motivos",options:REASONS.map(r=>[r,r])},
    {key:"st",all:"Todas as situações",options:[["draft","Rascunho"],["recorded","Registrada"],["cancelled","Cancelada"]]}]})+
@@ -27,6 +27,9 @@ export async function render(ctx){
   ],rows,{rowHref:r=>ctx.base+"/perdas/"+r.id,rowAttrs:r=>'data-search="'+e(searchKey(r.reason||""))+'" data-reason="'+e(String(r.reason||"").split(" — ")[0])+'" data-st="'+e(r.status)+'" data-date="'+e(String(r.loss_date).slice(0,10))+'" data-total="'+tot(r.id)+'"'}).replace('class="table"','class="table stack"'):emptyState("trash","Nenhuma perda registrada","Registre itens vencidos, quebrados ou descartados para manter o estoque correto."))+'</section>';
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
  bindFilters(ctx.el,{noun:["perda","perdas"]});
+ ctx.el.querySelector("[data-print-form]").onclick=async()=>{
+  try{printBlankForm(ctx,await loadItems({store:ctx.store}))}catch(error){toast(errorMessage(error),"danger")}
+ };
  // Sem formulário: cria o rascunho na hora (data de hoje) e abre; data, motivo e detalhe ficam no lançamento.
  // Se já existe um rascunho vazio (sem motivo e sem itens), reabre ele.
  let creating=false;
@@ -55,7 +58,7 @@ async function detail(ctx,id){
     field("Motivo",'<select class="control" name="motivo" data-head><option value="">Selecione</option>'+REASONS.map(r=>'<option'+(r===mot?" selected":"")+'>'+e(r)+'</option>').join("")+'</select>')+
     field("Detalhe (opcional)",input("detalhe",det.join(" — "),{placeholder:"Ex.: lote 123, freezer desligado",attrs:"data-head"}))+'</div></div></section>'})():'')+
   (loss.status==="recorded"?alertBox("Baixa registrada no estoque da loja.","ok"):'')+card("Itens perdidos",'<div data-lines></div>',{flush:true});
- const ui=mountLines({el:ctx.el.querySelector("[data-lines]"),table:"loss_items",parentKey:"loss_id",parentId:id,extra:{store_id:ctx.storeId},lines,items:map,editable,balances:editable?balances:null,costFor:itemId=>unitCost(itemId,lastCosts,map)});
+ const ui=mountLines({el:ctx.el.querySelector("[data-lines]"),table:"loss_items",parentKey:"loss_id",parentId:id,extra:{store_id:ctx.storeId},lines,items:map,editable,balances:editable?balances:null,fixedCost:true,costFor:itemId=>unitCost(itemId,lastCosts,map)});
  if(!editable)return;
  // Data, motivo e detalhe gravam ao sair do campo (motivo e detalhe ficam juntos em losses.reason: "Motivo — detalhe").
  const headVal=n=>ctx.el.querySelector('[data-head][name="'+n+'"]')?.value||"";
@@ -81,4 +84,22 @@ async function detail(ctx,id){
   if(!await confirmDialog({title:"Cancelar registro?",confirmLabel:"Cancelar registro",danger:true}))return;
   try{await update("losses",id,{status:"cancelled"},{status:"draft"});toast("Registro cancelado.");ctx.reload()}catch(error){toast(errorMessage(error),"danger")}
  };
+}
+
+// Formulário em branco para anotar as perdas à mão: todos os itens liberados para a loja, com quantidade e motivo em branco.
+function printBlankForm(ctx,items){
+ const rows=items.filter(i=>i.active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name),"pt-BR"));
+ const st=ctx.store;const loja=st?st.name+(st.everest_code?" ("+st.everest_code+")":""):"";
+ document.querySelector(".print-sheet")?.remove();
+ const sheet=document.createElement("div");sheet.className="print-sheet";
+ sheet.innerHTML='<h1>Formulário de perdas</h1>'+
+  '<p class="ps-meta">Loja: <strong>'+e(loja)+'</strong> · Data: ____/____/______ · Responsável: ______________________________</p>'+
+  '<p class="ps-meta">Motivos: '+REASONS.map((r,n)=>'<strong>'+(n+1)+'</strong> '+e(r)).join(" · ")+'</p>'+
+  '<table><thead><tr><th class="ps-n">#</th><th>Item</th><th>Unidade</th><th>Quantidade</th><th>Motivo (nº)</th></tr></thead><tbody>'+
+  rows.map((i,n)=>'<tr><td class="ps-n">'+(n+1)+'</td><td><strong>'+e(i.name)+'</strong><small>'+e(i.code||"")+'</small></td><td>'+e(i.base_unit||"")+'</td><td><span class="ps-blank"></span></td><td><span class="ps-blank" style="width:60px"></span></td></tr>').join("")+
+  '</tbody></table>';
+ document.body.appendChild(sheet);document.body.classList.add("printing-sheet");
+ const done=()=>{document.body.classList.remove("printing-sheet");sheet.remove();removeEventListener("afterprint",done)};
+ addEventListener("afterprint",done);
+ window.print();
 }
