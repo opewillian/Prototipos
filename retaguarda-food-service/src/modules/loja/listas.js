@@ -120,7 +120,7 @@ async function detail(ctx,id){
     const center=lastY-grab+tr.offsetHeight/2;
     const rows=others(tr);
     // Vai para antes da primeira linha cujo meio está abaixo do centro do item arrastado.
-    const want=rows.find(r=>center<layoutTop(r)+r.offsetHeight/2)||null;
+    const want=rows.find(r=>center<=layoutTop(r)+r.offsetHeight/2)||null;
     if(want!==tr.nextElementSibling)flip(rows,()=>{want?want.before(tr):tbody.appendChild(tr)});
     place();
     const sc=document.scrollingElement;if(lastY<60)sc.scrollBy(0,-12);else if(lastY>innerHeight-60)sc.scrollBy(0,12);
