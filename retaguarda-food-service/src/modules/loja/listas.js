@@ -98,7 +98,7 @@ async function detail(ctx,id){
   // ao soltar, ele assenta suavemente na nova posição.
   const others=tr=>[...tbody.querySelectorAll("tr[data-lid]")].filter(r=>r!==tr);
   // Posição de layout (sem a animação/transform aplicados), em coordenadas da tela.
-  const layoutTop=r=>tbody.getBoundingClientRect().top+r.offsetTop-tbody.offsetTop;
+  const layoutTop=r=>{const t=getComputedStyle(r).transform;return r.getBoundingClientRect().top-(t&&t!=="none"?new DOMMatrixReadOnly(t).m42:0)};
   const flip=(rows,mutate)=>{ // FLIP: guarda a posição, muda o DOM e anima o deslocamento das outras linhas
    const before=new Map(rows.map(r=>[r,r.getBoundingClientRect().top]));
    mutate();
