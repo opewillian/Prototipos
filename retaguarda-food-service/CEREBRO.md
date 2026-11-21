@@ -433,6 +433,13 @@ Regras de UX já decididas:
 - Em homologação, evitar transferir da Teste para lojas reais antes de liberação deliberada em **ambas**.
 - Registrar origem, destino, usuário, data e memória de movimentação.
 
+### Fornecedores vindos do Everest (20/11/2026, `docs/sql/17-fornecedores-cgh-2026.sql`, executado)
+
+- 29 fornecedores cadastrados em `suppliers`: os que têm NF-e emitida em 2026 para a CGH (empresa 57). Fonte: Everest DFI → Monitor → **Monitor de DANFEs Recebidas** (tem CNPJ do fornecedor, chave de acesso e aba Itens por nota; consulta máxima de 12 meses; filtrar a grade por "CGH-PUB" com a coluna Fantasia visível).
+- `code` = código do fornecedor no Everest; `name` = razão social da NF-e (fornecedores do grupo MFT com a fantasia do Everest entre parênteses, ex. "(MFT-OLI-ADM)"); `tax_id` = CNPJ só números. Inclui 4 CNPJs do próprio grupo (OLI-ADM, GIG-DES, BSB-SUL, CVD-EST).
+- Exportações guardadas em `Documents/MFT/dados/everest_danfes_57_*.tsv` (747 NF-e jan/2025–nov/2026) e `everest_notas_recebidas_57_2025-2026.tsv`.
+- Próximos passos combinados: notas e itens (itens em lote pelo relatório 554 do ADM; o Monitor só mostra itens nota a nota).
+
 ### 8.7 Perdas
 
 - **20/11/2026:** sem formulário inicial — "Registrar perda" cria o rascunho (data de hoje, motivo vazio; reabre rascunho vazio existente) e abre o lançamento; **Data, Motivo e Detalhe** ficam no topo e gravam ao sair do campo (`losses.reason` = "Motivo — detalhe"). Registrar baixa exige motivo.
