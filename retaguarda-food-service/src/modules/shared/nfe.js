@@ -11,6 +11,9 @@ import {icon} from "../../core/icons.js";
 
 const UNITS=["un","kg","l"];
 const round4=v=>Math.round(Number(v||0)*10000)/10000;
+// Valor unitário com até 4 casas (custos pequenos, ex. R$ 0,0482 por sachê).
+const unitBRL=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:4});
+const mu=v=>unitBRL.format(Number(v||0));
 export const codeKey=c=>String(c||"").trim().toLowerCase();
 const itemLabel=i=>i.name+(i.code?" · "+i.code:"");
 
@@ -72,9 +75,9 @@ export function nfeItemsCard({inv,nfe,lines,items,maps}){
    const ok=!!il;const pure=ok&&Number(il.quantity)>0?Number(l.total||0)/Number(il.quantity):0;const rated=ok&&Math.abs(Number(il.line_total)-Number(l.total||0))>=0.01;
    const cells=ok
     ?'<td><span class="strong">'+e(it?.code||"—")+'</span></td><td><span class="strong">'+e(it?.name||"Item")+'</span><small class="sub">Fornecedor: '+e(l.supplier_item_code||"")+' · '+e(l.description||"")+'</small></td>'+
-     '<td>'+e(m?.item_unit||it?.base_unit||"")+'</td><td class="num">'+num(il.quantity,4)+'</td><td class="num">'+money(pure)+(rated?'<small class="sub" title="Custo que entra no estoque, já com o rateio dos outros custos">'+money(il.unit_cost)+' c/ rateio</small>':'')+'</td>'
+     '<td>'+e(m?.item_unit||it?.base_unit||"")+'</td><td class="num">'+num(il.quantity,4)+'</td><td class="num">'+mu(pure)+(rated?'<small class="sub" title="Custo que entra no estoque, já com o rateio dos outros custos">'+mu(il.unit_cost)+' c/ rateio</small>':'')+'</td>'
     :'<td><span class="strong">'+e(l.supplier_item_code||"—")+'</span></td><td><span class="strong">'+e(l.description||"")+'</span><small class="sub nfe-todo">Item do fornecedor · falta de-para</small></td>'+
-     '<td>'+e(l.supplier_unit||"")+(l.package_desc?'<small class="sub">'+e(l.package_desc)+'</small>':'')+'</td><td class="num">'+num(l.quantity,4)+'</td><td class="num">'+money(l.unit_price)+'</td>';
+     '<td>'+e(l.supplier_unit||"")+(l.package_desc?'<small class="sub">'+e(l.package_desc)+'</small>':'')+'</td><td class="num">'+num(l.quantity,4)+'</td><td class="num">'+mu(l.unit_price)+'</td>';
    return '<tr class="row-click'+(ok?'':' nfe-pending')+'" data-nfe="'+e(l.id)+'" tabindex="0" title="'+(ok?"De-para feito — clique para ver ou editar":"Falta de-para — clique para fazer")+'">'+
     '<td class="nfe-st"><span class="nfe-dot '+(ok?"ok":"warn")+'" aria-label="'+(ok?"De-para feito":"Falta de-para")+'">'+icon(ok?"check":"alert",14)+'</span></td>'+
     cells+'<td class="num strong">'+money(l.total)+'</td></tr>'}).join("")+
@@ -127,7 +130,7 @@ export function openNfeDepara({inv,line,supplier,maps,items,onSaved}){
   if(item&&item.base_unit&&f.unit.dataset.auto!=="0"){f.unit.value=item.base_unit}
   d.el.querySelector("[data-u]").textContent=f.unit.value;
   d.el.querySelector("[data-example]").textContent=item&&fac>0
-   ?"Nesta nota: "+num(line.quantity,4)+" "+su+" → entram "+num(round4(Number(line.quantity)*fac),4)+" "+f.unit.value+" de "+item.name+", custo "+money(Number(line.total||0)/(Number(line.quantity)*fac))+" cada."
+   ?"Nesta nota: "+num(line.quantity,4)+" "+su+" → entram "+num(round4(Number(line.quantity)*fac),4)+" "+f.unit.value+" de "+item.name+", custo "+mu(Number(line.total||0)/(Number(line.quantity)*fac))+" cada."
    :"Quantos "+u+" do nosso item vêm em 1 "+su+" do fornecedor.";
  };
  f.unit.addEventListener("change",()=>{f.unit.dataset.auto="0";refresh()});
