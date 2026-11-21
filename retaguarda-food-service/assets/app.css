@@ -421,3 +421,11 @@ body.is-dragging{user-select:none;cursor:grabbing}
 .nfe-table tfoot .nfe-diff td{color:var(--warn,#a86500)}
 .nfe-table tr.nfe-pending td{background:#fffaf0}
 .nfe-table small.nfe-todo{text-decoration:none;font-weight:600}
+/* Outros custos da nota */
+.oc-box{padding:12px 18px 16px;border-top:1px solid var(--line,#e5e5e5)}
+.oc-row{display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0}
+.oc-row.oc-strong{font-size:15px;border-top:1px dashed var(--line,#ddd);margin-top:4px;padding-top:6px}
+.oc-row.oc-warn b{color:var(--warn,#a86500)}
+.oc-row.oc-ok b{color:var(--ok,#1c7c4a)}
+.oc-neg{color:var(--ok,#1c7c4a)}
+.oc-pos{color:var(--ink)}

@@ -6,7 +6,7 @@ import {icon} from "../../core/icons.js";
 import {pageHead,btn,dataTable,openDrawer,field,input,select,textarea,toast,confirmDialog,statusPill,emptyState,backLink,errorMessage,card,kpi,searchBox,searchKey,alertBox} from "../../core/ui.js";
 import {loadItems,loadSuppliers,byId,loadLastCosts,unitCost,lineTotal} from "../shared/catalog.js";
 import {mountLines} from "../shared/doclines.js";
-import {loadMaps,syncNfe,nfeItemsCard,openNfeDepara} from "../shared/nfe.js";
+import {loadMaps,syncNfe,nfeItemsCard,openNfeDepara,otherCostsCard,bindOtherCosts,costsTotal} from "../shared/nfe.js";
 
 export const ATTACH_BUCKET="retaguarda-anexos";
 const PAY={pending:"pending",paid:"paid"};
@@ -76,13 +76,15 @@ async function editHeader(ctx,inv,suppliers){
 }
 
 async function detail(ctx,id){
- const [inv,lines,pays,atts,items,suppliers,lastCosts,nfe]=await Promise.all([
+ const [inv,lines,pays,atts,items,suppliers,lastCosts,nfe,costs]=await Promise.all([
   get("invoices",id),list("invoice_items",{eq:{invoice_id:id},order:"created_at",asc:true}),
   list("invoice_payments",{eq:{invoice_id:id},order:"due_date",asc:true}),
   list("invoice_attachments",{eq:{invoice_id:id},order:"created_at",asc:true}).catch(()=>[]),
   loadItems({store:ctx.store}),loadSuppliers(),loadLastCosts(ctx.storeId),
-  list("invoice_nfe_items",{eq:{invoice_id:id},order:"seq",asc:true}).catch(()=>[])
+  list("invoice_nfe_items",{eq:{invoice_id:id},order:"seq",asc:true}).catch(()=>[]),
+  list("invoice_other_costs",{eq:{invoice_id:id},order:"created_at",asc:true}).catch(()=>[])
  ]);
+ const adj=costsTotal(costs);
  if(!ctx.isCurrent())return;
  if(inv.store_id!==ctx.storeId)throw Error("Esta nota pertence a outra loja.");
  const map=byId(items);const editable=inv.status==="pending";
@@ -92,23 +94,26 @@ async function detail(ctx,id){
  const nfeMode=nfe.length>0;
  const maps=nfeMode?await loadMaps(inv.supplier_id):[];
  if(nfeMode&&editable){
-  try{const r=await syncNfe({inv,nfe,lines,maps,storeId:ctx.storeId});lines.splice(0,lines.length,...r.lines)}
+  try{const r=await syncNfe({inv,nfe,lines,maps,storeId:ctx.storeId,adj});lines.splice(0,lines.length,...r.lines)}
   catch(error){toast("Não foi possível aplicar o de-para: "+errorMessage(error),"danger")}
  }
  if(!ctx.isCurrent())return;
  let currentLines=lines;
  const payTotal=()=>round2(pays.reduce((s,p)=>s+Number(p.amount||0),0));
  // Nota de NF-e: valor dos itens = soma de todas as linhas da NF-e (com ou sem de-para).
- const itemsTotal=()=>round2(nfeMode?nfe.reduce((s,l)=>s+Number(l.total||0),0):currentLines.reduce((s,l)=>s+Number(l.line_total||0),0));
+ const itemsSum=()=>round2(nfeMode?nfe.reduce((s,l)=>s+Number(l.total||0),0):currentLines.reduce((s,l)=>s+Number(l.line_total||0),0));
+ // Total da nota = itens + outros custos (desconto abate; frete, seguro, despesas, IPI, ST somam).
+ const itemsTotal=()=>round2(itemsSum()+adj);
  ctx.el.innerHTML=backLink(ctx.base+"/notas","Notas fiscais")+
   '<div class="doc-head"><div><div class="doc-title"><h1>Nota nº '+e(inv.invoice_number)+'</h1>'+statusPill(inv.status)+'</div><p class="muted" style="margin:6px 0 0">'+e(supplier?.name||"Sem fornecedor")+'</p></div>'+
   '<div class="page-actions">'+(editable?btn("Editar dados",{variant:"secondary",icon:"edit",attrs:"data-edit"})+btn("Cancelar nota",{variant:"ghost",attrs:"data-cancel"})+btn("Dar entrada no estoque",{variant:"ok",icon:"check",attrs:"data-receive"}):'')+'</div></div>'+
   '<div class="doc-meta"><div><small>Emissão</small><strong>'+dateBR(inv.issue_date)+'</strong></div><div><small>Entrada</small><strong>'+dateBR(inv.entry_date)+'</strong></div>'+
-  '<div><small>Pedido vinculado</small><strong>'+(order?'<a href="'+ctx.base+'/pedidos/'+order.id+'">'+e(order.number)+'</a>':"—")+'</strong></div><div><small>Valor dos itens</small><strong data-items-total>'+money(itemsTotal())+'</strong></div></div>'+
+  '<div><small>Pedido vinculado</small><strong>'+(order?'<a href="'+ctx.base+'/pedidos/'+order.id+'">'+e(order.number)+'</a>':"—")+'</strong></div><div><small>Total da nota</small><strong data-items-total>'+money(itemsTotal())+'</strong></div></div>'+
   (inv.access_key?'<p class="muted" style="margin:-8px 0 16px;font-size:12px">'+(inv.series?'Série '+e(inv.series)+' · ':'')+'Chave: '+e(inv.access_key)+(inv.origin==="everest"?' · importada do Everest':'')+'</p>':'')+
 
   (inv.status==="received"?alertBox("Entrada registrada em "+dateBR(inv.received_at)+". Os itens já compõem o estoque da loja.","ok"):'')+
   (nfeMode?nfeItemsCard({inv,nfe,lines,items:map,maps}):card("Itens da nota",'<div data-lines></div>',{flush:true,actions:editable&&order?btn("Importar itens do pedido "+order.number,{variant:"secondary",sm:true,icon:"download",attrs:"data-import"}):''}))+
+  otherCostsCard({inv,costs,itemsSum:itemsSum(),editable,nfeMode})+
   '<div class="grid-2">'+card("Pagamentos",'<div data-pays></div>',{flush:true,actions:btn("Parcela",{variant:"secondary",sm:true,icon:"plus",attrs:"data-add-pay"})+btn("Gerar parcelas",{variant:"ghost",sm:true,attrs:"data-gen-pay"})})+
   card("Anexos",'<div data-atts></div>',{flush:true,actions:'<label class="btn btn-secondary btn-sm">'+icon("paperclip",16)+'<span>Anexar</span><input type="file" data-file hidden multiple accept=".pdf,.xml,.jpg,.jpeg,.png"></label>'})+'</div>';
 
@@ -194,6 +199,7 @@ async function detail(ctx,id){
   const n=await linesUI.addMany(ol.filter(l=>Number(l.requested_quantity)>0).map(l=>({item_id:l.item_id,quantity:l.requested_quantity,unit_cost:l.unit_cost,line_total:lineTotal(l.requested_quantity,l.unit_cost),purchase_order_item_id:l.id})));
   toast(n?n+" item(ns) importado(s). Confira as quantidades e custos recebidos.":"Os itens do pedido já estão na nota.",n?"ok":"info");
  });
+ if(editable)bindOtherCosts({root:ctx.el,inv,costs,itemsSum:itemsSum(),storeId:ctx.storeId,onChange:()=>ctx.reload()});
  // Clique no item da NF-e: abre o de-para (cadastrar ou conferir).
  ctx.el.querySelectorAll("tr[data-nfe]").forEach(tr=>{
   const open=()=>openNfeDepara({inv,line:nfe.find(l=>l.id===tr.dataset.nfe),supplier,maps,items,onSaved:()=>ctx.reload()});
