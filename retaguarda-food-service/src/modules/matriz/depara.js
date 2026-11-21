@@ -58,7 +58,7 @@ function editMap(ctx,row,{suppliers,items,presetSupplier}){
   field("Código do produto na nota",input("supplier_item_code",v.supplier_item_code,{required:true,placeholder:"Ex.: 110"}),"Como vem no XML/DANFE do fornecedor.")+
   field("Unidade do fornecedor",'<input class="control" name="supplier_unit" list="dl-units" value="'+e(v.supplier_unit||"")+'" placeholder="Ex.: CX" autocomplete="off"><datalist id="dl-units">'+SUPPLIER_UNITS.map(u=>'<option value="'+u+'">').join("")+'</datalist>')+
   '<div class="span-2">'+field("Descrição na nota (opcional)",input("supplier_description",v.supplier_description,{placeholder:"Ex.: AGUA MIN S/GAS 500ML CX C/12"}))+'</div>'+
-  '<div class="span-2">'+field("Nosso item",'<input class="control" name="item" list="dl-dp-items" value="'+e(cur?itemLabel(cur):"")+'" placeholder="Digite o nome ou código" autocomplete="off" required><datalist id="dl-dp-items">'+its.map(i=>'<option value="'+e(itemLabel(i))+'">').join("")+'</datalist>')+'</div>'+
+  '<div class="span-2">'+field("Nosso item",'<input class="control" name="item_label" list="dl-dp-items" value="'+e(cur?itemLabel(cur):"")+'" placeholder="Digite o nome ou código" autocomplete="off" required><datalist id="dl-dp-items">'+its.map(i=>'<option value="'+e(itemLabel(i))+'">').join("")+'</datalist>')+'</div>'+
   '<div class="span-2"><div class="field"><span class="field-label">Conversão</span><div class="dp-conv">1 <b data-u1>'+e(v.supplier_unit||"un. fornecedor")+'</b> = '+
    '<input class="control dp-factor" name="factor" inputmode="decimal" value="'+e(String(v.factor??"").replace(".",","))+'" required> <b data-u2>'+e(cur?.base_unit||"")+'</b> <span data-iname class="muted">'+e(cur?.name||"do nosso item")+'</span></div>'+
    '<small class="field-hint" data-example></small></div></div>'+
@@ -69,7 +69,7 @@ function editMap(ctx,row,{suppliers,items,presetSupplier}){
   onSubmit:async form=>{const f=form.elements;
    if(!f.supplier_id.value)throw Error("Escolha o fornecedor.");
    const code=f.supplier_item_code.value.trim();if(!code)throw Error("Informe o código do produto na nota do fornecedor.");
-   const it=findItem(its,f.item.value);if(!it)throw Error("Escolha o nosso item na lista.");
+   const it=findItem(its,f.item_label.value);if(!it)throw Error("Escolha o nosso item na lista.");
    const factor=parseNum(f.factor.value);if(!(factor>0))throw Error("Informe a conversão: quantas "+(it.base_unit||"unidades")+" vêm em 1 unidade do fornecedor.");
    const data={supplier_id:f.supplier_id.value,supplier_item_code:code,supplier_unit:f.supplier_unit.value.trim().toUpperCase()||null,
     supplier_description:f.supplier_description.value.trim()||null,item_id:it.id,factor,notes:f.notes.value.trim()||null,active:f.active.checked};
@@ -82,13 +82,13 @@ function editMap(ctx,row,{suppliers,items,presetSupplier}){
  const f=d.el.elements;
  // Frase da conversão e exemplo ao vivo: "Nota com 2 CX a R$ 30,00 -> entram 24 un a R$ 2,50".
  const refresh=()=>{
-  const it=findItem(its,f.item.value);const u=f.supplier_unit.value.trim().toUpperCase()||"un. fornecedor";const fac=parseNum(f.factor.value);
+  const it=findItem(its,f.item_label.value);const u=f.supplier_unit.value.trim().toUpperCase()||"un. fornecedor";const fac=parseNum(f.factor.value);
   d.el.querySelector("[data-u1]").textContent=u;
   d.el.querySelector("[data-u2]").textContent=it?.base_unit||"";
   d.el.querySelector("[data-iname]").textContent=it?.name||"do nosso item";
   d.el.querySelector("[data-example]").textContent=it&&fac>0?"Exemplo: nota com 2 "+u+" a "+money(30)+" cada → entram "+num(round2(2*fac),3)+" "+it.base_unit+" de "+it.name+" a "+money(30/fac)+" cada.":"Quantas unidades do nosso item (na unidade dele) vêm em 1 unidade do fornecedor.";
  };
- ["item","supplier_unit","factor"].forEach(n=>{f[n].addEventListener("input",refresh);f[n].addEventListener("change",refresh)});
+ ["item_label","supplier_unit","factor"].forEach(n=>{f[n].addEventListener("input",refresh);f[n].addEventListener("change",refresh)});
  refresh();
  d.el.querySelector("[data-del]")?.addEventListener("click",async()=>{
   if(!await confirmDialog({title:"Excluir de-para?",text:"O código "+row.supplier_item_code+" deste fornecedor deixará de ser convertido automaticamente. Para só parar de usar, prefira desativar.",confirmLabel:"Excluir",danger:true}))return;
