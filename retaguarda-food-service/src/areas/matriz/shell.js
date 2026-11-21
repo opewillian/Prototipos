@@ -3,6 +3,7 @@ import * as painel from "../../modules/matriz/painel.js";
 import * as itens from "../../modules/matriz/itens.js";
 import * as marcas from "../../modules/matriz/marcas.js";
 import * as fornecedores from "../../modules/matriz/fornecedores.js";
+import * as depara from "../../modules/matriz/depara.js";
 import * as usuarios from "../../modules/matriz/usuarios.js";
 import * as pedidos from "../../modules/matriz/pedidos.js";
 import * as log from "../../modules/matriz/log.js";
@@ -14,6 +15,7 @@ export const matrizModules=[
  {id:"itens",label:"Itens",icon:"box",group:"Cadastros",groupIcon:"edit",tab:"catalog",mod:itens},
  {id:"marcas",label:"Marcas",icon:"list",group:"Cadastros",tab:"catalog",mod:marcas},
  {id:"fornecedores",label:"Fornecedores",icon:"truck",group:"Cadastros",tab:"suppliers",mod:fornecedores},
+ {id:"depara",label:"De-para",icon:"swap",group:"Cadastros",tab:"suppliers",mod:depara},
  {id:"usuarios",label:"Usuários e acessos",icon:"users",group:"Cadastros",tab:"users",mod:usuarios},
  {id:"log",label:"Log de alterações",icon:"layers",group:"Cadastros",tab:"users",mod:log}
 ];

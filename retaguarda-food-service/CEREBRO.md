@@ -440,6 +440,12 @@ Regras de UX já decididas:
 - Exportações guardadas em `Documents/MFT/dados/everest_danfes_57_*.tsv` (747 NF-e jan/2025–nov/2026) e `everest_notas_recebidas_57_2025-2026.tsv`.
 - Próximos passos combinados: notas e itens (itens em lote pelo relatório 554 do ADM; o Monitor só mostra itens nota a nota).
 
+### De-para de fornecedores (20/11/2026, `docs/sql/18-depara-fornecedor.sql` executado, `src/modules/matriz/depara.js`)
+
+- Tabela `supplier_item_map`: fornecedor + código do produto na nota (cProd do XML) → nosso item + `factor` (quantas unidades do nosso item, na UM base un/kg/l, vêm em 1 unidade do fornecedor). Também guarda unidade e descrição do fornecedor, observação e ativo. Código único por fornecedor (sem diferenciar maiúsculas). RLS igual a suppliers (membro lê, admin Matriz grava).
+- Regra para a entrada automática de notas (a fazer): qtd interna = qtd da nota × fator; custo unitário interno = valor unitário da nota ÷ fator.
+- Tela Matriz → Cadastros → **De-para** (permissão "Fornecedores"): filtro por fornecedor/situação, cadastro com frase de conversão e exemplo ao vivo ("nota com 2 CX a R$ 30 → entram 24 un a R$ 2,50"). Na tela do fornecedor, botão "De-para (n)" abre a lista já filtrada (`#/matriz/depara/<fornecedor>`).
+
 ### 8.7 Perdas
 
 - **20/11/2026:** sem formulário inicial — "Registrar perda" cria o rascunho (data de hoje, motivo vazio; reabre rascunho vazio existente) e abre o lançamento; **Data, Motivo e Detalhe** ficam no topo e gravam ao sair do campo (`losses.reason` = "Motivo — detalhe"). Registrar baixa exige motivo.

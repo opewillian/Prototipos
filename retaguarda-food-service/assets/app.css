@@ -396,3 +396,7 @@ tr.dragging{z-index:5;scale:1.015;box-shadow:0 10px 24px rgba(0,0,0,.18),0 2px 6
 tr.dragging td{background:var(--surface,#fff)!important}
 tr.dragging .drag-handle{cursor:grabbing}
 body.is-dragging{user-select:none;cursor:grabbing}
+
+/* De-para: linha da conversão "1 CX = [12] un Item" */
+.dp-conv{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.dp-conv .dp-factor{width:110px;text-align:center}

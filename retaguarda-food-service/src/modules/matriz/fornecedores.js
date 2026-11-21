@@ -45,14 +45,14 @@ function editSupplier(ctx,s){
 }
 
 async function detail(ctx,id){
- const [s,links,items]=await Promise.all([get("suppliers",id),list("store_item_suppliers",{eq:{supplier_id:id}}),loadItems()]);
+ const [s,links,items,maps]=await Promise.all([get("suppliers",id),list("store_item_suppliers",{eq:{supplier_id:id}}),loadItems(),list("supplier_item_map",{select:"id,active",eq:{supplier_id:id}})]);
  if(!ctx.isCurrent())return;
  const map=byId(items);const stores=ctx.app.stores.filter(x=>x.store_type==="operational");
  const storeName=sid=>stores.find(x=>x.id===sid)?.name||sid;
  const rows=links.filter(l=>l.active!==false).sort((a,b)=>storeName(a.store_id).localeCompare(storeName(b.store_id))||String(map.get(a.item_id)?.name).localeCompare(String(map.get(b.item_id)?.name)));
  ctx.el.innerHTML=backLink("#/matriz/fornecedores","Fornecedores")+
   '<div class="doc-head"><div><div class="doc-title"><h1>'+e(s.name)+'</h1>'+(s.active!==false?'<span class="pill pill-ok">Ativo</span>':'<span class="pill pill-muted">Inativo</span>')+'</div>'+
-  '<p class="muted" style="margin:6px 0 0">'+[fmtDoc(s.tax_id),s.phone,s.email].filter(Boolean).map(e).join(" · ")+'</p></div><div class="page-actions">'+btn("Editar",{variant:"secondary",icon:"edit",attrs:"data-edit"})+'</div></div>'+
+  '<p class="muted" style="margin:6px 0 0">'+[fmtDoc(s.tax_id),s.phone,s.email].filter(Boolean).map(e).join(" · ")+'</p></div><div class="page-actions">'+btn("De-para ("+maps.filter(m=>m.active!==false).length+")",{variant:"secondary",icon:"swap",href:"#/matriz/depara/"+id})+btn("Editar",{variant:"secondary",icon:"edit",attrs:"data-edit"})+'</div></div>'+
   card("Itens fornecidos por loja",'<div class="add-row">'+
    field("Loja",'<select class="control" id="l-store">'+stores.map(x=>'<option value="'+e(x.id)+'">'+e(x.name)+'</option>').join("")+'<option value="*">Todas as lojas</option></select>')+
    field("Item",'<input class="control" id="l-item" list="dl-sup" placeholder="Nome ou código" autocomplete="off"><datalist id="dl-sup">'+items.filter(i=>i.active!==false).map(i=>'<option value="'+e(i.name+(i.code?" · "+i.code:""))+'">').join("")+'</datalist>')+
