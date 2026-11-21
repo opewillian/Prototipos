@@ -446,6 +446,14 @@ Regras de UX já decididas:
 - Regra para a entrada automática de notas (a fazer): qtd interna = qtd da nota × fator; custo unitário interno = valor unitário da nota ÷ fator.
 - Tela Matriz → Cadastros → **De-para** (permissão "Fornecedores"): filtro por fornecedor/situação, cadastro com frase de conversão e exemplo ao vivo ("nota com 2 CX a R$ 30 → entram 24 un a R$ 2,50"). Na tela do fornecedor, botão "De-para (n)" abre a lista já filtrada (`#/matriz/depara/<fornecedor>`).
 
+### Itens da NF-e e nota de teste (20/11/2026, `docs/sql/19-nfe-itens-e-nota-teste.sql` executado)
+
+- `invoices` ganhou `series`, `total_amount`, `origin` ('everest' quando importada).
+- Tabela nova `invoice_nfe_items`: a linha da NF-e como veio (código/descrição/unidade/embalagem do fornecedor, quantidade, valor unitário, desconto, total, CFOP) + o vínculo do Everest (código e nome do item no Everest, quantidade em estoque) + `item_id` (nosso item quando o código do Everest existe em `items`). RLS igual a `invoice_items` (aba Notas).
+- Importada 1 nota de teste na CGH (`store_id='teste'`): Sendas/Assaí nº 184284, série 300, 12/11/2026, **pendente** (não mexe no estoque), 21 itens, 6 já ligados a item nosso, 9 sem vínculo nem no Everest. Soma dos itens R$ 1.426,30 × valor da nota R$ 1.355,98 (diferença R$ 70,32, a confirmar).
+- Tela da nota mostra o card "Itens da NF-e" (só leitura) com a situação de cada item (ligado / "Falta de-para"). `invoice_items` (entrada no estoque) continua vazio até a conversão pelo De-para.
+- Itens das outras 15 notas mais novas já extraídos do Everest em arquivos (pasta itens/ do scratchpad da sessão), não importados (decisão do Willian: testar com 1 nota).
+
 ### 8.7 Perdas
 
 - **20/11/2026:** sem formulário inicial — "Registrar perda" cria o rascunho (data de hoje, motivo vazio; reabre rascunho vazio existente) e abre o lançamento; **Data, Motivo e Detalhe** ficam no topo e gravam ao sair do campo (`losses.reason` = "Motivo — detalhe"). Registrar baixa exige motivo.

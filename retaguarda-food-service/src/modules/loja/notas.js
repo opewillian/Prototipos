@@ -75,11 +75,12 @@ async function editHeader(ctx,inv,suppliers){
 }
 
 async function detail(ctx,id){
- const [inv,lines,pays,atts,items,suppliers,lastCosts]=await Promise.all([
+ const [inv,lines,pays,atts,items,suppliers,lastCosts,nfe]=await Promise.all([
   get("invoices",id),list("invoice_items",{eq:{invoice_id:id},order:"created_at",asc:true}),
   list("invoice_payments",{eq:{invoice_id:id},order:"due_date",asc:true}),
   list("invoice_attachments",{eq:{invoice_id:id},order:"created_at",asc:true}).catch(()=>[]),
-  loadItems({store:ctx.store}),loadSuppliers(),loadLastCosts(ctx.storeId)
+  loadItems({store:ctx.store}),loadSuppliers(),loadLastCosts(ctx.storeId),
+  list("invoice_nfe_items",{eq:{invoice_id:id},order:"seq",asc:true}).catch(()=>[])
  ]);
  if(!ctx.isCurrent())return;
  if(inv.store_id!==ctx.storeId)throw Error("Esta nota pertence a outra loja.");
@@ -94,7 +95,8 @@ async function detail(ctx,id){
   '<div class="page-actions">'+(editable?btn("Editar dados",{variant:"secondary",icon:"edit",attrs:"data-edit"})+btn("Cancelar nota",{variant:"ghost",attrs:"data-cancel"})+btn("Dar entrada no estoque",{variant:"ok",icon:"check",attrs:"data-receive"}):'')+'</div></div>'+
   '<div class="doc-meta"><div><small>Emissão</small><strong>'+dateBR(inv.issue_date)+'</strong></div><div><small>Entrada</small><strong>'+dateBR(inv.entry_date)+'</strong></div>'+
   '<div><small>Pedido vinculado</small><strong>'+(order?'<a href="'+ctx.base+'/pedidos/'+order.id+'">'+e(order.number)+'</a>':"—")+'</strong></div><div><small>Valor dos itens</small><strong data-items-total>'+money(itemsTotal())+'</strong></div></div>'+
-  (inv.access_key?'<p class="muted" style="margin:-8px 0 16px;font-size:12px">Chave: '+e(inv.access_key)+'</p>':'')+
+  (inv.access_key?'<p class="muted" style="margin:-8px 0 16px;font-size:12px">'+(inv.series?'Série '+e(inv.series)+' · ':'')+'Chave: '+e(inv.access_key)+(inv.origin==="everest"?' · importada do Everest':'')+'</p>':'')+
+  nfeCard(inv,nfe,map)+
   (inv.status==="received"?alertBox("Entrada registrada em "+dateBR(inv.received_at)+". Os itens já compõem o estoque da loja.","ok"):'')+
   card("Itens da nota",'<div data-lines></div>',{flush:true,actions:editable&&order?btn("Importar itens do pedido "+order.number,{variant:"secondary",sm:true,icon:"download",attrs:"data-import"}):''})+
   '<div class="grid-2">'+card("Pagamentos",'<div data-pays></div>',{flush:true,actions:btn("Parcela",{variant:"secondary",sm:true,icon:"plus",attrs:"data-add-pay"})+btn("Gerar parcelas",{variant:"ghost",sm:true,attrs:"data-gen-pay"})})+
@@ -195,3 +197,24 @@ async function detail(ctx,id){
  };
 }
 export {num};
+
+// Itens da NF-e como vieram do fornecedor (invoice_nfe_items): só leitura. Mostra o vínculo que o Everest tinha
+// (código do item no Everest e quantidade em estoque) e se já existe o nosso item. A entrada no estoque continua
+// sendo pelos "Itens da nota" (invoice_items); a conversão automática virá do De-para.
+function nfeCard(inv,nfe,map){
+ if(!nfe.length)return "";
+ const sum=round2(nfe.reduce((s,l)=>s+Number(l.total||0),0));
+ const ok=nfe.filter(l=>l.item_id).length;
+ const diff=inv.total_amount!=null?round2(Number(inv.total_amount)-sum):0;
+ return card("Itens da NF-e ("+nfe.length+")",
+  '<div class="nfe-sum muted">'+ok+' de '+nfe.length+' itens já ligados a um item nosso · soma dos itens '+money(sum)+(inv.total_amount!=null?' · valor da nota '+money(inv.total_amount):'')+'</div>'+
+  (Math.abs(diff)>=0.01?'<div style="padding:0 18px 10px">'+alertBox("A soma dos itens difere do valor da nota em "+money(Math.abs(diff))+(diff<0?" (provável desconto no total da nota).":"."),"warn")+'</div>':'')+
+  '<div class="table-wrap"><table class="table nfe-table"><thead><tr><th class="num">#</th><th>Produto do fornecedor</th><th>Unid.</th><th class="num">Qtd</th><th class="num">V. unit.</th><th class="num">Total</th><th>Item no Everest</th><th>Nosso item</th></tr></thead><tbody>'+
+  nfe.map(l=>{const it=l.item_id?map.get(l.item_id):null;
+   return '<tr><td class="num">'+l.seq+'</td><td><span class="strong">'+e(l.description||"")+'</span><small class="sub">Cód. '+e(l.supplier_item_code||"—")+(l.cfop?' · CFOP '+e(l.cfop):'')+'</small></td>'+
+    '<td>'+e(l.supplier_unit||"")+(l.package_desc?'<small class="sub">'+e(l.package_desc)+'</small>':'')+'</td>'+
+    '<td class="num">'+num(l.quantity,4)+'</td><td class="num">'+money(l.unit_price)+'</td><td class="num">'+money(l.total)+'</td>'+
+    '<td>'+(l.everest_item_code?e(l.everest_item_code)+'<small class="sub">'+e(l.everest_item_name||"")+(l.everest_stock_qty!=null?' · '+num(l.everest_stock_qty,4)+' no estoque':'')+'</small>':'<span class="pill pill-muted">Sem vínculo</span>')+'</td>'+
+    '<td>'+(it?'<span class="strong">'+e(it.name)+'</span><small class="sub">'+e(it.code||"")+' · '+e(it.base_unit||"")+'</small>':(l.item_id?'<span class="muted">Item fora da marca da loja</span>':'<span class="pill pill-warn">Falta de-para</span>'))+'</td></tr>'}).join("")+
+  '</tbody></table></div>',{flush:true});
+}

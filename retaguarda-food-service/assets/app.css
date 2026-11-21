@@ -400,3 +400,7 @@ body.is-dragging{user-select:none;cursor:grabbing}
 /* De-para: linha da conversão "1 CX = [12] un Item" */
 .dp-conv{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
 .dp-conv .dp-factor{width:110px;text-align:center}
+
+/* Nota: itens da NF-e importados (só leitura) */
+.nfe-sum{padding:12px 18px;font-size:13px}
+.nfe-table td,.nfe-table th{vertical-align:top}
