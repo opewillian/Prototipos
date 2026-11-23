@@ -49,17 +49,20 @@ const SCREENS={
  ],
  "matriz:itens":[
   {title:"Itens",text:"Cadastro central de itens, usado por todas as lojas em contagens, listas, pedidos, notas e CMV."},
+  {sel:inContent(".kpis"),title:"Números do cadastro",text:"Itens ativos, quantos compõem o CMV, quantos tipos e quantos estão inativos."},
   {sel:btn("new"),title:"Novo item",text:"Cadastra um item: nome, tipo, marca, unidade, custo padrão e estoque mínimo."},
   {find:filters,title:"Filtros",text:"Busque por nome ou código e filtre por tipo, marca e situação (ativos ou inativos)."},
-  {find:tableCard,title:"Lista de itens",text:"Clique em um item para editar. O custo padrão é usado quando a loja ainda não tem compra recebida do item."}
+  {find:tableCard,title:"Lista de itens",text:"Clique em um item para editar. O custo padrão é usado quando a loja ainda não tem compra recebida do item. A coluna CMV mostra se o item entra no cálculo do CMV."}
  ],
  "matriz:marcas":[
   {title:"Marcas",text:"A marca define em quais lojas o item aparece. Itens \"Global\" aparecem em todas as lojas."},
+  {sel:inContent(".kpis"),title:"Números do cadastro",text:"Resumo das marcas cadastradas."},
   {sel:btn("new"),title:"Nova marca",text:"Cria uma marca e escolhe as lojas dela."},
   {find:tableCard,title:"Lista de marcas",text:"Quantas lojas e itens cada marca tem. Clique para editar."}
  ],
  "matriz:fornecedores":[
   {title:"Fornecedores",text:"Cadastro central de fornecedores, usado nos pedidos e nas notas de todas as lojas."},
+  {sel:inContent(".kpis"),title:"Números do cadastro",text:"Resumo dos fornecedores cadastrados."},
   {sel:btn("new"),title:"Novo fornecedor",text:"Cadastra nome, CNPJ/CPF e contato."},
   {find:filters,title:"Busca",text:"Encontre pelo nome, código ou CNPJ."},
   {find:tableCard,title:"Lista de fornecedores",text:"Mostra quantos itens estão vinculados a cada fornecedor. Clique para editar."}
