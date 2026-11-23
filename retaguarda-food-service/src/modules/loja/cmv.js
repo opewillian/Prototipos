@@ -157,7 +157,7 @@ function memoryView(ctx,r){
    (r.revenue?'<li><span class="muted">Perdas sobre o faturamento</span><strong class="text-warn">'+(r.revenue.net?pct(t.losses/r.revenue.net):'—')+'</strong></li>':'')+
    '</ul>',{flush:true})+
   card("Itens · memória de cálculo",'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item")+'</div>'+dataTable([
-   {label:"Item",render:x=>'<button type="button" class="cell-link strong" data-mov="all" data-item="'+e(x.item_id)+'" title="Ver todas as movimentações">'+e(x.item.name)+'</button><small class="sub">'+e(x.item.base_unit||"")+'</small>'},
+   {label:"Item",render:x=>'<button type="button" class="cell-link item-link" data-mov="all" data-item="'+e(x.item_id)+'" title="Ver todas as movimentações"><span class="strong">'+e(x.item.name)+'</span><small class="sub">'+e(x.item.base_unit||"")+'</small></button>'},
    {label:"Inicial",cls:"num",render:x=>clickNum(x,"open",x.oq,x.ov,r.c1)},
    {label:"Compras",cls:"num",render:x=>clickNum(x,"purchase",x.pq,x.pv)},
    {label:"Transf. líquida",cls:"num",render:x=>clickNum(x,"transfer",x.tiq-x.toq,x.tiv-x.tov)},
@@ -166,11 +166,11 @@ function memoryView(ctx,r){
    {label:"CMV",cls:"num",render:x=>'<strong>'+money(x.cmv)+'</strong>'}
   ],r.rows,{rowAttrs:x=>'data-search="'+e(searchKey(x.item.name,x.item.code))+'"'}),{flush:true});
 }
-// Número clicável da memória de cálculo. Contagem em rascunho ganha um lápis (abre a edição da quantidade).
+// Número clicável da memória de cálculo (contagem em rascunho abre a edição da quantidade).
 function clickNum(x,cat,qty,val,count){
  const draft=count&&count.status==="draft";
  return '<button type="button" class="cell-link" data-mov="'+cat+'" data-item="'+e(x.item_id)+'" title="'+(draft?"Editar a quantidade na contagem em rascunho":"Ver detalhes")+'">'+
-  '<span>'+num(qty)+(draft?' '+icon("edit",12):'')+'</span><small class="sub">'+money(val)+'</small></button>';
+  '<span>'+num(qty)+'</span><small class="sub">'+money(val)+'</small></button>';
 }
 
 const CATS=[["open","Estoque inicial"],["purchase","Compras"],["tin","Transferências recebidas"],["tout","Transferências enviadas"],["loss","Perdas (já baixadas do estoque)"],["close","Estoque final"]];

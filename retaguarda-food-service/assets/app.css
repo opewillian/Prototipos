@@ -482,3 +482,5 @@ td.num .cell-link{align-items:flex-end}
 .mov-list .num{text-align:right;white-space:nowrap;display:flex;flex-direction:column}
 .mov-date{font-size:12px;color:var(--muted)}
 .mov-total .mov-head{background:var(--brand-50)}
+.cell-link.item-link{display:flex;width:100%;box-sizing:border-box;padding:10px 16px;margin:-10px -16px;width:calc(100% + 32px)}
+td:has(> .item-link){cursor:pointer}
