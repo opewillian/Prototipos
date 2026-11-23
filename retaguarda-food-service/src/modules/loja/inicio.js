@@ -1,8 +1,8 @@
 // Loja · Início (repaginada em 23/11/2026):
 //   1) Faturamento dia a dia do mês atual (linha).
 //   2) Faturamento mês a mês de janeiro a dezembro do ano + pontilhado com o ano anterior.
-//   3) Notas pendentes de entrada no estoque.
-//   4) Últimos períodos de CMV (entre contagens seguidas) com o % sobre o faturamento.
+//   3) Últimos períodos de CMV (entre contagens seguidas) com o % sobre o faturamento.
+//   4) Notas pendentes de entrada no estoque.
 // Faturamento = líquido das vendas do Degust (resumos no R2, via ../shared/vendas.js), o mesmo usado no CMV. Cada bloco só aparece com o módulo liberado.
 import {list} from "../../core/db.js";
 import {salesSummary} from "../shared/vendas.js";
@@ -63,6 +63,13 @@ export async function render(ctx){
  ctx.el.innerHTML='<header class="page-head"><div><h1>'+e(ctx.store.name)+'</h1></div></header>'+
   (showSales?card("Faturamento",'<div class="chart-total"><span data-chart-total></span><small data-chart-sub></small></div><div data-chart></div>',
     {actions:'<div class="seg" role="tablist" aria-label="Visualização do faturamento"><button type="button" role="tab" data-view="dia">Dia a dia</button><button type="button" role="tab" data-view="mes">Mês a mês</button></div>'}):'')+
+  (showCmv?card("CMV por período",periods.length?dataTable([
+    {label:"Período",render:p=>'<span class="strong">'+dateBR(p.a.count_date)+' a '+dateBR(p.b.count_date)+'</span><small class="sub">'+e(p.a.display_id)+' → '+e(p.b.display_id)+((p.a.status==="draft"||p.b.status==="draft")?' · contagem em rascunho':'')+'</small>'},
+    {label:"CMV",cls:"num",render:p=>p.error?'<span class="muted">—</span>':money(p.cmv)},
+    {label:"Faturamento",cls:"num",render:p=>p.rev==null?'<span class="muted">—</span>':money(p.rev)+(p.partial?'<small class="sub text-warn">dias faltando</small>':'')},
+    {label:"CMV / faturamento",cls:"num",render:p=>p.rev?'<strong>'+pct(p.cmv/p.rev)+'</strong>':'<span class="muted">—</span>'}
+   ],periods,{rowHref:p=>ctx.base+"/cmv/novo/"+p.a.id+"/"+p.b.id})
+   :emptyState("chart","Nenhum período de CMV","São necessárias duas contagens em datas diferentes."),{flush:true}):'')+
   (showNotes?card("Notas pendentes de entrada ("+invoices.length+")",invoices.length?dataTable([
     {label:"Nota",render:i=>'<span class="strong">Nº '+e(i.invoice_number)+'</span><small class="sub">'+e(sup.get(i.supplier_id)||"Sem fornecedor")+'</small>'},
     {label:"Emissão",render:i=>dateBR(i.issue_date)},
@@ -71,13 +78,6 @@ export async function render(ctx){
    ],invoices,{rowHref:i=>ctx.base+"/notas/"+i.id}).replace('class="table"','class="table stack"')+
    '<p class="muted" style="margin:0;padding:10px 18px;font-size:13px">Total pendente: <strong>'+money(notesTotal)+'</strong></p>'
    :emptyState("check","Nenhuma nota pendente","Todas as notas já deram entrada no estoque."),{flush:true}):'')+
-  (showCmv?card("CMV por período",periods.length?dataTable([
-    {label:"Período",render:p=>'<span class="strong">'+dateBR(p.a.count_date)+' a '+dateBR(p.b.count_date)+'</span><small class="sub">'+e(p.a.display_id)+' → '+e(p.b.display_id)+((p.a.status==="draft"||p.b.status==="draft")?' · contagem em rascunho':'')+'</small>'},
-    {label:"CMV",cls:"num",render:p=>p.error?'<span class="muted">—</span>':money(p.cmv)},
-    {label:"Faturamento",cls:"num",render:p=>p.rev==null?'<span class="muted">—</span>':money(p.rev)+(p.partial?'<small class="sub text-warn">dias faltando</small>':'')},
-    {label:"CMV / faturamento",cls:"num",render:p=>p.rev?'<strong>'+pct(p.cmv/p.rev)+'</strong>':'<span class="muted">—</span>'}
-   ],periods,{rowHref:p=>ctx.base+"/cmv/novo/"+p.a.id+"/"+p.b.id})
-   :emptyState("chart","Nenhum período de CMV","São necessárias duas contagens em datas diferentes."),{flush:true}):'')+
   (!showSales&&!showNotes&&!showCmv?alertBox("Nenhum módulo com resumo liberado para esta loja.","info"):'');
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
  if(showSales){
