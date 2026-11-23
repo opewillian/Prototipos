@@ -912,3 +912,6 @@ Depois:
 - Documentos por DATA: do dia seguinte ao estoque inicial até o dia do estoque final, inclusive. Compras = notas recebidas pela entry_date; transferências emitidas pela transfer_date; perdas registradas pela loss_date.
 - Prévia avisa contagens em rascunho e notas pendentes / transferências e perdas em rascunho do período (ficam fora do cálculo). Salvar fechamento só com as duas contagens finalizadas.
 
+
+### Script 32 (23/11/2026) — datas de entrada out/26 CGH
+- Planilha de entregas de out/26 (31 notas) conferida: 29 já tinham a data certa; 121188 (planilha "121.138", R$ 7.671,11) passou para 28/10; Eurofoods 6636 (R$ 15,00, 27/10) NÃO existe na Retaguarda (não veio no import do Everest). "SPAL 181.961" da planilha é a Sendas 181961.
