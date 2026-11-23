@@ -13,7 +13,7 @@ import {matrixPerm,hasMatrix} from "../../core/access.js";
 export const matrizModules=[
  {id:"painel",label:"Painel",icon:"home",mod:painel},
  {id:"pedidos",label:"Pedidos das lojas",icon:"cart",tab:"orders",mod:pedidos},
- {id:"notas",label:"Notas fiscais",icon:"receipt",adminOnly:true,mod:notas},
+ {id:"notas",label:"Notas fiscais",icon:"receipt",tab:"invoices",mod:notas},
  {id:"itens",label:"Itens",icon:"box",group:"Cadastros",groupIcon:"edit",tab:"catalog",mod:itens},
  {id:"marcas",label:"Marcas",icon:"list",group:"Cadastros",tab:"catalog",mod:marcas},
  {id:"fornecedores",label:"Fornecedores",icon:"truck",group:"Cadastros",tab:"suppliers",mod:fornecedores},

@@ -2,8 +2,8 @@
 // Modelo: a pessoa recebe acesso a ambientes (Matriz e/ou lojas) e a módulos. Módulo liberado = pode usar e
 // editar. Os módulos das lojas valem para todas as lojas liberadas. O banco guarda por loja
 // (store_memberships + user_tab_permissions) e continua aplicando RLS.
-export const STORE_TABS=[["counts","Contagem"],["lists","Listas"],["orders","Pedidos de compra"],["notes","Notas fiscais"],["transfers","Transferências"],["losses","Perdas"],["cmv","CMV"]];
-export const MATRIX_TABS=[["orders","Pedidos das lojas"],["catalog","Itens"],["suppliers","Fornecedores"],["users","Usuários, acessos e log"]];
+export const STORE_TABS=[["sales","Faturamento"],["counts","Contagem"],["lists","Listas"],["orders","Pedidos de compra"],["notes","Notas fiscais"],["transfers","Transferências"],["losses","Perdas"],["cmv","CMV"]];
+export const MATRIX_TABS=[["orders","Pedidos das lojas"],["invoices","Notas fiscais"],["catalog","Itens"],["suppliers","Fornecedores"],["users","Usuários, acessos e log"]];
 
 const member=(app,sid)=>app.memberships.find(x=>x.store_id===sid&&x.active);
 // Cadastro antigo: vínculo matrix_admin sem módulos gravados = acesso completo.

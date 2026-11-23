@@ -13,7 +13,7 @@ import {storePerm} from "../../core/access.js";
 // feature = código em store_feature_flags; módulos sem liberação não aparecem.
 export const lojaModules=[
  {id:"inicio",label:"Início",icon:"home",mod:inicio},
- {id:"faturamento",label:"Faturamento",icon:"receipt",group:"Financeiro",groupIcon:"cash",feature:"cmv",mod:faturamento},
+ {id:"faturamento",label:"Faturamento",icon:"receipt",group:"Financeiro",groupIcon:"cash",feature:"sales",mod:faturamento},
  {id:"contagem",label:"Contagem",icon:"clipboard",group:"Estoque",groupIcon:"box",feature:"counts",mod:contagem},
  {id:"listas",label:"Listas",icon:"list",group:"Estoque",feature:"lists",mod:listas},
  {id:"transferencias",label:"Transferências",icon:"swap",group:"Estoque",feature:"transfers",mod:transferencias},
