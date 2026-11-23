@@ -4,7 +4,7 @@
 //   Compras = notas RECEBIDAS pela data de entrada; transferências emitidas pela data da transferência; perdas registradas pela data da perda.
 // CMV = estoque inicial + compras + transferências recebidas − transferências enviadas − estoque final.
 // Só itens marcados "compõe CMV". Perdas já reduziram o estoque final: são mostradas à parte, sem subtrair de novo.
-import {list,get,insert,insertMany} from "../../core/db.js";
+import {list,get,insert,insertMany,supabase} from "../../core/db.js";
 import {e,money,num,dateBR,dateTimeBR,round2,pct,addDays,daysBetween,today} from "../../core/format.js";
 import {icon} from "../../core/icons.js";
 import {pageHead,btn,dataTable,toast,emptyState,backLink,errorMessage,card,alertBox,searchBox,searchKey} from "../../core/ui.js";
@@ -48,7 +48,14 @@ export async function computeCMV(storeId,startId,endId){
  const sum=k=>round2(list2.reduce((s,r)=>s+r[k],0));
  const t={opening:sum("ov"),purchases:sum("pv"),tin:sum("tiv"),tout:sum("tov"),losses:sum("lv"),closing:sum("cv")};
  t.cmv=round2(t.opening+t.purchases+t.tin-t.tout-t.closing);
- return {c1,c2,from,to,rows:list2,totals:t,docs:{invs,trs,losses},pending,days:daysBetween(c1.count_date,c2.count_date)};
+ // Faturamento líquido do mesmo período (vendas do Degust por dia de caixa; canceladas fora).
+ let revenue=null;
+ try{
+  const [{data:byDay,error},imp]=await Promise.all([supabase.rpc("sales_by_day",{p_store:storeId,p_from:from,p_to:to}),list("sales_imports",{select:"business_date",eq:{store_id:storeId},gte:{business_date:from},lte:{business_date:to}})]);
+  if(error)throw error;
+  revenue={net:round2((byDay||[]).reduce((s,d)=>s+Number(d.net||0),0)),daysImported:imp.length,daysTotal:daysBetween(from,to)+1};
+ }catch(error){console.warn("Faturamento do período indisponível:",error)}
+ return {c1,c2,from,to,rows:list2,totals:t,docs:{invs,trs,losses},pending,revenue,days:daysBetween(c1.count_date,c2.count_date)};
 }
 
 // Calendário de contagens: só os dias com contagem (rascunho ou finalizada) podem ser clicados.
@@ -128,7 +135,10 @@ function memoryView(ctx,r){
    '<li><span>+ Compras recebidas ('+r.docs.invs.length+' nota(s))</span><strong>'+money(t.purchases)+'</strong></li>'+
    '<li><span>+ Transferências recebidas</span><strong>'+money(t.tin)+'</strong></li><li><span>− Transferências enviadas</span><strong>'+money(t.tout)+'</strong></li>'+
    '<li><span>− Estoque final ('+dateBR(r.c2.count_date)+')</span><strong>'+money(t.closing)+'</strong></li><li class="total"><span class="label">CMV do período</span><strong>'+money(t.cmv)+'</strong></li>'+
+   (r.revenue?'<li><span>Faturamento líquido do período'+(r.revenue.daysImported<r.revenue.daysTotal?' <small class="text-warn">('+r.revenue.daysImported+' de '+r.revenue.daysTotal+' dias importados)</small>':'')+'</span><strong>'+money(r.revenue.net)+'</strong></li>'+
+    '<li class="total"><span class="label">CMV sobre o faturamento</span><strong>'+(r.revenue.net?pct(t.cmv/r.revenue.net):'—')+'</strong></li>':'')+
    '<li><span class="muted">Perdas registradas (já incluídas no CMV)</span><strong class="text-warn">'+money(t.losses)+'</strong></li>'+
+   (r.revenue?'<li><span class="muted">Perdas sobre o faturamento</span><strong class="text-warn">'+(r.revenue.net?pct(t.losses/r.revenue.net):'—')+'</strong></li>':'')+
    '<li><span class="muted">Documentos de</span><strong>'+dateBR(r.from)+' a '+dateBR(r.to)+'</strong></li>'+
    '<li><span class="muted">Período</span><strong>'+r.days+' dias</strong></li></ul>',{flush:true})+
   card("Itens · memória de cálculo",'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item")+'</div>'+dataTable([
