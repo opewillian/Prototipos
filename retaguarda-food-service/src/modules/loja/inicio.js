@@ -3,8 +3,9 @@
 //   2) Faturamento mês a mês (12 meses) + linha pontilhada com o mesmo mês do ano anterior.
 //   3) Notas pendentes de entrada no estoque.
 //   4) Últimos períodos de CMV (entre contagens seguidas) com o % sobre o faturamento.
-// Faturamento = líquido das vendas do Degust (sales_by_day), o mesmo usado no CMV. Cada bloco só aparece com o módulo liberado.
-import {list,supabase} from "../../core/db.js";
+// Faturamento = líquido das vendas do Degust (resumos no R2, via ../shared/vendas.js), o mesmo usado no CMV. Cada bloco só aparece com o módulo liberado.
+import {list} from "../../core/db.js";
+import {salesSummary} from "../shared/vendas.js";
 import {e,money,dateBR,today,round2,pct} from "../../core/format.js";
 import {card,dataTable,emptyState,alertBox} from "../../core/ui.js";
 import {lineChart} from "../../core/chart.js";
@@ -18,10 +19,7 @@ const ym=d=>String(d).slice(0,7);
 const shiftMonth=(m,n)=>{const [y,mm]=m.split("-").map(Number);const d=new Date(y,mm-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
 const monthLabel=m=>MESES[Number(m.slice(5,7))-1]+"/"+m.slice(2,4);
 
-async function salesByDay(storeId,from,to){
- const {data,error}=await supabase.rpc("sales_by_day",{p_store:storeId,p_from:from,p_to:to});
- if(error)throw error;return data||[];
-}
+async function salesByDay(storeId,from,to){return (await salesSummary(storeId,from,to)).days}
 
 export async function render(ctx){
  const on=new Set(enabledModules(ctx.app,ctx.storeId).map(m=>m.id));

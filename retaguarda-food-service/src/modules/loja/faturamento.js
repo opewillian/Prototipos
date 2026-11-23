@@ -1,8 +1,9 @@
 // Loja · Faturamento. Vendas importadas da Linx Degust One (função "degust", docs/sql/34-vendas-degust.sql).
 // Período por dia de caixa. Vendas canceladas ficam fora dos valores (só contadas).
-// Resumos vêm das funções sales_by_day / sales_by_product / sales_by_payment (respeitam o acesso de quem consulta).
+// As vendas ficam só no Cloudflare R2: o resumo vem da função "degust" (ação "resumo", ver ../shared/vendas.js).
 // Administrador da Matriz pode importar (ou reimportar) os dias do período: cada dia é apagado e gravado de novo.
-import {list,supabase} from "../../core/db.js";
+import {supabase} from "../../core/db.js";
+import {salesSummary,clearSalesCache} from "../shared/vendas.js";
 import {e,money,num,dateBR,today,addDays,round2} from "../../core/format.js";
 import {pageHead,btn,dataTable,card,toast,alertBox,searchBox,searchKey,errorMessage} from "../../core/ui.js";
 
@@ -11,17 +12,13 @@ const pct=(a,b)=>b?(Math.round(a/b*1000)/10).toLocaleString("pt-BR")+"%":"—";
 const days=(from,to)=>{const out=[];for(let d=from;d<=to;d=addDays(d,1))out.push(d);return out};
 const weekday=d=>new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","");
 
-async function rpc(fn,args){const {data,error}=await supabase.rpc(fn,args);if(error)throw error;return data||[]}
 
 export async function render(ctx){
  const store=ctx.store||ctx.app.stores.find(s=>s.id===ctx.storeId)||{};
  const yesterday=addDays(today(),-1);
  const r=range[ctx.storeId]||(range[ctx.storeId]={from:today().slice(0,8)+"01",to:yesterday<today().slice(0,8)+"01"?today():yesterday});
- const args={p_store:ctx.storeId,p_from:r.from,p_to:r.to};
- const [byDay,byProd,byPay,imports]=await Promise.all([
-  rpc("sales_by_day",args),rpc("sales_by_product",args),rpc("sales_by_payment",args),
-  list("sales_imports",{eq:{store_id:ctx.storeId},gte:{business_date:r.from},lte:{business_date:r.to}}).catch(()=>[])
- ]);
+ const sum=await salesSummary(ctx.storeId,r.from,r.to);
+ const byDay=sum.days,byProd=sum.products,byPay=sum.payments,imports=sum.imported.map(d=>({business_date:d}));
  if(!ctx.isCurrent())return;
  const N=v=>Number(v||0);
  const dayMap=new Map(byDay.map(d=>[String(d.business_date).slice(0,10),d]));
@@ -100,6 +97,7 @@ export async function render(ctx){
    }catch(error){fail.push(dateBR(d)+": "+errorMessage(error))}
    if(!ctx.isCurrent())return;
   }
+  clearSalesCache();
   toast(ok+" dia(s) importado(s)"+(fail.length?"; "+fail.length+" com erro":"")+".",fail.length?"danger":"ok");
   if(fail.length)console.warn("Falhas na importação:",fail);
   ctx.reload();

@@ -11,6 +11,7 @@ import {e,money,num,dateBR,dateTimeBR,round2,pct,addDays,daysBetween,today,parse
 import {icon} from "../../core/icons.js";
 import {pageHead,btn,dataTable,toast,emptyState,backLink,errorMessage,card,alertBox,searchBox,searchKey,openModal,openDrawer,field,input} from "../../core/ui.js";
 import {loadItems,byId,loadSuppliers,loadLastCosts,unitCost,lineTotal} from "../shared/catalog.js";
+import {salesSummary} from "../shared/vendas.js";
 import {storePerm} from "../../core/access.js";
 
 const d10=v=>String(v||"").slice(0,10);
@@ -67,9 +68,8 @@ export async function computeCMV(storeId,startId,endId){
  // Faturamento líquido do mesmo período (vendas do Degust por dia de caixa; canceladas fora).
  let revenue=null;
  try{
-  const [{data:byDay,error},imp]=await Promise.all([supabase.rpc("sales_by_day",{p_store:storeId,p_from:from,p_to:to}),list("sales_imports",{select:"business_date",eq:{store_id:storeId},gte:{business_date:from},lte:{business_date:to}})]);
-  if(error)throw error;
-  revenue={net:round2((byDay||[]).reduce((s,d)=>s+Number(d.net||0),0)),daysImported:imp.length,daysTotal:daysBetween(from,to)+1};
+  const sum=await salesSummary(storeId,from,to);
+  revenue={net:round2(sum.days.reduce((s,d)=>s+Number(d.net||0),0)),daysImported:sum.imported.length,daysTotal:daysBetween(from,to)+1};
  }catch(error){console.warn("Faturamento do período indisponível:",error)}
  const purchaseDocs=invs.map(i=>({id:i.id,number:i.invoice_number,date:d10(i.entry_date),supplier:supName.get(i.supplier_id)||"",value:round2(invCmv.get(i.id)||0)}))
   .sort((a,b)=>a.date.localeCompare(b.date)||String(a.number).localeCompare(String(b.number)));
