@@ -1,4 +1,4 @@
--- 26: MP - CREME DE LEITE (1000044) passa de un para kg. EXECUTADO PELO USUÁRIO (decisão dele, 23/11/2026).
+-- 26: MP - CREME DE LEITE (1000044) passa de un para kg. Executado em 23/11/2026 a pedido explícito do usuário.
 -- A única entrada já feita é a nota 184284 (Sendas, recebida): 54 un a R$ 2,6524 = R$ 143,23.
 -- Convertida para 10,8 kg a R$ 13,262/kg (mesmo valor). Como a nota já foi recebida, a linha e o movimento são
 -- travados por trigger; este script desliga os triggers SÓ para essas duas linhas (session_replication_role) e religa em seguida.
