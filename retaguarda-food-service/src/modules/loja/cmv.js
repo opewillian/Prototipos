@@ -7,7 +7,7 @@
 import {list,get,insert,insertMany} from "../../core/db.js";
 import {e,money,num,dateBR,dateTimeBR,round2,pct,addDays,daysBetween,today} from "../../core/format.js";
 import {icon} from "../../core/icons.js";
-import {pageHead,btn,dataTable,toast,emptyState,backLink,errorMessage,card,kpi,alertBox,searchBox,searchKey} from "../../core/ui.js";
+import {pageHead,btn,dataTable,toast,emptyState,backLink,errorMessage,card,alertBox,searchBox,searchKey} from "../../core/ui.js";
 import {loadItems,byId} from "../shared/catalog.js";
 
 const d10=v=>String(v||"").slice(0,10);
@@ -162,7 +162,6 @@ async function preview(ctx,s,en){
   '<div class="doc-head"><div><div class="doc-title"><h1>CMV de '+dateBR(r.c1.count_date)+' a '+dateBR(r.c2.count_date)+'</h1><span class="pill pill-warn">Prévia</span></div><p class="muted" style="margin:6px 0 0">Estoque inicial '+e(r.c1.display_id)+' ('+stLabel(r.c1)+') → estoque final '+e(r.c2.display_id)+' ('+stLabel(r.c2)+') · documentos de '+dateBR(r.from)+' a '+dateBR(r.to)+'</p></div>'+
   '<div class="page-actions">'+(exists?btn("Ver fechamento salvo",{variant:"secondary",href:ctx.base+"/cmv/"+exists.id}):canSave?btn("Salvar fechamento",{variant:"ok",icon:"check",attrs:"data-save"}):'')+'</div></div>'+
   warnings(r)+
-  '<div class="kpis">'+kpi("CMV do período",money(r.totals.cmv),"",{icon:"chart"})+kpi("Compras",money(r.totals.purchases),r.docs.invs.length+" nota(s) recebida(s)",{icon:"receipt",tone:"info"})+kpi("Perdas",money(r.totals.losses),r.totals.cmv?pct(r.totals.losses/r.totals.cmv)+" do CMV":"",{icon:"trash",tone:"warn"})+kpi("Itens",r.rows.length,"compõem o CMV",{icon:"box",tone:"ok"})+'</div>'+
   memoryView(ctx,r);
  bindMemory(ctx);
  ctx.el.querySelector("[data-save]")?.addEventListener("click",async ev=>{
@@ -187,7 +186,6 @@ async function detail(ctx,id){
  ctx.el.innerHTML=backLink(ctx.base+"/cmv","CMV")+
   '<div class="doc-head"><div><div class="doc-title"><h1>CMV de '+dateBR(c.start_date)+' a '+dateBR(c.end_date)+'</h1><span class="pill pill-ok">Fechado</span></div><p class="muted" style="margin:6px 0 0">Fechado em '+dateTimeBR(c.closed_at)+'</p></div>'+
   '<div class="page-actions">'+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+'</div></div>'+
-  '<div class="kpis">'+kpi("CMV do período",money(c.cmv_value),"",{icon:"chart"})+kpi("Estoque inicial",money(c.opening_stock),"",{icon:"box",tone:"info"})+kpi("Compras líquidas",money(c.eligible_purchases),"inclui transferências",{icon:"receipt",tone:"ok"})+kpi("Estoque final",money(c.closing_stock),"Perdas: "+money(c.eligible_losses),{icon:"clipboard",tone:"warn"})+'</div>'+
   (changed?alertBox("Documentos do período mudaram depois do fechamento: o cálculo atual dá "+money(r.totals.cmv)+".","warn"):'')+memoryView(ctx,r);
  bindMemory(ctx);ctx.el.querySelector("[data-print]").onclick=()=>window.print();
 }
