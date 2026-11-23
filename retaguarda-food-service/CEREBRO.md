@@ -930,5 +930,5 @@ Depois:
 - Regra de valores da Linx: valProduto (gross) já vem SEM o desconto dos itens → bruto = gross + item_discount; descontos = discount + item_discount; líquido = valLiquido = gross − discount + surcharge. Out/26 CGH: bruto 268.979,00 − desc 5.220,28 = líquido 263.758,72 (= soma dos pagamentos).
 - Função degust: ação "importar" (1 dia por chamada: apaga o dia e regrava) e "diario" (últimos 3 dias de cada loja com degust_code). Histórico CGH carregado 01/08–22/11/2026: 114 dias, 25.282 vendas, R$ 957.141,99 líquido.
 - Script 35: pg_cron + pg_net, job 'degust-vendas-diario' às 09:00 UTC (06:00 BRT) com x-cron-key (integration_tokens 'cron') + apikey publishable. Teste manual OK (20–22/11 reimportados). "Verify JWT" da função continua LIGADO (desligar foi bloqueado; não precisou).
-- Tela Loja › Análise › Faturamento (loja/faturamento.js, liberação 'cmv'): período De/Até + atalhos; resumo; por dia; produtos (com busca); formas de pagamento; botão de importar o período (só admin).
+- Tela Loja › Financeiro › Faturamento (primeiro grupo do menu, logo após Início) (loja/faturamento.js, liberação 'cmv'): período De/Até + atalhos; resumo; por dia; produtos (com busca); formas de pagamento; botão de importar o período (só admin).
 
