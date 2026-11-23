@@ -1,16 +1,20 @@
 // Integração Linx Degust One (API de Integrações Externa). Roda no servidor do Supabase (Edge Function "degust").
 // Segredos (Edge Functions → Secrets): DEGUST_USUARIO, DEGUST_SENHA, DEGUST_FRANQUEADOR. A senha nunca vai ao navegador.
-// Só administrador da Matriz pode chamar. O token da Linx (4 h) fica em public.integration_tokens para ser reaproveitado.
+// O token da Linx (4 h) fica em public.integration_tokens (provider "degust") para ser reaproveitado.
+// Quem pode chamar:
+//   • administrador da Matriz (JWT do app) → ações "lojas", "vendas", "importar";
+//   • o agendamento diário (pg_cron, cabeçalho x-cron-key = integration_tokens "cron") → só a ação "diario".
 // Ações (POST JSON {acao, ...}):
-//   "lojas"  → lista as lojas da franquia no Degust (código, nome, CNPJ, cidade).
-//   "vendas" → relatório de vendas de uma loja num período (máx. 30 dias): {codLoja, dataInicial, dataFinal, resumo?}
+//   "lojas"    → lista as lojas da franquia no Degust (código, nome, CNPJ, cidade).
+//   "vendas"   → relatório de vendas de uma loja num período (máx. 30 dias): {codLoja, dataInicial, dataFinal, resumo?}
 //   "importar" → grava UM dia de caixa da loja nas tabelas sales/sale_items/sale_payments: {storeId, data}
+//   "diario"   → para cada loja com código do Degust, reimporta os últimos 3 dias (ontem e os 2 anteriores).
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const BASE = "https://lx-degust-api-integracao-prd.azurewebsites.net";
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
@@ -37,7 +41,7 @@ async function token(force = false): Promise<string> {
     }),
   });
   const txt = await r.text();
-  if (!r.ok) throw new Error("Login na Linx recusado (" + r.status + "): " + txt.slice(0, 300));
+  if (!r.ok) throw new Error("Login na Linx recusado (" + r.status + ").");
   let tk = txt.trim();
   try {
     const j = JSON.parse(txt);
@@ -65,14 +69,103 @@ async function linx(method: string, path: string, opts: { query?: Record<string,
   let r = await call(await token());
   if (r.status === 401) r = await call(await token(true)); // token vencido do lado da Linx
   const txt = await r.text();
-  if (!r.ok) throw new Error("Linx " + path + " (" + r.status + "): " + txt.slice(0, 300));
+  if (!r.ok) throw new Error("Linx " + path + " (" + r.status + "): " + txt.slice(0, 300).replace(/eyJ[\w.-]+/g, "[token]"));
   try { return JSON.parse(txt); } catch { return txt; }
+}
+
+const n = (v: unknown) => Number(String(v ?? 0).replace(",", ".")) || 0;
+const yes = (v: unknown) => String(v ?? "").trim().toUpperCase() === "S";
+
+// Importa UM dia de caixa de uma loja: apaga o que havia do dia e grava de novo (pega cancelamentos tardios).
+async function importDay(storeId: string, degustCode: number, dia: string, userId: string | null) {
+  const r = await linx("POST", "/api/venda/relatorio-vendas", {
+    body: { dataInicial: dia, dataFinal: dia, codFranqueador: franqueador(), codLoja: degustCode, exibirVendasCanceladas: true, tipoData: "C" },
+  });
+  const vendas: Record<string, any>[] = Array.isArray(r) ? r : [];
+  const byCtl = new Map<number, Record<string, any>>();   // mesmo controle repetido no dia: fica o último
+  for (const v of vendas) byCtl.set(Number(v.controle), v);
+  const lista = [...byCtl.values()];
+  const del = await admin.from("sales").delete().eq("store_id", storeId).eq("business_date", dia);
+  if (del.error) throw new Error("Apagar dia: " + del.error.message);
+  let gravadas = 0, itens = 0, pagtos = 0;
+  for (let i = 0; i < lista.length; i += 200) {
+    const lote = lista.slice(i, i + 200);
+    const rows = lote.map((v) => {
+      const doc = (v.documento ?? [])[0] ?? {};
+      return {
+        store_id: storeId, business_date: dia, control: Number(v.controle), sale_date: v.dataVenda ?? null, created_raw: v.dataHoraInclusao ?? null,
+        pdv: v.numPdv ?? null, opening: v.numAbertura ?? null, sale_type: v.tipoVenda ?? null, cancelled: yes(v.cancelada),
+        gross: n(v.valProduto), discount: n(v.valDesconto), item_discount: n(v.valDescontoItem), surcharge: n(v.valAcrescimo),
+        net: n(v.valLiquido), change_amount: n(v.valTroco), has_customer_doc: yes(v.possuiCpfCnpj),
+        doc_model: doc.modelo ?? null, doc_number: doc.numero ?? null, doc_key: doc.chave ?? null, doc_status: doc.situacaoSefaz ?? null,
+      };
+    });
+    const ins = await admin.from("sales").insert(rows).select("id,control");
+    if (ins.error) throw new Error("Gravar vendas: " + ins.error.message);
+    const idOf = new Map((ins.data ?? []).map((x: { id: string; control: number }) => [Number(x.control), x.id]));
+    gravadas += ins.data?.length ?? 0;
+    const its: Record<string, unknown>[] = [], pgs: Record<string, unknown>[] = [];
+    for (const v of lote) {
+      const sid = idOf.get(Number(v.controle));
+      if (!sid) continue;
+      for (const it of v.itens ?? []) its.push({
+        sale_id: sid, store_id: storeId, business_date: dia, line: it.numLancto ?? null, main_line: it.numLanctoItemPrincipal ?? null,
+        product_code: it.codProduto ?? null, product_name: it.descricaoProduto ?? null, unit: it.unidadeProduto ?? null,
+        quantity: n(it.quantidade), unit_price: n(it.valUnitario), total: n(it.valTotal), discount: n(it.valDesconto),
+        cancelled: yes(it.cancelado), stock_item_code: it.fiscal?.codItemEstoque ?? null,
+      });
+      for (const pg of v.formaPagamento ?? []) pgs.push({
+        sale_id: sid, store_id: storeId, business_date: dia, seq: pg.sequencia ?? null, method: pg.formaPgto ?? null,
+        method_code: pg.codFormaPagamento ?? null, brand: pg.bandeira ?? null, amount: n(pg.valor), installments: pg.tefQtdeParcela ?? null,
+      });
+    }
+    for (let k = 0; k < its.length; k += 500) {
+      const e = await admin.from("sale_items").insert(its.slice(k, k + 500));
+      if (e.error) throw new Error("Gravar itens: " + e.error.message);
+    }
+    for (let k = 0; k < pgs.length; k += 500) {
+      const e = await admin.from("sale_payments").insert(pgs.slice(k, k + 500));
+      if (e.error) throw new Error("Gravar pagamentos: " + e.error.message);
+    }
+    itens += its.length; pagtos += pgs.length;
+  }
+  const ok = lista.filter((v) => !yes(v.cancelada));
+  const liquido = Math.round(ok.reduce((s, v) => s + n(v.valLiquido), 0) * 100) / 100;
+  await admin.from("sales_imports").upsert({
+    store_id: storeId, business_date: dia, sales: ok.length, cancelled: lista.length - ok.length, net: liquido,
+    imported_at: new Date().toISOString(), imported_by: userId,
+  });
+  return { data: dia, vendas: ok.length, canceladas: lista.length - ok.length, liquido, gravadas, itens, pagamentos: pagtos };
+}
+
+// Data de hoje em São Paulo, menos N dias (AAAA-MM-DD).
+function diaSP(menos: number) {
+  const hoje = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  hoje.setDate(hoje.getDate() - menos);
+  return hoje.toLocaleDateString("en-CA");
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    // Quem chama precisa ser administrador da Matriz.
+    const p = await req.json().catch(() => ({}));
+
+    // Agendamento diário: confere a chave guardada no banco e só aceita a ação "diario".
+    const cronKey = req.headers.get("x-cron-key");
+    if (cronKey) {
+      const { data: k } = await admin.from("integration_tokens").select("token").eq("provider", "cron").maybeSingle();
+      if (!k?.token || k.token !== cronKey) return json({ erro: "Chave do agendamento inválida." }, 401);
+      if (p.acao !== "diario") return json({ erro: "O agendamento só pode rodar a ação diario." }, 400);
+      const { data: lojas } = await admin.from("stores").select("id,degust_code").not("degust_code", "is", null).eq("active", true);
+      const res: unknown[] = [];
+      for (const st of lojas ?? []) for (const d of [3, 2, 1]) {
+        try { res.push({ loja: st.id, ...(await importDay(st.id, st.degust_code, diaSP(d), null)) }); }
+        catch (e) { res.push({ loja: st.id, data: diaSP(d), erro: String((e as Error).message ?? e) }); }
+      }
+      return json({ ok: true, resultado: res });
+    }
+
+    // Demais ações: precisa ser administrador da Matriz.
     const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
     const { data: u } = await admin.auth.getUser(jwt);
     if (!u?.user) return json({ erro: "Faça login." }, 401);
@@ -80,7 +173,6 @@ Deno.serve(async (req) => {
       .eq("user_id", u.user.id).eq("store_id", "matriz").eq("role", "matrix_admin").eq("active", true).limit(1);
     if (!m?.length) return json({ erro: "Somente administradores da Matriz." }, 403);
 
-    const p = await req.json().catch(() => ({}));
     if (p.acao === "lojas") {
       const r = await linx("GET", "/api/loja/listarLojasFranquia", { query: { codigoFranquia: franqueador() } });
       const lojas = (Array.isArray(r) ? r : []).map((l: Record<string, unknown>) => ({
@@ -97,8 +189,7 @@ Deno.serve(async (req) => {
       });
       const vendas = Array.isArray(r) ? r : [];
       if (p.resumo) {
-        const n = (v: unknown) => Number(String(v ?? 0).replace(",", ".")) || 0;
-        const ok = vendas.filter((v: Record<string, unknown>) => v.cancelada !== "S");
+        const ok = vendas.filter((v: Record<string, unknown>) => !yes(v.cancelada));
         return json({
           ok: true, vendas: vendas.length, canceladas: vendas.length - ok.length,
           liquido: Math.round(ok.reduce((s: number, v: Record<string, unknown>) => s + n(v.valLiquido), 0) * 100) / 100,
@@ -109,75 +200,14 @@ Deno.serve(async (req) => {
       return json({ ok: true, vendas });
     }
     if (p.acao === "importar") {
-      // Importa UM dia de caixa de uma loja: apaga o que havia do dia e grava de novo (pega cancelamentos tardios).
       const dia = String(p.data ?? "");
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return json({ erro: "Informe a data (AAAA-MM-DD)." }, 400);
       const { data: st } = await admin.from("stores").select("id,degust_code").eq("id", p.storeId).maybeSingle();
       if (!st?.degust_code) return json({ erro: "Loja sem código do Degust." }, 400);
-      const r = await linx("POST", "/api/venda/relatorio-vendas", {
-        body: { dataInicial: dia, dataFinal: dia, codFranqueador: franqueador(), codLoja: st.degust_code, exibirVendasCanceladas: true, tipoData: "C" },
-      });
-      const vendas: Record<string, any>[] = Array.isArray(r) ? r : [];
-      const n = (v: unknown) => Number(String(v ?? 0).replace(",", ".")) || 0;
-      const yes = (v: unknown) => String(v ?? "").trim().toUpperCase() === "S";
-      // Mesmo controle repetido no dia: fica o último.
-      const byCtl = new Map<number, Record<string, any>>();
-      for (const v of vendas) byCtl.set(Number(v.controle), v);
-      const lista = [...byCtl.values()];
-      const del = await admin.from("sales").delete().eq("store_id", st.id).eq("business_date", dia);
-      if (del.error) throw new Error("Apagar dia: " + del.error.message);
-      let gravadas = 0, itens = 0, pagtos = 0;
-      for (let i = 0; i < lista.length; i += 200) {
-        const lote = lista.slice(i, i + 200);
-        const rows = lote.map((v) => {
-          const doc = (v.documento ?? [])[0] ?? {};
-          return {
-            store_id: st.id, business_date: dia, control: Number(v.controle), sale_date: v.dataVenda ?? null, created_raw: v.dataHoraInclusao ?? null,
-            pdv: v.numPdv ?? null, opening: v.numAbertura ?? null, sale_type: v.tipoVenda ?? null, cancelled: yes(v.cancelada),
-            gross: n(v.valProduto), discount: n(v.valDesconto), item_discount: n(v.valDescontoItem), surcharge: n(v.valAcrescimo),
-            net: n(v.valLiquido), change_amount: n(v.valTroco), has_customer_doc: yes(v.possuiCpfCnpj),
-            doc_model: doc.modelo ?? null, doc_number: doc.numero ?? null, doc_key: doc.chave ?? null, doc_status: doc.situacaoSefaz ?? null,
-          };
-        });
-        const ins = await admin.from("sales").insert(rows).select("id,control");
-        if (ins.error) throw new Error("Gravar vendas: " + ins.error.message);
-        const idOf = new Map((ins.data ?? []).map((x: { id: string; control: number }) => [Number(x.control), x.id]));
-        gravadas += ins.data?.length ?? 0;
-        const its: Record<string, unknown>[] = [], pgs: Record<string, unknown>[] = [];
-        for (const v of lote) {
-          const sid = idOf.get(Number(v.controle));
-          if (!sid) continue;
-          for (const it of v.itens ?? []) its.push({
-            sale_id: sid, store_id: st.id, business_date: dia, line: it.numLancto ?? null, main_line: it.numLanctoItemPrincipal ?? null,
-            product_code: it.codProduto ?? null, product_name: it.descricaoProduto ?? null, unit: it.unidadeProduto ?? null,
-            quantity: n(it.quantidade), unit_price: n(it.valUnitario), total: n(it.valTotal), discount: n(it.valDesconto),
-            cancelled: yes(it.cancelado), stock_item_code: it.fiscal?.codItemEstoque ?? null,
-          });
-          for (const pg of v.formaPagamento ?? []) pgs.push({
-            sale_id: sid, store_id: st.id, business_date: dia, seq: pg.sequencia ?? null, method: pg.formaPgto ?? null,
-            method_code: pg.codFormaPagamento ?? null, brand: pg.bandeira ?? null, amount: n(pg.valor), installments: pg.tefQtdeParcela ?? null,
-          });
-        }
-        for (let k = 0; k < its.length; k += 500) {
-          const e = await admin.from("sale_items").insert(its.slice(k, k + 500));
-          if (e.error) throw new Error("Gravar itens: " + e.error.message);
-        }
-        for (let k = 0; k < pgs.length; k += 500) {
-          const e = await admin.from("sale_payments").insert(pgs.slice(k, k + 500));
-          if (e.error) throw new Error("Gravar pagamentos: " + e.error.message);
-        }
-        itens += its.length; pagtos += pgs.length;
-      }
-      const ok = lista.filter((v) => !yes(v.cancelada));
-      const liquido = Math.round(ok.reduce((s, v) => s + n(v.valLiquido), 0) * 100) / 100;
-      await admin.from("sales_imports").upsert({
-        store_id: st.id, business_date: dia, sales: ok.length, cancelled: lista.length - ok.length, net: liquido,
-        imported_at: new Date().toISOString(), imported_by: u.user.id,
-      });
-      return json({ ok: true, data: dia, vendas: ok.length, canceladas: lista.length - ok.length, liquido, gravadas, itens, pagamentos: pagtos });
+      return json({ ok: true, ...(await importDay(st.id, st.degust_code, dia, u.user.id)) });
     }
     return json({ erro: "Ação desconhecida." }, 400);
   } catch (e) {
-    return json({ erro: String((e as Error).message ?? e) }, 500);
+    return json({ erro: String((e as Error).message ?? e).replace(/eyJ[\w.-]+/g, "[token]") }, 500);
   }
 });
