@@ -30,7 +30,7 @@ export async function render(ctx){
  const sup=byId(suppliers);
  const tot=id=>round2(lines.filter(l=>l.invoice_id===id).reduce((s,l)=>s+Number(l.line_total||0),0));
  const month=today().slice(0,7);
- const monthTotal=invoices.filter(i=>i.status==="received"&&String(i.entry_date).startsWith(month)).reduce((s,i)=>s+tot(i.id),0);
+ const monthTotal=invoices.filter(i=>i.status==="received"&&String(i.entry_date).startsWith(month)).reduce((s,i)=>s+(i.total_amount!=null?Number(i.total_amount):tot(i.id)),0);
  const openPays=pays.filter(p=>payState(p)!=="paid");
  const due7=openPays.filter(p=>p.due_date>=today()&&p.due_date<=addDays(today(),7));
  const overdue=openPays.filter(p=>payState(p)==="overdue");
@@ -43,7 +43,7 @@ export async function render(ctx){
    '<select class="control" id="f-st"><option value="">Todas</option><option value="pending">Pendentes</option><option value="received">Recebidas</option><option value="cancelled">Canceladas</option></select></div>'+dataTable([
    {label:"Nota",render:i=>'<span class="strong">Nº '+e(i.invoice_number)+'</span><small class="sub">'+e(sup.get(i.supplier_id)?.name||"Sem fornecedor")+'</small>'},
    {label:"Emissão",render:i=>dateBR(i.issue_date)},{label:"Entrada",render:i=>dateBR(i.entry_date)},
-   {label:"Valor",cls:"num",render:i=>money(tot(i.id))},
+   {label:"Valor",cls:"num",render:i=>money(i.total_amount!=null?i.total_amount:tot(i.id))},
    {label:"Pagamento",render:i=>{const ps=pays.filter(p=>p.invoice_id===i.id);if(!ps.length)return '<span class="muted">—</span>';const st=ps.map(payState);return statusPill(st.includes("overdue")?"overdue":st.every(s=>s==="paid")?"paid":"open")}},
    {label:"Situação",render:i=>statusPill(i.status)}
   ],invoices,{rowHref:i=>ctx.base+"/notas/"+i.id,rowAttrs:i=>'data-search="'+e(searchKey(i.invoice_number,sup.get(i.supplier_id)?.name))+'" data-st="'+e(i.status)+'"'}).replace('class="table"','class="table stack"')
