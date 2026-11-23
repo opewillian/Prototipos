@@ -915,3 +915,7 @@ Depois:
 
 ### Script 32 (23/11/2026) — datas de entrada out/26 CGH
 - Planilha de entregas de out/26 (31 notas) conferida: 29 já tinham a data certa; 121188 (planilha "121.138", R$ 7.671,11) passou para 28/10; Eurofoods 6636 (R$ 15,00, 27/10) NÃO existe na Retaguarda: foi EXCLUÍDA no Monitor de DANFEs do Everest (emp 57) em 09/11/2026 17:10; decisão do usuário: fica fora. "SPAL 181.961" da planilha é a Sendas 181961.
+
+### Entrada das notas de out/26 da CGH (23/11/2026)
+- Das 30 notas da planilha (de-para completo + data revisada), 19 receberam entrada pelo app (de-para/rateio iguais à tela): 111 movimentos, R$ 43.502,91.
+- 11 ficaram PENDENTES porque a soma dos itens não fecha com o valor da nota (faltam descontos/impostos em "Outros custos"): Sendas 177919, 178953, 179616, 179704, 180447, 180877, 181113, 181961, 182114 (itens acima da nota = desconto); SPAL 16946833 e 16979884 (itens abaixo da nota = IPI/ST/frete).
