@@ -211,7 +211,7 @@ function editCountQty(ctx,r,x,which){
  openDrawer({title:"Contagem "+count.display_id+" · "+x.item.name,submitLabel:"Salvar quantidade",
   body:'<p class="muted" style="margin:0 0 12px">'+(which==="open"?"Estoque inicial":"Estoque final")+" de "+dateBR(count.count_date)+' (rascunho). Deixe tudo vazio para o item ficar como não contado.</p>'+
    '<div class="form-grid">'+cols.map(([k,l])=>'<div class="span-2">'+field(l+(unit?" ("+unit+")":""),input("p_"+k,parts[k]==null?"":String(parts[k]).replace(".",","),{attrs:'inputmode="decimal" data-part="'+e(k)+'"'}))+'</div>').join("")+'</div>'+
-   (line?'<p class="muted" style="margin:10px 0 0;font-size:13px">Custo da linha: '+money(line.unit_cost)+" / "+e(unit)+'</p>':''),
+   (line?'<p class="muted" style="margin:10px 0 0;font-size:13px">Custo: '+money(line.unit_cost)+" / "+e(unit)+'</p>':''),
   onSubmit:async form=>{
    const p={};
    for(const el of form.querySelectorAll("[data-part]")){
