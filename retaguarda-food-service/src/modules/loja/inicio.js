@@ -2,6 +2,8 @@
 //   1) Faturamento dia a dia do mês atual (linha).
 //   2) Faturamento mês a mês de janeiro a dezembro do ano + pontilhado com o ano anterior.
 //   Nos dois, linha pontilhada vinho = projeção (tabela sales_forecast, recalculada todo dia às 06:30).
+//   Por hora: média do líquido de cada hora (0h a 23h) por dia no mês atual x mês anterior (tracejado). As horas vêm dos
+//   resumos de dia feitos a partir do cupom completo (desde 01/10/2026).
 //   3) Últimos períodos de CMV (entre contagens seguidas) com o % sobre o faturamento.
 //   4) Notas pendentes de entrada no estoque.
 // Faturamento = líquido das vendas do Degust (resumos no R2, via ../shared/vendas.js), o mesmo usado no CMV. Cada bloco só aparece com o módulo liberado.
@@ -57,6 +59,14 @@ export async function render(ctx){
  const ci=Number(mm)-1,mProj=months.map(()=>null);
  if(hasProj){mProj[ci]=round2((mCur[ci]||0)+fcMonth);if(ci>0&&mCur[ci-1]!=null)mProj[ci-1]=mCur[ci-1]}
 
+ // Por hora: média por dia de cada hora, no mês atual e no anterior (só dias com horas no resumo).
+ const hourAvg=m=>{const ds=days.filter(d=>ym(String(d.business_date).slice(0,10))===m&&Array.isArray(d.hours));
+  if(!ds.length)return {n:0,vals:Array(24).fill(null)};
+  return {n:ds.length,vals:Array.from({length:24},(_,h)=>round2(ds.reduce((s,d)=>s+Number(d.hours[h]||0),0)/ds.length))}};
+ const prevM=Number(mm)===1?(PY+"-12"):(Y+"-"+String(Number(mm)-1).padStart(2,"0"));
+ const hCur=hourAvg(curM),hPrev=hourAvg(prevM),HORAS=Array.from({length:24},(_,h)=>h+"h");
+ const mesLabel=m=>MESES[Number(m.slice(5,7))-1]+"/"+m.slice(0,4);
+
  // Períodos de CMV: cada par de contagens seguidas (sem as canceladas), do mais recente para trás (até 6).
  let periods=[];
  if(showCmv){
@@ -72,7 +82,7 @@ export async function render(ctx){
  const notesTotal=round2(invoices.reduce((s,i)=>s+Number(i.total_amount||0),0));
  ctx.el.innerHTML='<header class="page-head"><div><h1>'+e(ctx.store.name)+'</h1></div></header>'+
   (showSales?card("Faturamento",'<div class="chart-total"><span data-chart-total></span><small data-chart-sub></small></div><div data-chart></div>',
-    {actions:'<div class="seg" role="tablist" aria-label="Visualização do faturamento"><button type="button" role="tab" data-view="dia">Dia a dia</button><button type="button" role="tab" data-view="mes">Mês a mês</button></div>'}):'')+
+    {actions:'<div class="seg" role="tablist" aria-label="Visualização do faturamento"><button type="button" role="tab" data-view="dia">Dia a dia</button><button type="button" role="tab" data-view="mes">Mês a mês</button><button type="button" role="tab" data-view="hora">Por hora</button></div>'}):'')+
   (showCmv?card("CMV por período",periods.length?dataTable([
     {label:"Período",render:p=>'<span class="strong">'+dateBR(p.a.count_date)+' a '+dateBR(p.b.count_date)+'</span><small class="sub">'+e(p.a.display_id)+' → '+e(p.b.display_id)+((p.a.status==="draft"||p.b.status==="draft")?' · contagem em rascunho':'')+'</small>'},
     {label:"CMV",cls:"num",render:p=>p.error?'<span class="muted">—</span>':money(p.cmv)},
@@ -91,7 +101,7 @@ export async function render(ctx){
   (!showSales&&!showNotes&&!showCmv?alertBox("Nenhum módulo com resumo liberado para esta loja.","info"):'');
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
  if(showSales){
-  // Um gráfico só; o botão no topo troca entre dia a dia (mês atual) e mês a mês (12 meses x ano anterior).
+  // Um gráfico só; o botão no topo troca entre dia a dia (mês atual), mês a mês (12 meses x ano anterior) e por hora.
   const box=ctx.el.querySelector("[data-chart]"),tot=ctx.el.querySelector("[data-chart-total]"),sub=ctx.el.querySelector("[data-chart-sub]");
   const yearTotal=round2(mCur.reduce((s,v)=>s+(v||0),0));
   const show=v=>{
@@ -100,6 +110,12 @@ export async function render(ctx){
    if(v==="dia"){
     tot.textContent=money(monthTotal);sub.textContent=" no mês de "+MESES[Number(mm)-1]+"/"+Y+(hasProj?" · projeção do mês "+money(round2(monthTotal+fcMonth)):"");
     lineChart(box,{labels:dLabels,series:[{name:"Faturamento",color:BRAND,values:dVals},...(hasProj?[{name:"Projeção",color:PROJ,dash:true,values:dProj}]:[])],format:money,tickEvery:5,ariaLabel:"Faturamento por dia no mês atual, com projeção"});
+   }else if(v==="hora"){
+    const base=hCur.n?hCur:hPrev,baseM=hCur.n?curM:prevM;
+    if(!base.n){box._lcRO?.disconnect();box._lcRO=null;tot.textContent="—";sub.textContent=" sem vendas por hora no período";box.innerHTML='<p class="muted" style="padding:24px 0;margin:0">As vendas por hora existem a partir de 01/10/2026.</p>';return}
+    const peak=base.vals.reduce((b,x,h)=>x>(base.vals[b]||0)?h:b,0);
+    tot.textContent=money(base.vals[peak]);sub.textContent=" por dia, em média, no horário de pico ("+peak+"h às "+(peak+1)+"h) · "+mesLabel(baseM)+" ("+base.n+" dias)";
+    lineChart(box,{labels:HORAS,series:[{name:mesLabel(curM),color:BRAND,values:hCur.vals},{name:mesLabel(prevM),color:GRAY,dash:true,values:hPrev.vals}].filter(x=>x.values.some(y=>y!=null)),format:money,tickEvery:2,ariaLabel:"Faturamento médio por hora do dia, mês atual e anterior"});
    }else{
     tot.textContent=money(yearTotal);sub.textContent=" em "+Y;
     lineChart(box,{labels:MESES,series:[{name:String(Y),color:BRAND,values:mCur},...(hasProj?[{name:"Projeção "+Y,color:PROJ,dash:true,values:mProj}]:[]),{name:String(PY),color:GRAY,dash:true,values:mPrev}],format:money,tickEvery:1,ariaLabel:"Faturamento por mês no ano atual e no anterior"});
@@ -109,4 +125,4 @@ export async function render(ctx){
   show(view);
  }
 }
-let view=(()=>{try{return localStorage.getItem("rfs-inicio-fat")==="mes"?"mes":"dia"}catch{return "dia"}})();
+let view=(()=>{try{const v=localStorage.getItem("rfs-inicio-fat");return v==="mes"||v==="hora"?v:"dia"}catch{return "dia"}})();

@@ -21,7 +21,7 @@
 //   • administrador da Matriz → todas as outras.
 // Ações (POST JSON {acao, ...}):
 //   "cupons"   → {storeId, data}: cupons do dia (recibos) lidos do arquivo completo; quem vê Faturamento/CMV. Só a partir de DETALHE_DESDE.
-//   "resumo"   → {storeId, de, ate, somenteDias?}: dias, produtos e formas de pagamento do período (lido dos resumos no R2);
+//   "resumo"   → {storeId, de, ate, somenteDias?}: dias (com vendas por hora quando houver), produtos e formas de pagamento do período (lido dos resumos no R2);
 //                somenteDias:true devolve só o dia a dia (mais rápido, para gráficos).
 //   "importar" → {storeId, data}: busca o dia na Linx e grava arquivo + resumos no R2.
 //   "diario"   → para cada loja com código do Degust, reimporta os 3 dias anteriores.
@@ -151,7 +151,8 @@ const keyMonthSum = (storeId: string, ym: string) => "resumo/" + folder(storeId,
 // ---------------------------------------------------------------- Resumos
 type Prod = { product_code: number | null; product_name: string; quantity: number; total: number; discount: number; net: number };
 type Pay = { method: string; brand: string; payments: number; amount: number };
-type DaySum = { business_date: string; sales: number; cancelled: number; gross: number; discount: number; net: number; products: Prod[]; payments: Pay[] };
+// hours / hoursN: líquido e nº de vendas por hora do dia (0 a 23, pela hora de inclusão da venda). Só nos dias resumidos a partir do arquivo completo.
+type DaySum = { business_date: string; sales: number; cancelled: number; gross: number; discount: number; net: number; hours?: number[]; hoursN?: number[]; products: Prod[]; payments: Pay[] };
 
 // Cupom para a tela de recibos (Faturamento › clicar no dia). Só os campos usados no recibo; sem dados do cliente.
 // hora = dataHoraInclusao ("AAAA-MM-DD HH:MM:SS"); bruto/desconto/líquido com a mesma regra do resumo.
@@ -169,12 +170,14 @@ const cupom = (v: Record<string, any>) => ({
   })),
 });
 function summarizeDay(dia: string, vendas: Record<string, any>[]): DaySum {
-  const s: DaySum = { business_date: dia, sales: 0, cancelled: 0, gross: 0, discount: 0, net: 0, products: [], payments: [] };
+  const s: DaySum = { business_date: dia, sales: 0, cancelled: 0, gross: 0, discount: 0, net: 0, hours: Array(24).fill(0), hoursN: Array(24).fill(0), products: [], payments: [] };
   const prods = new Map<string, Prod>(), pays = new Map<string, Pay>();
   for (const v of vendas) {
     if (yes(v.cancelada)) { s.cancelled++; continue; }
     s.sales++;
     s.gross += n(v.valProduto) + n(v.valDescontoItem); s.discount += n(v.valDesconto) + n(v.valDescontoItem); s.net += n(v.valLiquido);
+    const h = Number(String(v.dataHoraInclusao ?? "").slice(11, 13));
+    if (h >= 0 && h < 24 && String(v.dataHoraInclusao ?? "").length >= 13) { s.hours![h] += n(v.valLiquido); s.hoursN![h]++; }
     for (const it of v.itens ?? []) {
       if (yes(it.cancelado)) continue;
       const k = String(it.codProduto ?? "");
@@ -189,7 +192,7 @@ function summarizeDay(dia: string, vendas: Record<string, any>[]): DaySum {
       p.payments++; p.amount += n(pg.valor); pays.set(k, p);
     }
   }
-  s.gross = r2d(s.gross); s.discount = r2d(s.discount); s.net = r2d(s.net);
+  s.gross = r2d(s.gross); s.discount = r2d(s.discount); s.net = r2d(s.net); s.hours = s.hours!.map(r2d);
   s.products = [...prods.values()].map((p) => ({ ...p, quantity: Math.round(p.quantity * 10000) / 10000, total: r2d(p.total), discount: r2d(p.discount), net: r2d(p.net) })).sort((a, b) => b.net - a.net);
   s.payments = [...pays.values()].map((p) => ({ ...p, amount: r2d(p.amount) })).sort((a, b) => b.amount - a.amount);
   return s;
