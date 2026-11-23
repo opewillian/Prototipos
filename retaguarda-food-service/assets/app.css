@@ -467,3 +467,18 @@ button.cal-day:hover{outline:2px solid var(--brand);outline-offset:-2px}
 .cal-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 .cal-dot.fin{background:var(--ok-50);border:1px solid var(--ok)}.cal-dot.draft{background:var(--warn-50);border:1px solid var(--warn)}
 @media (max-width:640px){.cal-months{grid-template-columns:1fr}.cal-months .cal-month:first-child{display:none}.date-range{min-width:0;flex:1}.cal-pop{padding:10px}}
+/* CMV · memória de cálculo clicável e popin de movimentações */
+.cell-link{all:unset;cursor:pointer;display:inline-flex;flex-direction:column;border-radius:4px;padding:1px 4px;margin:-1px -4px}
+td.num .cell-link{align-items:flex-end}
+.cell-link:hover{background:var(--brand-50);color:var(--brand)}
+.cell-link:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.cell-link svg{display:inline;vertical-align:-1px;color:var(--warn)}
+.mov-wrap{padding:4px 18px 14px}
+.mov-group{border:1px solid var(--line);border-radius:8px;margin-top:10px;overflow:hidden}
+.mov-head{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--surface-2);font-size:13.5px}
+.mov-list{list-style:none;margin:0;padding:0}
+.mov-list li{display:flex;justify-content:space-between;gap:12px;padding:8px 12px;border-top:1px solid var(--line-2);font-size:13.5px}
+.mov-list li>div:first-child{display:flex;flex-direction:column;min-width:0}
+.mov-list .num{text-align:right;white-space:nowrap;display:flex;flex-direction:column}
+.mov-date{font-size:12px;color:var(--muted)}
+.mov-total .mov-head{background:var(--brand-50)}
