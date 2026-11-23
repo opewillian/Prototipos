@@ -54,7 +54,8 @@ export async function computeCMV(storeId,startId,endId){
  const row=id=>rows.get(id)||rows.set(id,{item_id:id,oq:0,ov:0,pq:0,pv:0,tiq:0,tiv:0,toq:0,tov:0,lq:0,lv:0,cq:0,cv:0}).get(id);
  for(const l of l1)if(cmvItem(l.item_id)){const r=row(l.item_id);r.oq+=Number(l.counted_quantity);r.ov+=Number(l.line_total)}
  for(const l of l2)if(cmvItem(l.item_id)){const r=row(l.item_id);r.cq+=Number(l.counted_quantity);r.cv+=Number(l.line_total)}
- for(const l of invLines)if(cmvItem(l.item_id)){const r=row(l.item_id);r.pq+=Number(l.quantity);r.pv+=Number(l.line_total)}
+ const invCmv=new Map();// valor de cada nota que entra no CMV (só itens que compõem o CMV)
+ for(const l of invLines)if(cmvItem(l.item_id)){const r=row(l.item_id);r.pq+=Number(l.quantity);r.pv+=Number(l.line_total);invCmv.set(l.invoice_id,(invCmv.get(l.invoice_id)||0)+Number(l.line_total))}
  const trDir=new Map(trs.map(t=>[t.id,t.to_store_id===storeId?"in":"out"]));
  for(const l of trLines)if(cmvItem(l.item_id)){const r=row(l.item_id);if(trDir.get(l.transfer_id)==="in"){r.tiq+=Number(l.quantity);r.tiv+=Number(l.line_total)}else{r.toq+=Number(l.quantity);r.tov+=Number(l.line_total)}}
  for(const l of lossLines)if(cmvItem(l.item_id)){const r=row(l.item_id);r.lq+=Number(l.quantity);r.lv+=Number(l.line_total)}
@@ -70,7 +71,9 @@ export async function computeCMV(storeId,startId,endId){
   if(error)throw error;
   revenue={net:round2((byDay||[]).reduce((s,d)=>s+Number(d.net||0),0)),daysImported:imp.length,daysTotal:daysBetween(from,to)+1};
  }catch(error){console.warn("Faturamento do período indisponível:",error)}
- return {c1,c2,from,to,rows:list2,totals:t,docs:{invs,trs,losses},pending,revenue,mov,
+ const purchaseDocs=invs.map(i=>({id:i.id,number:i.invoice_number,date:d10(i.entry_date),supplier:supName.get(i.supplier_id)||"",value:round2(invCmv.get(i.id)||0)}))
+  .sort((a,b)=>a.date.localeCompare(b.date)||String(a.number).localeCompare(String(b.number)));
+ return {c1,c2,from,to,rows:list2,totals:t,docs:{invs,trs,losses,purchases:purchaseDocs},pending,revenue,mov,
   lines:{open:new Map(l1.map(l=>[l.item_id,l])),close:new Map(l2.map(l=>[l.item_id,l]))},days:daysBetween(c1.count_date,c2.count_date)};
 }
 
@@ -148,7 +151,7 @@ export async function render(ctx){
 function memoryView(ctx,r){
  const t=r.totals;
  return card("Resumo do período",'<ul class="list-plain calc"><li><span>Estoque inicial ('+dateBR(r.c1.count_date)+')</span><strong>'+money(t.opening)+'</strong></li>'+
-   '<li><span>+ Compras recebidas ('+r.docs.invs.length+' nota(s))</span><strong>'+money(t.purchases)+'</strong></li>'+
+   '<li class="calc-link" data-notes tabindex="0" role="button" title="Ver as notas"><span>+ Compras recebidas</span><strong>'+money(t.purchases)+'</strong></li>'+
    '<li><span>+ Transferências recebidas</span><strong>'+money(t.tin)+'</strong></li><li><span>− Transferências enviadas</span><strong>'+money(t.tout)+'</strong></li>'+
    '<li><span>− Estoque final ('+dateBR(r.c2.count_date)+')</span><strong>'+money(t.closing)+'</strong></li><li class="total"><span class="label">CMV do período</span><strong>'+money(t.cmv)+'</strong></li>'+
    (r.revenue?'<li><span>Faturamento líquido do período'+(r.revenue.daysImported<r.revenue.daysTotal?' <small class="text-warn">('+r.revenue.daysImported+' de '+r.revenue.daysTotal+' dias importados)</small>':'')+'</span><strong>'+money(r.revenue.net)+'</strong></li>'+
@@ -236,6 +239,17 @@ function editCountQty(ctx,r,x,which){
 function bindMemory(ctx,r){
  const q=ctx.el.querySelector("#q");q?.addEventListener("input",()=>{const t=searchKey(q.value).trim();ctx.el.querySelectorAll("tr[data-search]").forEach(x=>x.hidden=!!t&&!x.dataset.search.includes(t))});
  const canEditCounts=storePerm(ctx.app,ctx.storeId,"counts").e;
+ // Compras recebidas: abre a lista das notas do período (valor = itens que compõem o CMV).
+ const notes=ctx.el.querySelector("[data-notes]");
+ const openNotes=()=>{
+  const ds=r.docs.purchases;
+  const body='<div class="mov-wrap"><section class="mov-group"><header class="mov-head"><strong>'+ds.length+' nota(s) recebida(s)</strong><span>'+money(r.totals.purchases)+'</span></header>'+
+   (ds.length?'<ul class="mov-list">'+ds.map(d=>'<li><div><span class="mov-date">Entrada '+dateBR(d.date)+'</span><a href="#'+String(ctx.base).replace(/^#/,"")+'/notas/'+e(d.id)+'" data-close-modal>Nota nº '+e(d.number)+'</a><small class="sub">'+e(d.supplier)+'</small></div><div class="num"><strong>'+money(d.value)+'</strong></div></li>').join("")+'</ul>':'<p class="muted" style="padding:10px 12px;margin:0">Nenhuma nota recebida no período.</p>')+
+   '</section></div>';
+  const m=openModal({title:"Compras recebidas · "+dateBR(r.from)+" a "+dateBR(r.to),body,wide:true});
+  document.querySelectorAll("[data-close-modal]").forEach(a=>a.addEventListener("click",()=>m.close()));
+ };
+ notes?.addEventListener("click",openNotes);notes?.addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();openNotes()}});
  // A célula inteira da coluna Item abre o detalhamento (não só o nome).
  ctx.el.querySelectorAll(".item-link").forEach(b=>b.closest("td")?.addEventListener("click",ev=>{if(!b.contains(ev.target))b.click()}));
  ctx.el.querySelectorAll("[data-mov]").forEach(b=>b.addEventListener("click",ev=>{
