@@ -236,6 +236,8 @@ function editCountQty(ctx,r,x,which){
 function bindMemory(ctx,r){
  const q=ctx.el.querySelector("#q");q?.addEventListener("input",()=>{const t=searchKey(q.value).trim();ctx.el.querySelectorAll("tr[data-search]").forEach(x=>x.hidden=!!t&&!x.dataset.search.includes(t))});
  const canEditCounts=storePerm(ctx.app,ctx.storeId,"counts").e;
+ // A célula inteira da coluna Item abre o detalhamento (não só o nome).
+ ctx.el.querySelectorAll(".item-link").forEach(b=>b.closest("td")?.addEventListener("click",ev=>{if(!b.contains(ev.target))b.click()}));
  ctx.el.querySelectorAll("[data-mov]").forEach(b=>b.addEventListener("click",ev=>{
   ev.stopPropagation();
   const x=r.rows.find(y=>y.item_id===b.dataset.item);if(!x)return;
