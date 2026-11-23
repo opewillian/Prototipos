@@ -919,3 +919,4 @@ Depois:
 ### Entrada das notas de out/26 da CGH (23/11/2026)
 - Das 30 notas da planilha (de-para completo + data revisada), 19 receberam entrada pelo app (de-para/rateio iguais à tela): 111 movimentos, R$ 43.502,91.
 - 11 ficaram PENDENTES porque a soma dos itens não fecha com o valor da nota (faltam descontos/impostos em "Outros custos"): Sendas 177919, 178953, 179616, 179704, 180447, 180877, 181113, 181961, 182114 (itens acima da nota = desconto); SPAL 16946833 e 16979884 (itens abaixo da nota = IPI/ST/frete).
+- Depois (a pedido do usuário): nas 11 pendentes a diferença foi lançada em Outros custos ("Desconto" nas 9 da Sendas; "ICMS ST" nas 2 da SPAL: 4,82 e 190,62), com descrição "Diferença para fechar com o valor da nota", rateio reaplicado e entrada dada. Resultado: 30/30 notas de out/26 recebidas, 154 movimentos, R$ 47.866,68 (notas somam 47.867,27; 0,59 é arredondamento do custo unitário em 4 casas).
