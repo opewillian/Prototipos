@@ -63,9 +63,8 @@ export async function render(ctx){
 
  const notesTotal=round2(invoices.reduce((s,i)=>s+Number(i.total_amount||0),0));
  ctx.el.innerHTML='<header class="page-head"><div><h1>'+e(ctx.store.name)+'</h1></div></header>'+
-  (showSales?'<div class="grid-2">'+
-   card("Faturamento do mês · "+MESES[Number(t.slice(5,7))-1]+"/"+t.slice(0,4),'<div class="chart-total">'+money(monthTotal)+'</div><div data-chart="dia"></div>')+
-   card("Faturamento mês a mês",'<div data-chart="mes"></div>')+'</div>':'')+
+  (showSales?card("Faturamento",'<div class="chart-total"><span data-chart-total></span><small data-chart-sub></small></div><div data-chart></div>',
+    {actions:'<div class="seg" role="tablist" aria-label="Visualização do faturamento"><button type="button" role="tab" data-view="dia">Dia a dia</button><button type="button" role="tab" data-view="mes">Mês a mês</button></div>'}):'')+
   (showNotes?card("Notas pendentes de entrada ("+invoices.length+")",invoices.length?dataTable([
     {label:"Nota",render:i=>'<span class="strong">Nº '+e(i.invoice_number)+'</span><small class="sub">'+e(sup.get(i.supplier_id)||"Sem fornecedor")+'</small>'},
     {label:"Emissão",render:i=>dateBR(i.issue_date)},
@@ -84,8 +83,22 @@ export async function render(ctx){
   (!showSales&&!showNotes&&!showCmv?alertBox("Nenhum módulo com resumo liberado para esta loja.","info"):'');
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
  if(showSales){
-  lineChart(ctx.el.querySelector('[data-chart="dia"]'),{labels:dLabels,series:[{name:"Faturamento",color:BRAND,values:dVals}],format:money,tickEvery:5,ariaLabel:"Faturamento por dia no mês atual"});
-  lineChart(ctx.el.querySelector('[data-chart="mes"]'),{labels:months.map(monthLabel),series:[
-   {name:"Faturamento",color:BRAND,values:mCur},{name:"Mesmo mês do ano anterior",color:GRAY,dash:true,values:mPrev}],format:money,tickEvery:2,ariaLabel:"Faturamento por mês"});
+  // Um gráfico só; o botão no topo troca entre dia a dia (mês atual) e mês a mês (12 meses x ano anterior).
+  const box=ctx.el.querySelector("[data-chart]"),tot=ctx.el.querySelector("[data-chart-total]"),sub=ctx.el.querySelector("[data-chart-sub]");
+  const yearTotal=round2(mCur.reduce((s,v)=>s+(v||0),0));
+  const show=v=>{
+   view=v;try{localStorage.setItem("rfs-inicio-fat",v)}catch{}
+   ctx.el.querySelectorAll("[data-view]").forEach(b=>{const on=b.dataset.view===v;b.classList.toggle("on",on);b.setAttribute("aria-selected",String(on))});
+   if(v==="dia"){
+    tot.textContent=money(monthTotal);sub.textContent=" no mês de "+MESES[Number(t.slice(5,7))-1]+"/"+t.slice(0,4);
+    lineChart(box,{labels:dLabels,series:[{name:"Faturamento",color:BRAND,values:dVals}],format:money,tickEvery:5,ariaLabel:"Faturamento por dia no mês atual"});
+   }else{
+    tot.textContent=money(yearTotal);sub.textContent=" nos últimos 12 meses";
+    lineChart(box,{labels:months.map(monthLabel),series:[{name:"Faturamento",color:BRAND,values:mCur},{name:"Mesmo mês do ano anterior",color:GRAY,dash:true,values:mPrev}],format:money,tickEvery:2,ariaLabel:"Faturamento por mês"});
+   }
+  };
+  ctx.el.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>show(b.dataset.view));
+  show(view);
  }
 }
+let view=(()=>{try{return localStorage.getItem("rfs-inicio-fat")==="mes"?"mes":"dia"}catch{return "dia"}})();

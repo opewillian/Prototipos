@@ -46,6 +46,8 @@ export function lineChart(el,{labels,series,format=v=>String(v),tickEvery=1,heig
   hit.addEventListener("touchstart",ev=>show(ev.touches[0].clientX),{passive:true});
  };
  draw();
- let t;const ro=new ResizeObserver(()=>{clearTimeout(t);t=setTimeout(draw,120)});ro.observe(el);
+ // Redesenha ao mudar a largura; um observador por elemento (trocar o gráfico no mesmo lugar substitui o anterior).
+ el._lcRO?.disconnect();
+ let t;const ro=new ResizeObserver(()=>{clearTimeout(t);t=setTimeout(draw,120)});ro.observe(el);el._lcRO=ro;
  return draw;
 }

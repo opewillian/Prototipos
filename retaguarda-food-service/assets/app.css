@@ -506,3 +506,10 @@ td:has(> .item-link){cursor:pointer}
 .lc-legend{display:flex;gap:16px;flex-wrap:wrap;padding:6px 18px 14px;font-size:12.5px;color:var(--text)}
 .lc-legend span{display:inline-flex;align-items:center;gap:6px}
 .chart-total{padding:0 18px;font-size:22px;font-weight:700;color:var(--ink)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:6px 12px;font:inherit;font-size:13px;color:var(--text);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--brand);color:#fff}
+.seg button:not(.on):hover{background:var(--brand-50)}
+.chart-total small{font-size:13px;font-weight:400;color:var(--muted)}
+.card-head:has(.seg){display:flex;justify-content:space-between;align-items:center;gap:10px}
