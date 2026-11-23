@@ -1,9 +1,11 @@
 // Loja · Faturamento. Vendas importadas da Linx Degust One (função "degust", docs/sql/34-vendas-degust.sql).
 // Período por dia de caixa. Vendas canceladas ficam fora dos valores (só contadas).
 // As vendas ficam só no Cloudflare R2: o resumo vem da função "degust" (ação "resumo", ver ../shared/vendas.js).
+// Clicar em um dia da tabela "Por dia" abre os recibos do dia (./recibos.js).
 // Administrador da Matriz pode importar (ou reimportar) os dias do período: cada dia é apagado e gravado de novo.
 import {supabase} from "../../core/db.js";
 import {salesSummary,clearSalesCache} from "../shared/vendas.js";
+import {receiptsModal} from "./recibos.js";
 import {e,money,num,dateBR,today,addDays,round2} from "../../core/format.js";
 import {pageHead,btn,dataTable,card,toast,alertBox,searchBox,searchKey,errorMessage} from "../../core/ui.js";
 
@@ -56,7 +58,7 @@ export async function render(ctx){
    {label:"Descontos",cls:"num",render:d=>dayMap.has(d)?money(N(dayMap.get(d).discount)):'<span class="muted">—</span>'},
    {label:"Líquido",cls:"num",render:d=>dayMap.has(d)?'<strong>'+money(N(dayMap.get(d).net))+'</strong>':'<span class="muted">—</span>'},
    {label:"Ticket médio",cls:"num",render:d=>{const x=dayMap.get(d);return x&&N(x.sales)?money(round2(N(x.net)/N(x.sales))):'<span class="muted">—</span>'}}
-  ],allDays.slice().reverse()),{flush:true})+
+  ],allDays.slice().reverse(),{rowAttrs:d=>dayMap.has(d)&&N(dayMap.get(d).sales)+N(dayMap.get(d).cancelled)>0?'class="day-link" data-day="'+d+'" tabindex="0" title="Ver os recibos do dia"':""}),{flush:true,actions:'<small class="muted">Clique em um dia para ver os recibos</small>'})+
   '<div class="grid-3">'+
   card("Produtos vendidos ("+byProd.length+")",'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("qp","Buscar produto")+'</div>'+dataTable([
    {label:"Produto",render:p=>'<span class="strong">'+e(p.product_name||"Produto")+'</span><small class="sub">Cód. '+e(p.product_code??"")+'</small>'},
@@ -80,6 +82,8 @@ export async function render(ctx){
   else if(q==="ant"){const end=addDays(m,-1);setRange(end.slice(0,8)+"01",end)}
   else setRange(addDays(today(),-7),addDays(today(),-1));
  });
+ // Recibos do dia (popin) → recibo em estilo cartoon.
+ ctx.el.querySelectorAll("tr[data-day]").forEach(tr=>{const go=()=>receiptsModal(ctx,tr.dataset.day);tr.onclick=go;tr.onkeydown=ev=>{if(ev.key==="Enter")go()}});
  const qp=ctx.el.querySelector("#qp");
  qp?.addEventListener("input",()=>{const s=searchKey(qp.value).trim();ctx.el.querySelectorAll("tr[data-search]").forEach(x=>x.hidden=!!s&&!x.dataset.search.includes(s))});
 

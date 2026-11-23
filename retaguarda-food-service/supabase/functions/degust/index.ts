@@ -20,6 +20,7 @@
 //   • quem vê Faturamento ou CMV da loja → "resumo";
 //   • administrador da Matriz → todas as outras.
 // Ações (POST JSON {acao, ...}):
+//   "cupons"   → {storeId, data}: cupons do dia (recibos) lidos do arquivo completo; quem vê Faturamento/CMV. Só a partir de DETALHE_DESDE.
 //   "resumo"   → {storeId, de, ate, somenteDias?}: dias, produtos e formas de pagamento do período (lido dos resumos no R2);
 //                somenteDias:true devolve só o dia a dia (mais rápido, para gráficos).
 //   "importar" → {storeId, data}: busca o dia na Linx e grava arquivo + resumos no R2.
@@ -152,6 +153,21 @@ type Prod = { product_code: number | null; product_name: string; quantity: numbe
 type Pay = { method: string; brand: string; payments: number; amount: number };
 type DaySum = { business_date: string; sales: number; cancelled: number; gross: number; discount: number; net: number; products: Prod[]; payments: Pay[] };
 
+// Cupom para a tela de recibos (Faturamento › clicar no dia). Só os campos usados no recibo; sem dados do cliente.
+// hora = dataHoraInclusao ("AAAA-MM-DD HH:MM:SS"); bruto/desconto/líquido com a mesma regra do resumo.
+const cupom = (v: Record<string, any>) => ({
+  id: v.controle, hora: String(v.dataHoraInclusao ?? ""), pdv: v.numPdv ?? "", nfce: v.documento?.[0]?.numero ?? null,
+  cancelada: yes(v.cancelada),
+  bruto: r2d(n(v.valProduto) + n(v.valDescontoItem)), desconto: r2d(n(v.valDesconto) + n(v.valDescontoItem)),
+  acrescimo: r2d(n(v.valAcrescimo)), liquido: r2d(n(v.valLiquido)), troco: r2d(n(v.valTroco)),
+  itens: (v.itens ?? []).map((it: Record<string, any>) => ({
+    codigo: it.codProduto ?? null, nome: String(it.descricaoProduto ?? ""), unid: String(it.unidadeProduto ?? ""),
+    qtd: n(it.quantidade), unit: r2d(n(it.valUnitario)), total: r2d(n(it.valTotal)), desconto: r2d(n(it.valDesconto)), cancelado: yes(it.cancelado),
+  })),
+  pagamentos: (v.formaPagamento ?? []).map((pg: Record<string, any>) => ({
+    forma: String(pg.formaPgto ?? "").trim() || "Não informado", adm: String(pg.administradora ?? "").trim(), valor: r2d(n(pg.valor)), parcelas: n(pg.tefQtdeParcela) || 1,
+  })),
+});
 function summarizeDay(dia: string, vendas: Record<string, any>[]): DaySum {
   const s: DaySum = { business_date: dia, sales: 0, cancelled: 0, gross: 0, discount: 0, net: 0, products: [], payments: [] };
   const prods = new Map<string, Prod>(), pays = new Map<string, Pay>();
@@ -289,6 +305,20 @@ Deno.serve(async (req) => {
       if (error) throw new Error("Permissão: " + error.message);
       if (!can) return json({ erro: "Sem acesso ao faturamento desta loja." }, 403);
       return json({ ok: true, ...(await periodSummary(storeId, de, ate, !!p.somenteDias)) });
+    }
+    // Cupons de um dia (arquivo completo do R2; só existe a partir de DETALHE_DESDE). Mesma permissão do resumo.
+    if (p.acao === "cupons") {
+      const storeId = String(p.storeId ?? ""), dia = String(p.data ?? "");
+      if (!isStore(storeId) || !isDay(dia)) return json({ erro: "Loja ou data inválida." }, 400);
+      const asUser = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { auth: { persistSession: false }, global: { headers: { Authorization: "Bearer " + jwt } } });
+      const { data: can, error } = await asUser.rpc("can_view_sales", { p_store: storeId });
+      if (error) throw new Error("Permissão: " + error.message);
+      if (!can) return json({ erro: "Sem acesso ao faturamento desta loja." }, 403);
+      if (dia < DETALHE_DESDE) return json({ ok: true, detalhe: false, desde: DETALHE_DESDE, cupons: [] });
+      const b = await r2Get(keyDetail(storeId, dia));
+      if (!b) return json({ ok: true, detalhe: true, cupons: [] });
+      const doc = JSON.parse(await gunzip(b));
+      return json({ ok: true, detalhe: true, cupons: (doc.vendas ?? []).map(cupom) });
     }
 
     const { data: m } = await admin.from("store_memberships").select("user_id")

@@ -98,7 +98,7 @@ const SCREENS={
   {find:()=>$("#content [data-q]")?.closest(".card"),title:"Período",text:"Escolha as datas ou use os atalhos (este mês, mês passado, últimos 7 dias)."},
   {sel:btn("import"),title:"Importar vendas",text:"Busca de novo as vendas do período no Degust. Use se algum dia ficou faltando."},
   {find:cardT("Resumo do período"),title:"Resumo do período",text:"Vendas, bruto, descontos, líquido e ticket médio. O líquido é o usado no CMV e nos gráficos."},
-  {find:cardT("Por dia"),title:"Por dia",text:"O faturamento de cada dia do período."},
+  {find:cardT("Por dia"),title:"Por dia",text:"O faturamento de cada dia do período. Clique em um dia para ver todos os recibos dele, e em um recibo para abri-lo (a partir de 01/10/2026)."},
   {find:cardT("Produtos vendidos"),title:"Produtos vendidos",text:"O que mais vendeu, com quantidade e participação. Use a busca para achar um produto."},
   {find:cardT("Formas de pagamento"),title:"Formas de pagamento",text:"Quanto entrou em cada forma de pagamento e bandeira."}
  ],
