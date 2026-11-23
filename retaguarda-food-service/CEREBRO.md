@@ -906,3 +906,9 @@ Depois:
 ### Script 31 (23/11/2026) — contagem única por data
 - Índice único parcial `stock_counts_store_date_key` em (store_id, count_date) onde status <> 'cancelled': uma loja não pode ter duas contagens na mesma data (canceladas não contam).
 - App (loja/contagem.js): "Nova contagem" avisa e abre a contagem já existente de hoje; mudar a data para uma já usada mostra o aviso e volta a data anterior.
+
+### CMV com calendário (23/11/2026)
+- Página CMV (loja/cmv.js): botão "Selecionar datas" abre calendário que só libera dias com contagem (rascunho ou finalizada; canceladas fora). 1º clique = estoque inicial, 2º = estoque final (data posterior).
+- Documentos por DATA: do dia seguinte ao estoque inicial até o dia do estoque final, inclusive. Compras = notas recebidas pela entry_date; transferências emitidas pela transfer_date; perdas registradas pela loss_date.
+- Prévia avisa contagens em rascunho e notas pendentes / transferências e perdas em rascunho do período (ficam fora do cálculo). Salvar fechamento só com as duas contagens finalizadas.
+
