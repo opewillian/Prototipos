@@ -1,7 +1,6 @@
 // Loja · Início (repaginada em 23/11/2026):
 //   1) Faturamento dia a dia do mês atual (linha).
 //   2) Faturamento mês a mês de janeiro a dezembro do ano + pontilhado com o ano anterior.
-//      No dia a dia, o pontilhado é o mesmo dia do mês no ano anterior.
 //   3) Notas pendentes de entrada no estoque.
 //   4) Últimos períodos de CMV (entre contagens seguidas) com o % sobre o faturamento.
 // Faturamento = líquido das vendas do Degust (resumos no R2, via ../shared/vendas.js), o mesmo usado no CMV. Cada bloco só aparece com o módulo liberado.
@@ -37,11 +36,10 @@ export async function render(ctx){
  // Primeiro dia com vendas importadas: antes dele não há dado (linha vazia, não zero).
  const firstDay=[...byDate.keys()].sort()[0]||"9999";
  const dayVal=d=>d>t||d<firstDay?null:(byDate.get(d)??(d<t?0:null));
- // Mês atual, dia a dia, e o MESMO DIA do ano anterior (linha pontilhada).
+ // Mês atual, dia a dia.
  const lastDay=new Date(Y,Number(t.slice(5,7)),0).getDate(),mm=t.slice(5,7);
- const dLabels=[],dVals=[],dPrev=[];
- for(let i=1;i<=lastDay;i++){const dd=String(i).padStart(2,"0");dLabels.push(String(i));dVals.push(dayVal(Y+"-"+mm+"-"+dd));
-  const pd=PY+"-"+mm+"-"+dd;dPrev.push(i<=new Date(PY,Number(mm),0).getDate()?dayVal(pd):null)}
+ const dLabels=[],dVals=[];
+ for(let i=1;i<=lastDay;i++){const dd=String(i).padStart(2,"0");dLabels.push(String(i));dVals.push(dayVal(Y+"-"+mm+"-"+dd))}
  const monthTotal=round2(dVals.reduce((s,v)=>s+(v||0),0));
  // Mês a mês: janeiro a dezembro do ano atual e, pontilhado, o mesmo mês do ano anterior.
  const byMonth=new Map();for(const [d,v] of byDate)byMonth.set(ym(d),(byMonth.get(ym(d))||0)+v);
@@ -91,7 +89,7 @@ export async function render(ctx){
    ctx.el.querySelectorAll("[data-view]").forEach(b=>{const on=b.dataset.view===v;b.classList.toggle("on",on);b.setAttribute("aria-selected",String(on))});
    if(v==="dia"){
     tot.textContent=money(monthTotal);sub.textContent=" no mês de "+MESES[Number(mm)-1]+"/"+Y;
-    lineChart(box,{labels:dLabels,series:[{name:MESES[Number(mm)-1]+"/"+Y,color:BRAND,values:dVals},{name:"Mesmo dia em "+PY,color:GRAY,dash:true,values:dPrev}],format:money,tickEvery:5,ariaLabel:"Faturamento por dia no mês atual e no mesmo mês do ano anterior"});
+    lineChart(box,{labels:dLabels,series:[{name:"Faturamento",color:BRAND,values:dVals}],format:money,tickEvery:5,ariaLabel:"Faturamento por dia no mês atual"});
    }else{
     tot.textContent=money(yearTotal);sub.textContent=" em "+Y;
     lineChart(box,{labels:MESES,series:[{name:String(Y),color:BRAND,values:mCur},{name:String(PY),color:GRAY,dash:true,values:mPrev}],format:money,tickEvery:1,ariaLabel:"Faturamento por mês no ano atual e no anterior"});
