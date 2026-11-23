@@ -11,8 +11,12 @@
 //   "diario"   → para cada loja com código do Degust, reimporta os últimos 3 dias (ontem e os 2 anteriores).
 //   "bq_setup" → cria no BigQuery o conjunto "retaguarda" (São Paulo) e as tabelas sales / sale_items / sale_payments.
 //   "bq_sync"  → copia UM dia de uma loja do Supabase para o BigQuery (apaga o dia lá e grava de novo): {storeId, data}
-// BigQuery: segredos GCP_PROJECT_ID e GCP_SA_KEY (JSON da conta de serviço). O token do Google (1 h) fica em
-// integration_tokens (provider "google"). Toda importação ("importar"/"diario") também copia o dia para o BigQuery.
+//   "r2_list"  → lista os arquivos guardados no R2 (prefixo opcional) com o tamanho total: {prefixo?}
+// ARQUIVO (Cloudflare R2): toda importação ("importar"/"diario") grava o detalhe do dia, como veio da Linx
+// (sem CPF/CNPJ do consumidor), em vendas/loja=<id>/ano=<AAAA>/mes=<MM>/<AAAA-MM-DD>.json.gz no bucket R2_BUCKET.
+// Segredos: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET.
+// BigQuery (desligado; só roda com o segredo BQ_ENABLED=1): GCP_PROJECT_ID e GCP_SA_KEY. Ficou bloqueado por falta de
+// faturamento no Google (conta de faturamento fechada / pré-pagamento) — trocado pelo R2 em 23/11/2026.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const BASE = "https://lx-degust-api-integracao-prd.azurewebsites.net";
@@ -139,10 +143,76 @@ async function importDay(storeId: string, degustCode: number, dia: string, userI
     store_id: storeId, business_date: dia, sales: ok.length, cancelled: lista.length - ok.length, net: liquido,
     imported_at: new Date().toISOString(), imported_by: userId,
   });
-  // Cópia para o BigQuery (se falhar, a importação no Supabase continua valendo; o erro volta no resultado).
+  // Arquivo no R2 com o detalhe completo do dia (se falhar, a importação no Supabase continua valendo; o erro volta no resultado).
+  let arquivo: unknown = null;
+  if (Deno.env.get("R2_BUCKET")) {
+    try { arquivo = await r2PutDay(storeId, degustCode, dia, lista); } catch (e) { arquivo = { erro: String((e as Error).message ?? e) }; }
+  }
   let bigquery: unknown = null;
-  if (gcpProject()) { try { bigquery = await bqSyncDay(storeId, dia); } catch (e) { bigquery = { erro: String((e as Error).message ?? e) }; } }
-  return { data: dia, vendas: ok.length, canceladas: lista.length - ok.length, liquido, gravadas, itens, pagamentos: pagtos, bigquery };
+  if (Deno.env.get("BQ_ENABLED") === "1" && gcpProject()) { try { bigquery = await bqSyncDay(storeId, dia); } catch (e) { bigquery = { erro: String((e as Error).message ?? e) }; } }
+  return { data: dia, vendas: ok.length, canceladas: lista.length - ok.length, liquido, gravadas, itens, pagamentos: pagtos, arquivo, bigquery };
+}
+
+// ---------------------------------------------------------------- Cloudflare R2 (API compatível com S3, assinatura AWS SigV4)
+const enc = new TextEncoder();
+const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+const sha256 = async (d: Uint8Array | string) => hex(await crypto.subtle.digest("SHA-256", typeof d === "string" ? enc.encode(d) : d));
+const hmac = async (key: ArrayBuffer | Uint8Array, msg: string) =>
+  crypto.subtle.sign("HMAC", await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]), enc.encode(msg));
+const uriEnc = (s: string, slash = false) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase()).replace(slash ? /%2F/g : /$^/, "/");
+async function r2(method: string, key: string, query: Record<string, string> = {}, body?: Uint8Array, contentType?: string) {
+  const acct = Deno.env.get("R2_ACCOUNT_ID") ?? "", bucket = Deno.env.get("R2_BUCKET") ?? "";
+  const akid = Deno.env.get("R2_ACCESS_KEY_ID") ?? "", secret = Deno.env.get("R2_SECRET_ACCESS_KEY") ?? "";
+  if (!acct || !bucket || !akid || !secret) throw new Error("Segredos do R2 incompletos.");
+  const host = acct + ".r2.cloudflarestorage.com";
+  const path = "/" + bucket + (key ? "/" + uriEnc(key, true) : "");
+  const qs = Object.keys(query).sort().map((k) => uriEnc(k) + "=" + uriEnc(query[k])).join("&");
+  const now = new Date(), amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""), day = amzDate.slice(0, 8);
+  const payloadHash = await sha256(body ?? new Uint8Array());
+  const headers: Record<string, string> = { host, "x-amz-content-sha256": payloadHash, "x-amz-date": amzDate };
+  if (contentType) headers["content-type"] = contentType;
+  const names = Object.keys(headers).sort();
+  const canonical = [method, path, qs, names.map((n) => n + ":" + headers[n]).join("\n") + "\n", names.join(";"), payloadHash].join("\n");
+  const scope = day + "/auto/s3/aws4_request";
+  const toSign = ["AWS4-HMAC-SHA256", amzDate, scope, await sha256(canonical)].join("\n");
+  let k: ArrayBuffer = await hmac(enc.encode("AWS4" + secret), day);
+  for (const part of ["auto", "s3", "aws4_request"]) k = await hmac(k, part);
+  const sig = hex(await hmac(k, toSign));
+  const { host: _h, ...send } = headers;
+  const r = await fetch("https://" + host + path + (qs ? "?" + qs : ""), {
+    method, body, headers: { ...send, Authorization: "AWS4-HMAC-SHA256 Credential=" + akid + "/" + scope + ", SignedHeaders=" + names.join(";") + ", Signature=" + sig },
+  });
+  const text = await r.text();
+  if (!r.ok) throw new Error("R2 " + method + " (" + r.status + "): " + text.slice(0, 300));
+  return text;
+}
+async function gzip(s: string) {
+  const cs = new Blob([s]).stream().pipeThrough(new CompressionStream("gzip"));
+  return new Uint8Array(await new Response(cs).arrayBuffer());
+}
+// Guarda o dia inteiro como veio da Linx (sem documento do consumidor). Regravar o mesmo dia substitui o arquivo.
+async function r2PutDay(storeId: string, degustCode: number, dia: string, vendas: Record<string, any>[]) {
+  const clean = vendas.map(({ docConsumidor: _a, docConsumidorDesconto: _b, ...v }) => v);
+  const doc = JSON.stringify({ loja: storeId, codLojaDegust: degustCode, data: dia, geradoEm: new Date().toISOString(), vendas: clean });
+  const body = await gzip(doc);
+  const key = "vendas/loja=" + storeId + "/ano=" + dia.slice(0, 4) + "/mes=" + dia.slice(5, 7) + "/" + dia + ".json.gz";
+  await r2("PUT", key, {}, body, "application/gzip");
+  return { arquivo: key, bytes: body.length, bytesSemCompactar: enc.encode(doc).length };
+}
+async function r2List(prefix = "") {
+  const files: { key: string; size: number }[] = [];
+  let token = "";
+  for (let i = 0; i < 50; i++) {
+    const q: Record<string, string> = { "list-type": "2", "max-keys": "1000" };
+    if (prefix) q.prefix = prefix; if (token) q["continuation-token"] = token;
+    const xml = await r2("GET", "", q);
+    for (const m of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+      files.push({ key: (m[1].match(/<Key>(.*?)<\/Key>/) ?? [])[1] ?? "", size: Number((m[1].match(/<Size>(\d+)<\/Size>/) ?? [])[1] ?? 0) });
+    }
+    token = (xml.match(/<NextContinuationToken>(.*?)<\/NextContinuationToken>/) ?? [])[1] ?? "";
+    if (!token) break;
+  }
+  return { arquivos: files.length, bytes: files.reduce((s, f) => s + f.size, 0), primeiros: files.slice(0, 3), ultimos: files.slice(-3) };
 }
 
 // ---------------------------------------------------------------- BigQuery
@@ -323,6 +393,7 @@ Deno.serve(async (req) => {
       }
       return json({ ok: true, vendas });
     }
+    if (p.acao === "r2_list") return json({ ok: true, ...(await r2List(String(p.prefixo ?? ""))) });
     if (p.acao === "bq_setup") return json({ ok: true, ...(await bqSetup()) });
     if (p.acao === "bq_sync") {
       const dia = String(p.data ?? "");
