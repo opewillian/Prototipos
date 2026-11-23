@@ -58,7 +58,7 @@ function receiptCartoon(c,store,day){
  const line=(l,r,cls="")=>'<div class="rcp-line '+cls+'"><span>'+l+'</span><span>'+r+'</span></div>';
  let k=0;const st=()=>' style="--i:'+(k++)+'"';
  const body=
-  '<div class="rcp-head"'+st()+'><div class="rcp-logo">MFT</div><strong>'+e(store.name||"Loja")+'</strong><small>'+(c.nfce?'NFC-e nº '+e(c.nfce)+' · ':'')+'Caixa '+e(c.pdv)+'</small>'+
+  '<div class="rcp-head"'+st()+'><strong>'+e(store.name||"Loja")+'</strong><small>'+(c.nfce?'NFC-e nº '+e(c.nfce)+' · ':'')+'Caixa '+e(c.pdv)+'</small>'+
   '<small>'+dateBR(day)+' às '+e(hhmm(c.hora))+'</small></div>'+
   '<div class="rcp-cut"'+st()+'></div>'+
   items.map(i=>'<div class="rcp-item"'+st()+'><div class="rcp-iname"><b>'+num(i.qtd)+'×</b> '+e(i.nome)+'</div><div class="rcp-ival">'+money(i.total)+
@@ -67,8 +67,7 @@ function receiptCartoon(c,store,day){
   '<div class="rcp-tot"'+st()+'>'+(c.cancelada?"":line("Subtotal",money(c.bruto)))+(c.desconto?line("Descontos","− "+money(c.desconto),"rcp-disc"):"")+(c.acrescimo?line("Acréscimos","+ "+money(c.acrescimo)):"")+
   line("TOTAL",money(c.liquido),"rcp-big")+'</div>'+
   '<div class="rcp-pays"'+st()+'>'+c.pagamentos.map(p=>'<div class="rcp-pay"><span class="rcp-chip">'+e(p.forma)+'</span><span>'+(p.adm?'<small>'+e(p.adm)+(p.parcelas>1?' · '+p.parcelas+'x':'')+'</small>':'')+money(p.valor)+'</span></div>').join("")+
-  (c.troco?line("Troco",money(c.troco)):"")+'</div>'+
-  '<div class="rcp-foot"'+st()+'>Obrigado e volte sempre! ☕</div>';
+  (c.troco?line("Troco",money(c.troco)):"")+'</div>';
  const ov=document.createElement("div");
  ov.className="rcp-overlay";ov.setAttribute("role","dialog");ov.setAttribute("aria-modal","true");ov.setAttribute("aria-label","Recibo");
  ov.innerHTML='<div class="rcp-stage"><div class="rcp-printer"><span class="rcp-led"></span><span class="rcp-slot"></span></div>'+
