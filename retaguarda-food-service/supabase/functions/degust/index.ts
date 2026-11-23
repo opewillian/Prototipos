@@ -9,6 +9,10 @@
 //   "vendas"   → relatório de vendas de uma loja num período (máx. 30 dias): {codLoja, dataInicial, dataFinal, resumo?}
 //   "importar" → grava UM dia de caixa da loja nas tabelas sales/sale_items/sale_payments: {storeId, data}
 //   "diario"   → para cada loja com código do Degust, reimporta os últimos 3 dias (ontem e os 2 anteriores).
+//   "bq_setup" → cria no BigQuery o conjunto "retaguarda" (São Paulo) e as tabelas sales / sale_items / sale_payments.
+//   "bq_sync"  → copia UM dia de uma loja do Supabase para o BigQuery (apaga o dia lá e grava de novo): {storeId, data}
+// BigQuery: segredos GCP_PROJECT_ID e GCP_SA_KEY (JSON da conta de serviço). O token do Google (1 h) fica em
+// integration_tokens (provider "google"). Toda importação ("importar"/"diario") também copia o dia para o BigQuery.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const BASE = "https://lx-degust-api-integracao-prd.azurewebsites.net";
@@ -135,7 +139,127 @@ async function importDay(storeId: string, degustCode: number, dia: string, userI
     store_id: storeId, business_date: dia, sales: ok.length, cancelled: lista.length - ok.length, net: liquido,
     imported_at: new Date().toISOString(), imported_by: userId,
   });
-  return { data: dia, vendas: ok.length, canceladas: lista.length - ok.length, liquido, gravadas, itens, pagamentos: pagtos };
+  // Cópia para o BigQuery (se falhar, a importação no Supabase continua valendo; o erro volta no resultado).
+  let bigquery: unknown = null;
+  if (gcpProject()) { try { bigquery = await bqSyncDay(storeId, dia); } catch (e) { bigquery = { erro: String((e as Error).message ?? e) }; } }
+  return { data: dia, vendas: ok.length, canceladas: lista.length - ok.length, liquido, gravadas, itens, pagamentos: pagtos, bigquery };
+}
+
+// ---------------------------------------------------------------- BigQuery
+const BQ_DATASET = "retaguarda", BQ_LOCATION = "southamerica-east1";
+const gcpProject = () => Deno.env.get("GCP_PROJECT_ID") ?? "";
+const b64url = (b: ArrayBuffer | string) => {
+  const bytes = typeof b === "string" ? new TextEncoder().encode(b) : new Uint8Array(b);
+  let s = ""; for (const x of bytes) s += String.fromCharCode(x);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+// Token do Google pela conta de serviço (JWT assinado com a chave privada). Reaproveita enquanto faltar > 5 min.
+async function googleToken(): Promise<string> {
+  const { data } = await admin.from("integration_tokens").select("token,expires_at").eq("provider", "google").maybeSingle();
+  if (data && new Date(data.expires_at).getTime() - Date.now() > 5 * 60 * 1000) return data.token;
+  const sa = JSON.parse(Deno.env.get("GCP_SA_KEY") ?? "{}");
+  if (!sa.client_email || !sa.private_key) throw new Error("Segredo GCP_SA_KEY ausente ou inválido.");
+  const now = Math.floor(Date.now() / 1000);
+  const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = b64url(JSON.stringify({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/bigquery", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
+  const der = Uint8Array.from(atob(String(sa.private_key).replace(/-----[^-]+-----/g, "").replace(/\s+/g, "")), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(head + "." + claim));
+  const r = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=" + head + "." + claim + "." + b64url(sig),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) throw new Error("Login no Google recusado (" + r.status + "): " + (j.error_description || j.error || ""));
+  await admin.from("integration_tokens").upsert({ provider: "google", token: j.access_token, expires_at: new Date(Date.now() + (j.expires_in || 3600) * 1000).toISOString(), updated_at: new Date().toISOString() });
+  return j.access_token;
+}
+async function bq(method: string, path: string, body?: unknown) {
+  const r = await fetch("https://bigquery.googleapis.com/bigquery/v2/projects/" + gcpProject() + path, {
+    method, headers: { Authorization: "Bearer " + (await googleToken()), "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined,
+  });
+  const t = await r.text(); let j: any = {}; try { j = JSON.parse(t); } catch { j = { raw: t.slice(0, 300) }; }
+  return { ok: r.ok, status: r.status, j };
+}
+const F = (name: string, type: string, mode = "NULLABLE") => ({ name, type, mode });
+const BQ_TABLES: Record<string, ReturnType<typeof F>[]> = {
+  sales: [F("store_id", "STRING", "REQUIRED"), F("business_date", "DATE", "REQUIRED"), F("control", "INT64", "REQUIRED"), F("sale_date", "STRING"), F("created_raw", "STRING"),
+    F("pdv", "STRING"), F("opening", "STRING"), F("sale_type", "STRING"), F("cancelled", "BOOL"), F("gross", "NUMERIC"), F("discount", "NUMERIC"), F("item_discount", "NUMERIC"),
+    F("surcharge", "NUMERIC"), F("net", "NUMERIC"), F("change_amount", "NUMERIC"), F("has_customer_doc", "BOOL"), F("doc_model", "STRING"), F("doc_number", "INT64"),
+    F("doc_key", "STRING"), F("doc_status", "STRING"), F("imported_at", "TIMESTAMP")],
+  sale_items: [F("store_id", "STRING", "REQUIRED"), F("business_date", "DATE", "REQUIRED"), F("control", "INT64", "REQUIRED"), F("line", "INT64"), F("main_line", "INT64"),
+    F("product_code", "INT64"), F("product_name", "STRING"), F("unit", "STRING"), F("quantity", "NUMERIC"), F("unit_price", "NUMERIC"), F("total", "NUMERIC"),
+    F("discount", "NUMERIC"), F("cancelled", "BOOL"), F("stock_item_code", "INT64")],
+  sale_payments: [F("store_id", "STRING", "REQUIRED"), F("business_date", "DATE", "REQUIRED"), F("control", "INT64", "REQUIRED"), F("seq", "STRING"), F("method", "STRING"),
+    F("method_code", "STRING"), F("brand", "STRING"), F("amount", "NUMERIC"), F("installments", "INT64")],
+};
+async function bqSetup() {
+  const out: Record<string, number> = {};
+  const ds = await bq("POST", "/datasets", { datasetReference: { projectId: gcpProject(), datasetId: BQ_DATASET }, location: BQ_LOCATION, description: "Retaguarda MFT — vendas do Degust" });
+  if (!ds.ok && ds.status !== 409) throw new Error("Criar conjunto no BigQuery (" + ds.status + "): " + JSON.stringify(ds.j.error?.message ?? ds.j).slice(0, 300));
+  out.dataset = ds.status;
+  for (const [t, fields] of Object.entries(BQ_TABLES)) {
+    const r = await bq("POST", "/datasets/" + BQ_DATASET + "/tables", {
+      tableReference: { projectId: gcpProject(), datasetId: BQ_DATASET, tableId: t }, schema: { fields },
+      timePartitioning: { type: "DAY", field: "business_date" }, clustering: { fields: ["store_id"] },
+    });
+    if (!r.ok && r.status !== 409) throw new Error("Criar tabela " + t + " (" + r.status + "): " + JSON.stringify(r.j.error?.message ?? r.j).slice(0, 300));
+    out[t] = r.status;
+  }
+  return out;
+}
+async function bqWaitJob(jobId: string) {
+  for (let i = 0; i < 60; i++) {
+    const r = await bq("GET", "/jobs/" + jobId + "?location=" + BQ_LOCATION);
+    if (!r.ok) throw new Error("Job BigQuery (" + r.status + ")");
+    if (r.j.status?.state === "DONE") { if (r.j.status.errorResult) throw new Error("BigQuery: " + r.j.status.errorResult.message); return r.j; }
+    await new Promise((res) => setTimeout(res, 1000));
+  }
+  throw new Error("BigQuery demorou demais.");
+}
+async function bqQuery(sql: string) {
+  const r = await bq("POST", "/queries", { query: sql, useLegacySql: false, location: BQ_LOCATION, timeoutMs: 60000 });
+  if (!r.ok) throw new Error("Consulta BigQuery (" + r.status + "): " + (r.j.error?.message ?? ""));
+  if (!r.j.jobComplete) await bqWaitJob(r.j.jobReference.jobId);
+  return r.j;
+}
+// Grava linhas por "load job" (gratuito) em NDJSON.
+async function bqLoad(table: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) return 0;
+  const boundary = "bq" + crypto.randomUUID().replace(/-/g, "");
+  const meta = { configuration: { load: { destinationTable: { projectId: gcpProject(), datasetId: BQ_DATASET, tableId: table }, sourceFormat: "NEWLINE_DELIMITED_JSON", writeDisposition: "WRITE_APPEND" } }, jobReference: { location: BQ_LOCATION } };
+  const body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(meta) + "\r\n--" + boundary +
+    "\r\nContent-Type: application/octet-stream\r\n\r\n" + rows.map((x) => JSON.stringify(x)).join("\n") + "\r\n--" + boundary + "--";
+  const r = await fetch("https://bigquery.googleapis.com/upload/bigquery/v2/projects/" + gcpProject() + "/jobs?uploadType=multipart", {
+    method: "POST", headers: { Authorization: "Bearer " + (await googleToken()), "Content-Type": "multipart/related; boundary=" + boundary }, body,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error("Enviar " + table + " ao BigQuery (" + r.status + "): " + (j.error?.message ?? ""));
+  await bqWaitJob(j.jobReference.jobId);
+  return rows.length;
+}
+async function allRows(build: (from: number, to: number) => any) {
+  const out: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await build(from, from + 999);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? [])); if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+// Copia um dia de uma loja do Supabase para o BigQuery (apaga o dia lá e grava de novo).
+async function bqSyncDay(storeId: string, dia: string) {
+  if (!/^[a-z0-9-]+$/i.test(storeId) || !/^\d{4}-\d{2}-\d{2}$/.test(dia)) throw new Error("Loja ou data inválida.");
+  const sales = await allRows((a, b) => admin.from("sales").select("id,store_id,business_date,control,sale_date,created_raw,pdv,opening,sale_type,cancelled,gross,discount,item_discount,surcharge,net,change_amount,has_customer_doc,doc_model,doc_number,doc_key,doc_status,imported_at").eq("store_id", storeId).eq("business_date", dia).order("id").range(a, b));
+  const ctl = new Map(sales.map((s: any) => [s.id, s.control]));
+  const items = await allRows((a, b) => admin.from("sale_items").select("sale_id,line,main_line,product_code,product_name,unit,quantity,unit_price,total,discount,cancelled,stock_item_code").eq("store_id", storeId).eq("business_date", dia).order("id").range(a, b));
+  const pays = await allRows((a, b) => admin.from("sale_payments").select("sale_id,seq,method,method_code,brand,amount,installments").eq("store_id", storeId).eq("business_date", dia).order("id").range(a, b));
+  const base = { store_id: storeId, business_date: dia };
+  await bqQuery(["sales", "sale_items", "sale_payments"].map((t) => "DELETE FROM `" + BQ_DATASET + "." + t + "` WHERE store_id = '" + storeId + "' AND business_date = DATE '" + dia + "';").join("\n"));
+  const n1 = await bqLoad("sales", sales.map(({ id: _id, ...s }: any) => s));
+  const n2 = await bqLoad("sale_items", items.map(({ sale_id, ...x }: any) => ({ ...base, control: ctl.get(sale_id), ...x })));
+  const n3 = await bqLoad("sale_payments", pays.map(({ sale_id, ...x }: any) => ({ ...base, control: ctl.get(sale_id), ...x })));
+  return { vendas: n1, itens: n2, pagamentos: n3 };
 }
 
 // Data de hoje em São Paulo, menos N dias (AAAA-MM-DD).
@@ -198,6 +322,11 @@ Deno.serve(async (req) => {
         });
       }
       return json({ ok: true, vendas });
+    }
+    if (p.acao === "bq_setup") return json({ ok: true, ...(await bqSetup()) });
+    if (p.acao === "bq_sync") {
+      const dia = String(p.data ?? "");
+      return json({ ok: true, data: dia, ...(await bqSyncDay(String(p.storeId ?? ""), dia)) });
     }
     if (p.acao === "importar") {
       const dia = String(p.data ?? "");
