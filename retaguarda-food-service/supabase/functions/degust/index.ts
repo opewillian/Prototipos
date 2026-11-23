@@ -9,6 +9,8 @@
 //   bruto = valProduto + valDescontoItem; descontos = valDesconto + valDescontoItem; líquido = valLiquido;
 //   produto: itens não cancelados, líquido = valTotal − valDesconto do item; pagamento: forma + bandeira.
 // No Supabase fica só o registro de quais dias foram importados (sales_imports).
+// Regra do usuário (23/11/2026): o arquivo completo (vendas/...json.gz) só é guardado a partir de DETALHE_DESDE;
+// dias anteriores ficam só com os resumos.
 //
 // Segredos: DEGUST_USUARIO, DEGUST_SENHA, DEGUST_FRANQUEADOR, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET.
 // Tokens reaproveitados ficam em public.integration_tokens (Linx: 4 h, "não gerar toda hora").
@@ -24,6 +26,7 @@
 //   "diario"   → para cada loja com código do Degust, reimporta os 3 dias anteriores.
 //   "resumir"  → {storeId, data, mes?}: refaz o resumo do dia a partir do arquivo já guardado (sem chamar a Linx);
 //                mes:true também refaz o resumo do mês.
+//   "r2_limpar_detalhe" → {storeId}: apaga os arquivos completos anteriores a DETALHE_DESDE (os resumos ficam).
 //   "lojas", "vendas" (consulta direta à Linx), "r2_list" {prefixo?}.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -43,6 +46,7 @@ const yes = (v: unknown) => String(v ?? "").trim().toUpperCase() === "S";
 const r2d = (v: number) => Math.round(v * 100) / 100;
 const isDay = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
 const isStore = (s: string) => /^[a-z0-9-]+$/i.test(s);
+const DETALHE_DESDE = "2026-10-01";
 
 // ---------------------------------------------------------------- Linx
 async function token(force = false): Promise<string> {
@@ -227,13 +231,13 @@ async function importDay(storeId: string, degustCode: number, dia: string, userI
   for (const v of (Array.isArray(r) ? r : [])) byCtl.set(Number(v.controle), v);
   const lista = [...byCtl.values()].map(({ docConsumidor: _a, docConsumidorDesconto: _b, ...v }) => v);
   const doc = JSON.stringify({ loja: storeId, codLojaDegust: degustCode, data: dia, geradoEm: new Date().toISOString(), vendas: lista });
-  const gz = await gzip(doc);
-  await r2Put(keyDetail(storeId, dia), gz, "application/gzip");
+  let gz: Uint8Array | null = null;
+  if (dia >= DETALHE_DESDE) { gz = await gzip(doc); await r2Put(keyDetail(storeId, dia), gz, "application/gzip"); }
   const sum = summarizeDay(dia, lista);
   await r2PutJson(keyDaySum(storeId, dia), sum);
   if (rebuild) await rebuildMonth(storeId, dia.slice(0, 7));
   await admin.from("sales_imports").upsert({ store_id: storeId, business_date: dia, sales: sum.sales, cancelled: sum.cancelled, net: sum.net, imported_at: new Date().toISOString(), imported_by: userId });
-  return { data: dia, vendas: sum.sales, canceladas: sum.cancelled, liquido: sum.net, arquivo: { bytes: gz.length, bytesSemCompactar: enc.encode(doc).length } };
+  return { data: dia, vendas: sum.sales, canceladas: sum.cancelled, liquido: sum.net, arquivo: gz ? { bytes: gz.length, bytesSemCompactar: enc.encode(doc).length } : "só resumo" };
 }
 // Refaz o resumo do dia a partir do arquivo já guardado (sem chamar a Linx).
 async function resummarize(storeId: string, dia: string, month: boolean) {
@@ -300,6 +304,15 @@ Deno.serve(async (req) => {
       const vendas = Array.isArray(r) ? r : [];
       const ok = vendas.filter((v: Record<string, unknown>) => !yes(v.cancelada));
       return json({ ok: true, vendas: vendas.length, canceladas: vendas.length - ok.length, liquido: r2d(ok.reduce((s: number, v: Record<string, unknown>) => s + n(v.valLiquido), 0)) });
+    }
+    if (p.acao === "r2_limpar_detalhe") {
+      const sid = String(p.storeId ?? "");
+      if (!isStore(sid)) return json({ erro: "Loja inválida." }, 400);
+      const old = (await r2Keys("vendas/loja=" + sid + "/")).filter((f) => (f.key.match(/(\d{4}-\d{2}-\d{2})\.json\.gz$/) ?? [])[1] < DETALHE_DESDE);
+      for (let i = 0; i < old.length; i += 10) {
+        await Promise.all(old.slice(i, i + 10).map(async (f) => { const r = await r2Fetch("DELETE", f.key); await r.body?.cancel(); if (!r.ok && r.status !== 404) throw new Error("R2 DELETE (" + r.status + ")"); }));
+      }
+      return json({ ok: true, apagados: old.length, bytes: old.reduce((s, f) => s + f.size, 0) });
     }
     if (p.acao === "r2_list") {
       const files = await r2Keys(String(p.prefixo ?? ""));
