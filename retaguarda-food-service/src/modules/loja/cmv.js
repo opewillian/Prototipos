@@ -28,7 +28,7 @@ export async function computeCMV(storeId,startId,endId){
  const from=addDays(d10(c1.count_date),1),to=d10(c2.count_date);
  const [l1,l2,invsAll,trsAll,lossesAll]=await Promise.all([
   list("stock_count_items",{eq:{count_id:startId}}),list("stock_count_items",{eq:{count_id:endId}}),
-  list("invoices",{select:"id,invoice_number,entry_date,status,supplier_id",eq:{store_id:storeId},gte:{entry_date:from},lte:{entry_date:to}}),
+  list("invoices",{select:"id,invoice_number,entry_date,status,supplier_id,total_amount",eq:{store_id:storeId},gte:{entry_date:from},lte:{entry_date:to}}),
   list("transfers",{select:"id,number,from_store_id,to_store_id,transfer_date,issued_at,status",or:"from_store_id.eq."+storeId+",to_store_id.eq."+storeId}),
   list("losses",{select:"id,loss_date,reason,status",eq:{store_id:storeId},gte:{loss_date:from},lte:{loss_date:to}})
  ]);
@@ -43,6 +43,7 @@ export async function computeCMV(storeId,startId,endId){
  ]);
  // Movimentações de cada item (detalhe clicável). cat: open | purchase | tin | tout | loss | close.
  const supName=new Map(suppliers.map(x=>[x.id,x.name]));
+ for(const i of pending.invs)i.supplier=supName.get(i.supplier_id)||"";
  const invBy=new Map(invs.map(i=>[i.id,i])),trBy=new Map(trs.map(t=>[t.id,t])),lossBy=new Map(losses.map(l=>[l.id,l]));
  const mov=new Map();const addMov=(id,m)=>{(mov.get(id)||mov.set(id,[]).get(id)).push(m)};
  const cntLabel=c=>"Contagem "+c.display_id+(c.status==="draft"?" (rascunho)":"");
@@ -253,77 +254,103 @@ function analysisModal(ctx,r){
  const purchases=x=>(r.mov.get(x.item_id)||[]).filter(m=>m.cat==="purchase"&&m.qty>0);
  const avgBuy=x=>{const ps=purchases(x),q=ps.reduce((s,m)=>s+m.qty,0);return q>0?ps.reduce((s,m)=>s+m.total,0)/q:null};
  const median=a=>{const s=a.slice().sort((x,y)=>x-y),k=s.length>>1;return s.length%2?s[k]:(s[k-1]+s[k])/2};
- const groups=[];
- const add=(tone,title,why,rows,fix)=>groups.push({tone,title,why,rows,fix});
- const itemLink=x=>'<a href="#" data-an-item="'+e(x.item_id)+'">'+e(x.item.name)+'</a>';
+ const itemLink=x=>'<a href="#" class="an-item" data-an-item="'+e(x.item_id)+'">'+e(x.item.name)+'</a><small class="sub">'+e(unit(x))+'</small>';
+ const docLink=(doc,label)=>'<a href="'+e(href(doc))+'" data-close-modal>'+e(label)+'</a>';
+ const n0=v=>'<span class="'+(v<0?"text-danger":"")+'">'+v+'</span>';
+ const pctDiff=(a,b)=>{const d=b?(a-b)/b:0;return '<span class="an-diff '+(d>0?"up":"down")+'">'+(d>0?"+":"")+pct(d)+'</span>'};
+ // Cada verificação: {sev, title, why, fix, cols:[{label,num?}], rows:[[cells]], impact?}
+ const checks={docs:[],cost:[],cons:[],fat:[]};
 
- // 1. Documentos que ficaram fora do cálculo.
- add("danger","Notas pendentes de entrada no período","Entraram na loja (data de entrada no período) mas não foram recebidas: o valor não está nas compras do CMV.",
-  r.pending.invs.sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))).map(i=>['<a href="'+e(href("notas/"+i.id))+'" data-close-modal>Nota nº '+e(i.invoice_number)+'</a>',"Entrada "+dateBR(i.entry_date)]),
-  "Abra a nota, confira o de-para e dê entrada.");
- add("warn","Transferências e perdas em rascunho no período","Não foram emitidas/registradas, então não entram no CMV.",
-  [...r.pending.trs.map(x=>['<a href="'+e(href("transferencias/"+x.id))+'" data-close-modal>Transferência '+e(x.number||"")+'</a>',dateBR(x.transfer_date||x.issued_at)]),
-   ...r.pending.losses.map(x=>['<a href="'+e(href("perdas/"+x.id))+'" data-close-modal>Perda</a>',dateBR(x.loss_date)+(x.reason?" · "+e(x.reason):"")])],
-  "Emita a transferência ou registre a perda, ou cancele se não vale.");
- // 2. Contagens.
- const drafts=[r.c1,r.c2].filter(c=>c.status==="draft");
- add("warn","Contagens em rascunho",'Os números podem mudar até a contagem ser finalizada; o fechamento só pode ser salvo com as duas finalizadas.',
-  drafts.map(c=>['<a href="'+e(href("contagem/"+c.id))+'" data-close-modal>Contagem '+e(c.display_id)+'</a>',dateBR(c.count_date)]),"Revise e finalize as contagens.");
- // 3. Custos da contagem muito diferentes das compras do período.
+ // ---- Documentos fora do cálculo
+ const pinv=r.pending.invs.slice().sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date)));
+ checks.docs.push({sev:"danger",title:"Notas pendentes de entrada",why:"Têm data de entrada no período mas não foram recebidas: o valor não está nas compras do CMV.",fix:"Abra a nota, confira o de-para e dê entrada.",
+  cols:[{label:"Nota"},{label:"Fornecedor"},{label:"Entrada"},{label:"Valor",num:true}],
+  rows:pinv.map(i=>[docLink("notas/"+i.id,"Nº "+i.invoice_number),e(i.supplier||"—"),dateBR(i.entry_date),money(i.total_amount||0)]),
+  impact:round2(pinv.reduce((s,i)=>s+Number(i.total_amount||0),0))});
+ checks.docs.push({sev:"warn",title:"Transferências e perdas em rascunho",why:"Não foram emitidas ou registradas, então não entram no CMV.",fix:"Emita/registre, ou cancele se não valem.",
+  cols:[{label:"Documento"},{label:"Data"},{label:"Detalhe"}],
+  rows:[...r.pending.trs.map(x=>[docLink("transferencias/"+x.id,"Transferência "+(x.number||"")),dateBR(x.transfer_date||x.issued_at),""]),
+   ...r.pending.losses.map(x=>[docLink("perdas/"+x.id,"Perda"),dateBR(x.loss_date),e(x.reason||"")])]});
+ checks.docs.push({sev:"warn",title:"Contagens em rascunho",why:"Os números ainda podem mudar; o fechamento só é salvo com as duas contagens finalizadas.",fix:"Revise e finalize as contagens.",
+  cols:[{label:"Contagem"},{label:"Data"},{label:"Papel"}],
+  rows:[[r.c1,"Estoque inicial"],[r.c2,"Estoque final"]].filter(([c])=>c.status==="draft").map(([c,p])=>[docLink("contagem/"+c.id,c.display_id),dateBR(c.count_date),p])});
+
+ // ---- Custos e preços
  const costRows=[];
  for(const x of r.rows){
   const ab=avgBuy(x);if(!ab)continue;
-  for(const [which,label] of [["open","inicial"],["close","final"]]){
+  for(const [which,label,c0] of [["open","Inicial",r.c1],["close","Final",r.c2]]){
    const l=r.lines[which].get(x.item_id);if(!l||!(Number(l.counted_quantity)>0))continue;
    const c=Number(l.unit_cost);
-   if(ratio(c,ab)>=ANALISE.custoDiverge)costRows.push([itemLink(x),"Estoque "+label+": "+money(c)+"/"+e(unit(x))+" × compras "+money(round2(ab))+"/"+e(unit(x)),Math.abs(Number(l.counted_quantity)*(c-ab))]);
+   if(ratio(c,ab)>=ANALISE.custoDiverge)costRows.push({imp:Math.abs(Number(l.counted_quantity)*(c-ab)),cells:[itemLink(x),label+'<small class="sub">'+e(c0.display_id)+'</small>',num(l.counted_quantity),money(c),money(round2(ab)),pctDiff(c,ab)]});
   }
  }
- costRows.sort((a,b)=>b[2]-a[2]);
- add("danger","Custo da contagem muito diferente do custo de compra","O custo unitário usado no estoque está mais de "+Math.round((ANALISE.custoDiverge-1)*100)+"% acima ou abaixo da média das compras do período. Costuma ser unidade errada (pacote × kg) ou preço digitado errado.",
-  costRows.map(([a,b,v])=>[a,b+'<small class="sub">impacto estimado '+money(round2(v))+'</small>']),"Confira a unidade e o custo na contagem (clique no estoque do item na memória de cálculo).");
- // 4. Linhas de nota com preço fora do padrão do próprio item.
+ costRows.sort((a,b)=>b.imp-a.imp);
+ checks.cost.push({sev:"danger",title:"Custo da contagem diferente do custo de compra",why:"O custo usado no estoque está mais de "+Math.round((ANALISE.custoDiverge-1)*100)+"% acima ou abaixo da média das compras do período. Costuma ser unidade errada (pacote × kg) ou preço digitado errado.",fix:"Confira unidade e custo na contagem (clique no estoque do item na memória de cálculo).",
+  cols:[{label:"Item"},{label:"Estoque"},{label:"Qtd",num:true},{label:"Custo contagem",num:true},{label:"Custo compras",num:true},{label:"Diferença",num:true},{label:"Impacto",num:true}],
+  rows:costRows.map(r0=>[...r0.cells,money(round2(r0.imp))]),impact:round2(costRows.reduce((s,x)=>s+x.imp,0))});
  const priceRows=[];
  for(const x of r.rows){
   const ps=purchases(x);if(ps.length<2)continue;
   const med=median(ps.map(m=>m.total/m.qty));
-  for(const m of ps){const u=m.total/m.qty;if(ratio(u,med)>=ANALISE.precoCompraDiverge)priceRows.push([itemLink(x),'<a href="'+e(href(m.doc))+'" data-close-modal>'+e(m.label)+'</a> ('+dateBR(m.date)+'): '+money(round2(u))+"/"+e(unit(x))+" × usual "+money(round2(med)),Math.abs(m.qty*(u-med))])}
+  for(const m of ps){const u=m.total/m.qty;if(ratio(u,med)>=ANALISE.precoCompraDiverge)priceRows.push({imp:Math.abs(m.qty*(u-med)),cells:[itemLink(x),docLink(m.doc,m.label)+'<small class="sub">'+dateBR(m.date)+'</small>',money(round2(u)),money(round2(med)),pctDiff(u,med)]})}
  }
- priceRows.sort((a,b)=>b[2]-a[2]);
- add("warn","Compras com preço fora do padrão","Linha de nota com custo unitário muito diferente das outras compras do mesmo item no período (pode ser fator do de-para errado).",
-  priceRows.map(([a,b])=>[a,b]),"Abra a nota e confira o de-para (fator de conversão) do item.");
- // 5. CMV negativo por item.
- const neg=r.rows.filter(x=>x.cmv<=-ANALISE.cmvNegativoMin).sort((a,b)=>a.cmv-b.cmv);
- add("danger","Itens com CMV negativo","O estoque final ficou maior que inicial + compras + transferências: falta lançar compra/transferência ou a contagem está errada.",
-  neg.map(x=>[itemLink(x),"CMV "+money(x.cmv)+" · consumo "+num(round2(x.oq+x.pq+x.tiq-x.toq-x.cq))+" "+e(unit(x))]),"Procure nota pendente do item ou revise as contagens.");
- // 6. Custo zerado.
+ priceRows.sort((a,b)=>b.imp-a.imp);
+ checks.cost.push({sev:"warn",title:"Compras com preço fora do padrão",why:"Linha de nota com custo unitário muito diferente das outras compras do mesmo item (pode ser fator do de-para errado).",fix:"Abra a nota e confira o de-para do item.",
+  cols:[{label:"Item"},{label:"Nota"},{label:"Custo na nota",num:true},{label:"Custo usual",num:true},{label:"Diferença",num:true}],rows:priceRows.map(x=>x.cells)});
  const zero=[];
- for(const x of r.rows)for(const [which,label] of [["open","inicial"],["close","final"]]){const l=r.lines[which].get(x.item_id);if(l&&Number(l.counted_quantity)>0&&!(Number(l.unit_cost)>0))zero.push([itemLink(x),"Estoque "+label+" com "+num(l.counted_quantity)+" "+e(unit(x))+" e custo zero"])}
- add("warn","Estoque contado com custo zero","Quantidade contada sem valor: o item não pesa no CMV.",zero,"Informe o custo do item (custo padrão no cadastro ou compra lançada).");
- // 7. Itens que zeraram sem compra.
- const gone=r.rows.filter(x=>x.oq>0&&x.cq===0&&x.pq===0&&x.tiq===0&&x.ov>=50).sort((a,b)=>b.ov-a.ov);
- add("info","Itens que zeraram sem compra no período","Tinham estoque no início e foram a zero sem nenhuma compra: confirme se foram mesmo consumidos (ou faltou contar).",
-  gone.map(x=>[itemLink(x),num(x.oq)+" "+e(unit(x))+" ("+money(x.ov)+") → 0"]),"Confira na contagem final se o item foi contado.");
- // 8. Itens que pesam muito no CMV.
- const heavy=t.cmv>0?r.rows.filter(x=>x.cmv/t.cmv>=ANALISE.pesoItem).sort((a,b)=>b.cmv-a.cmv):[];
- add("info","Itens que mais pesam no CMV","Cada um responde por mais de "+Math.round(ANALISE.pesoItem*100)+"% do CMV. Vale conferir contagem e custo primeiro neles.",
-  heavy.map(x=>[itemLink(x),money(x.cmv)+" · "+pct(x.cmv/t.cmv)+" do CMV"]),"");
- // 9. Faturamento e faixa do CMV.
- const rev=r.revenue,fat=[];
- if(!rev)fat.push(["Faturamento indisponível","Não foi possível ler as vendas do período."]);
- else{
-  if(rev.daysImported<rev.daysTotal)fat.push(["Dias sem vendas importadas",rev.daysImported+" de "+rev.daysTotal+" dias: o % do CMV fica distorcido."]);
-  const p=rev.net?t.cmv/rev.net:null;
-  if(p!=null&&(p<ANALISE.cmvFaixa[0]||p>ANALISE.cmvFaixa[1]))fat.push(["CMV fora da faixa esperada",pct(p)+" do faturamento (faixa de referência "+pct(ANALISE.cmvFaixa[0])+" a "+pct(ANALISE.cmvFaixa[1])+")."]);
- }
- add("warn","Faturamento e percentual","Pontos que afetam a leitura do CMV sobre o faturamento.",fat,"");
+ for(const x of r.rows)for(const [which,label] of [["open","Inicial"],["close","Final"]]){const l=r.lines[which].get(x.item_id);if(l&&Number(l.counted_quantity)>0&&!(Number(l.unit_cost)>0))zero.push([itemLink(x),label,num(l.counted_quantity)])}
+ checks.cost.push({sev:"warn",title:"Estoque contado com custo zero",why:"Quantidade contada sem valor: o item não pesa no CMV.",fix:"Informe o custo (custo padrão no cadastro ou compra lançada).",
+  cols:[{label:"Item"},{label:"Estoque"},{label:"Qtd",num:true}],rows:zero});
 
- const total=groups.reduce((s,g)=>s+g.rows.length,0),crit=groups.filter(g=>g.tone==="danger").reduce((s,g)=>s+g.rows.length,0);
- const ico={danger:"alert",warn:"alert",info:"info"};
- const body='<div class="mov-wrap an-wrap"><p class="an-sum">'+(total?'<strong>'+total+'</strong> ponto(s) de atenção'+(crit?' · <span class="text-danger">'+crit+' importante(s)</span>':''):'<strong>Nenhum ponto de atenção</strong> encontrado.')+'</p>'+
-  groups.map(g=>'<section class="mov-group an-group an-'+g.tone+(g.rows.length?'':' an-ok')+'"><header class="mov-head"><strong>'+icon(g.rows.length?ico[g.tone]:"check",15)+' '+e(g.title)+'</strong><span>'+(g.rows.length?g.rows.length:"ok")+'</span></header>'+
-   (g.rows.length?'<p class="an-why">'+e(g.why)+(g.fix?' <b>'+e(g.fix)+'</b>':'')+'</p><ul class="mov-list">'+g.rows.slice(0,50).map(([a,b])=>'<li><div>'+a+'</div><div class="an-det">'+b+'</div></li>').join("")+(g.rows.length>50?'<li class="muted">… e mais '+(g.rows.length-50)+'</li>':'')+'</ul>':'')+'</section>').join("")+'</div>';
+ // ---- Consumo dos itens
+ const neg=r.rows.filter(x=>x.cmv<=-ANALISE.cmvNegativoMin).sort((a,b)=>a.cmv-b.cmv);
+ checks.cons.push({sev:"danger",title:"Itens com CMV negativo",why:"O estoque final valeu mais que inicial + compras + transferências: falta lançar compra/transferência, ou a contagem (quantidade ou custo) está errada.",fix:"Procure nota pendente do item ou revise as contagens.",
+  cols:[{label:"Item"},{label:"Inicial",num:true},{label:"Compras",num:true},{label:"Final",num:true},{label:"Consumo",num:true},{label:"CMV",num:true}],
+  rows:neg.map(x=>[itemLink(x),num(x.oq),num(x.pq),num(x.cq),n0(num(round2(x.oq+x.pq+x.tiq-x.toq-x.cq))),'<strong class="text-danger">'+money(x.cmv)+'</strong>']),impact:round2(-neg.reduce((s,x)=>s+x.cmv,0))});
+ const gone=r.rows.filter(x=>x.oq>0&&x.cq===0&&x.pq===0&&x.tiq===0&&x.ov>=50).sort((a,b)=>b.ov-a.ov);
+ checks.cons.push({sev:"info",title:"Itens que zeraram sem compra",why:"Tinham estoque no início e foram a zero sem nenhuma compra no período: confirme se foram consumidos ou se faltou contar.",fix:"Confira se o item foi contado na contagem final.",
+  cols:[{label:"Item"},{label:"Inicial",num:true},{label:"Valor",num:true}],rows:gone.map(x=>[itemLink(x),num(x.oq),money(x.ov)])});
+ const heavy=t.cmv>0?r.rows.filter(x=>x.cmv/t.cmv>=ANALISE.pesoItem).sort((a,b)=>b.cmv-a.cmv):[];
+ checks.cons.push({sev:"info",title:"Itens que mais pesam no CMV",why:"Cada um responde por mais de "+Math.round(ANALISE.pesoItem*100)+"% do CMV: comece a conferência por eles.",fix:"",
+  cols:[{label:"Item"},{label:"Consumo",num:true},{label:"CMV",num:true},{label:"% do CMV",num:true}],
+  rows:heavy.map(x=>[itemLink(x),num(round2(x.oq+x.pq+x.tiq-x.toq-x.cq)),money(x.cmv),pct(x.cmv/t.cmv)])});
+
+ // ---- Faturamento
+ const rev=r.revenue;
+ checks.fat.push({sev:"warn",title:"Dias sem vendas importadas",why:"Sem todos os dias, o percentual do CMV sobre o faturamento fica distorcido.",fix:"Importe as vendas que faltam em Financeiro › Faturamento.",
+  cols:[{label:"Situação"},{label:"Dias",num:true}],rows:!rev?[["Faturamento indisponível","—"]]:rev.daysImported<rev.daysTotal?[["Importados",rev.daysImported+" de "+rev.daysTotal]]:[]});
+ const p=rev?.net?t.cmv/rev.net:null;
+ checks.fat.push({sev:"warn",title:"CMV fora da faixa de referência",why:"Faixa de referência: "+pct(ANALISE.cmvFaixa[0])+" a "+pct(ANALISE.cmvFaixa[1])+" do faturamento.",fix:"Valores muito fora costumam vir dos pontos acima (notas pendentes, custos).",
+  cols:[{label:"CMV"},{label:"Faturamento",num:true},{label:"%",num:true}],rows:p!=null&&(p<ANALISE.cmvFaixa[0]||p>ANALISE.cmvFaixa[1])?[[money(t.cmv),money(rev.net),pct(p)]]:[]});
+
+ // ---- Montagem
+ const SECS=[["docs","receipt","Documentos fora do cálculo"],["cost","cash","Custos e preços"],["cons","box","Consumo dos itens"],["fat","chart","Faturamento"]];
+ const all=Object.values(checks).flat();
+ const cnt=s=>all.filter(c=>c.sev===s).reduce((a,c)=>a+c.rows.length,0);
+ const sevLabel={danger:"Importante",warn:"Atenção",info:"Informativo"};
+ const card=c=>'<details class="an-check an-'+c.sev+'"'+(c.sev==="danger"||c.rows.length<=8?" open":"")+'><summary><span class="an-chip an-'+c.sev+'">'+sevLabel[c.sev]+'</span><span class="an-title">'+e(c.title)+'</span>'+
+   (c.impact?'<span class="an-impact">'+money(c.impact)+'</span>':'')+'<span class="an-count">'+c.rows.length+'</span></summary>'+
+   '<div class="an-body"><p class="an-why">'+e(c.why)+(c.fix?'<span class="an-fix">'+icon("check",13)+e(c.fix)+'</span>':'')+'</p>'+
+   '<div class="table-wrap"><table class="table an-table"><thead><tr>'+c.cols.map(k=>'<th class="'+(k.num?"num":"")+'">'+e(k.label)+'</th>').join("")+'</tr></thead><tbody>'+
+   c.rows.slice(0,100).map(row=>'<tr>'+row.map((v,i)=>'<td class="'+(c.cols[i]?.num?"num":"")+'" data-label="'+e(c.cols[i]?.label||"")+'">'+v+'</td>').join("")+'</tr>').join("")+
+   (c.rows.length>100?'<tr><td colspan="'+c.cols.length+'" class="muted">… e mais '+(c.rows.length-100)+'</td></tr>':'')+'</tbody></table></div></div></details>';
+ const body='<div class="an-wrap">'+
+  '<div class="an-kpis">'+
+   '<div class="an-kpi an-danger"><small>Importantes</small><strong>'+cnt("danger")+'</strong></div>'+
+   '<div class="an-kpi an-warn"><small>Atenção</small><strong>'+cnt("warn")+'</strong></div>'+
+   '<div class="an-kpi an-info"><small>Informativos</small><strong>'+cnt("info")+'</strong></div>'+
+   '<div class="an-kpi"><small>CMV do período</small><strong>'+money(t.cmv)+'</strong>'+(p!=null?'<span>'+pct(p)+' do faturamento</span>':'')+'</div>'+
+  '</div>'+
+  SECS.map(([k,ic,label])=>{
+   const list=checks[k],withRows=list.filter(c=>c.rows.length),ok=list.filter(c=>!c.rows.length);
+   const n=withRows.reduce((a,c)=>a+c.rows.length,0);
+   return '<section class="an-sec"><header class="an-sec-head">'+icon(ic,18)+'<h3>'+e(label)+'</h3><span class="an-sec-n'+(n?"":" ok")+'">'+(n?n+" ponto(s)":"tudo certo")+'</span></header>'+
+    withRows.map(card).join("")+
+    (ok.length?'<ul class="an-oklist">'+ok.map(c=>'<li>'+icon("check",14)+e(c.title)+'</li>').join("")+'</ul>':'')+'</section>';
+  }).join("")+'</div>';
  const m=openModal({title:"Análise completa · CMV de "+dateBR(r.c1.count_date)+" a "+dateBR(r.c2.count_date),body,wide:true});
+ document.querySelector(".overlay-modal:last-of-type .dialog")?.classList.add("dialog-xl");
  document.querySelectorAll("[data-close-modal]").forEach(a=>a.addEventListener("click",()=>m.close()));
  document.querySelectorAll("[data-an-item]").forEach(a=>a.addEventListener("click",ev=>{ev.preventDefault();const x=r.rows.find(y=>y.item_id===a.dataset.anItem);if(x)movementsModal(ctx,r,x,"all")}));
 }
