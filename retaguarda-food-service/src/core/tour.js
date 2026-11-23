@@ -94,7 +94,7 @@ const SCREENS={
   {find:cardT("Notas pendentes"),title:"Notas pendentes de entrada",text:"Notas lançadas que ainda não entraram no estoque. Enquanto pendentes, ficam fora do CMV."}
  ],
  "loja:faturamento":[
-  {title:"Faturamento",text:"Vendas do caixa (Degust), importadas sozinhas todo dia às 6h."},
+  {title:"Faturamento",text:"Vendas do caixa (Degust), importadas automaticamente todo dia às 6h."},
   {find:()=>$("#content [data-q]")?.closest(".card"),title:"Período",text:"Escolha as datas ou use os atalhos (este mês, mês passado, últimos 7 dias)."},
   {sel:btn("import"),title:"Importar vendas",text:"Busca de novo as vendas do período no Degust. Use se algum dia ficou faltando."},
   {find:cardT("Resumo do período"),title:"Resumo do período",text:"Vendas, bruto, descontos, líquido e ticket médio. O líquido é o usado no CMV e nos gráficos."},
@@ -208,7 +208,7 @@ function generalSteps(area){
  ];
  const loja=[
   {sel:'#nav a[href$="/inicio"]',side:"right",title:"Início",text:"Resumo da loja: faturamento do mês com a projeção, comparação com o ano anterior, CMV de cada período e notas que ainda não deram entrada."},
-  {sel:grp("Financeiro"),side:"right",title:"Financeiro · Faturamento",text:"Vendas do caixa (Degust), importadas sozinhas todo dia às 6h: por dia, produtos e formas de pagamento."},
+  {sel:grp("Financeiro"),side:"right",title:"Financeiro · Faturamento",text:"Vendas do caixa (Degust), importadas automaticamente todo dia às 6h: por dia, produtos e formas de pagamento."},
   {sel:grp("Estoque"),side:"right",title:"Estoque",text:"Contagem (inventário por listas), Listas, Transferências entre lojas e Perdas."},
   {sel:grp("Compras"),side:"right",title:"Compras",text:"Pedidos de compra com sugestão pelo consumo e Notas fiscais, que ao dar entrada contam no estoque e no CMV."},
   {sel:grp("Análise"),side:"right",title:"Análise · CMV",text:"Escolha duas contagens e veja o CMV com a memória de cálculo e a Análise completa."}
