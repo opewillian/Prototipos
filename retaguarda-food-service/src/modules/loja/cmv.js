@@ -139,8 +139,7 @@ function memoryView(ctx,r){
     '<li class="total"><span class="label">CMV sobre o faturamento</span><strong>'+(r.revenue.net?pct(t.cmv/r.revenue.net):'—')+'</strong></li>':'')+
    '<li><span class="muted">Perdas registradas (já incluídas no CMV)</span><strong class="text-warn">'+money(t.losses)+'</strong></li>'+
    (r.revenue?'<li><span class="muted">Perdas sobre o faturamento</span><strong class="text-warn">'+(r.revenue.net?pct(t.losses/r.revenue.net):'—')+'</strong></li>':'')+
-   '<li><span class="muted">Documentos de</span><strong>'+dateBR(r.from)+' a '+dateBR(r.to)+'</strong></li>'+
-   '<li><span class="muted">Período</span><strong>'+r.days+' dias</strong></li></ul>',{flush:true})+
+   '</ul>',{flush:true})+
   card("Itens · memória de cálculo",'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item")+'</div>'+dataTable([
    {label:"Item",render:x=>'<span class="strong">'+e(x.item.name)+'</span><small class="sub">'+e(x.item.base_unit||"")+'</small>'},
    {label:"Inicial",cls:"num",render:x=>num(x.oq)+'<small class="sub">'+money(x.ov)+'</small>'},
@@ -159,7 +158,7 @@ async function preview(ctx,s,en){
  const exists=(await list("cmv_closings",{select:"id",eq:{store_id:ctx.storeId,start_count_id:s,end_count_id:en}}))[0];
  const canSave=r.c1.status==="finalized"&&r.c2.status==="finalized";
  ctx.el.innerHTML=backLink(ctx.base+"/cmv","CMV")+
-  '<div class="doc-head"><div><div class="doc-title"><h1>CMV de '+dateBR(r.c1.count_date)+' a '+dateBR(r.c2.count_date)+'</h1><span class="pill pill-warn">Prévia</span></div></div>'+
+  '<div class="doc-head"><div><div class="doc-title"><h1>CMV de '+dateBR(r.c1.count_date)+' a '+dateBR(r.c2.count_date)+'</h1></div></div>'+
   '<div class="page-actions">'+(exists?btn("Ver fechamento salvo",{variant:"secondary",href:ctx.base+"/cmv/"+exists.id}):canSave?btn("Salvar fechamento",{variant:"ok",icon:"check",attrs:"data-save"}):'')+'</div></div>'+
   memoryView(ctx,r);
  bindMemory(ctx);

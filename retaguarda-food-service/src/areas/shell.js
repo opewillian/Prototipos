@@ -14,7 +14,6 @@ function setPref(k,v){try{localStorage.setItem(k,v)}catch{}}
 export function shops(app){return app.stores.filter(s=>s.store_type==="operational"&&storeAllowed(app,s.id))}
 
 export function appShell(app){
- const name=app.profile?.display_name||app.session?.user?.email||"";
  const collapsed=getPref(COLLAPSE_KEY)==="1";
  return '<div class="app'+(collapsed?" collapsed":"")+'" id="shell">'+
   '<aside class="sb" aria-label="Menu principal"><a class="sb-brand" href="#/" title="Início"><span class="sb-logo"><img src="'+LOGO+'" alt="MFT"></span><span class="nav-label"><strong>Retaguarda</strong><small data-area-label></small></span></a>'+
@@ -27,7 +26,7 @@ export function appShell(app){
   '<div class="tb-field tb-store"><span class="tb-label">Loja</span><div class="combo" id="store-combo"><button type="button" class="combo-btn" id="store-btn" aria-haspopup="listbox" aria-expanded="false"></button>'+
   '<div class="combo-pop" id="store-pop" hidden><label class="combo-search">'+icon("search",15)+'<input id="store-q" placeholder="Buscar loja por nome ou código" autocomplete="off"></label><ul class="combo-list" role="listbox" id="store-list"></ul></div></div></div>'+
   '<span class="tb-spacer"></span>'+
-  '<div class="tb-user" title="'+e(name)+'"><span class="tb-user-name">'+e(name)+'</span></div>'+
+
   '</header><main class="content" id="content"></main></div><div class="sb-scrim" data-close-nav></div></div>';
 }
 

@@ -35,7 +35,7 @@ export async function render(ctx){
  const payTotal=byPay.reduce((s,p)=>s+N(p.amount),0);
  const canImport=!!ctx.app.isAdmin&&!!store.degust_code;
 
- ctx.el.innerHTML=pageHead("Faturamento","Vendas da loja importadas do Degust (Linx), por dia de caixa.",
+ ctx.el.innerHTML=pageHead("Faturamento","",
    canImport?btn("Importar vendas do período",{icon:"refresh",attrs:"data-import"}):"")+
   '<section class="card"><div class="toolbar" style="padding:14px 18px;gap:10px;flex-wrap:wrap;align-items:flex-end">'+
    '<label class="field" style="margin:0"><span class="field-label">De</span><input class="control" type="date" name="from" value="'+e(r.from)+'"></label>'+
@@ -50,8 +50,7 @@ export async function render(ctx){
    '<li><span>− Descontos</span><strong>'+money(round2(t.discount))+'</strong></li>'+
    '<li class="total"><span class="label">Faturamento líquido</span><strong>'+money(round2(t.net))+'</strong></li>'+
    '<li><span class="muted">Ticket médio</span><strong>'+money(ticket)+'</strong></li>'+
-   '<li><span class="muted">Vendas canceladas (fora dos valores)</span><strong>'+num(t.cancelled,0)+'</strong></li>'+
-   '<li><span class="muted">Período</span><strong>'+dateBR(r.from)+' a '+dateBR(r.to)+' · '+imported.size+' de '+allDays.length+' dia(s) importado(s)</strong></li></ul>',{flush:true})+
+   '<li><span class="muted">Vendas canceladas (fora dos valores)</span><strong>'+num(t.cancelled,0)+'</strong></li></ul>',{flush:true})+
   card("Por dia",dataTable([
    {label:"Dia",render:d=>'<span class="strong">'+dateBR(d)+'</span><small class="sub">'+weekday(d)+'</small>'},
    {label:"Vendas",cls:"num",render:d=>dayMap.has(d)?num(N(dayMap.get(d).sales),0):(imported.has(d)?'0':'<span class="muted">não importado</span>')},
