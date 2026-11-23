@@ -6,6 +6,7 @@
 // Só itens marcados "compõe CMV". Perdas já reduziram o estoque final: são mostradas à parte, sem subtrair de novo.
 // Memória de cálculo clicável: o nome do item abre todas as movimentações dele (por categoria e data); cada número abre o
 // detalhe daquela categoria. Estoque inicial/final de contagem em RASCUNHO abre a edição da quantidade (grava e recalcula).
+// Botão "Análise completa": popin com os pontos de atenção (regras em ANALISE).
 import {list,get,insert,insertMany,update,remove,supabase} from "../../core/db.js";
 import {e,money,num,dateBR,dateTimeBR,round2,pct,addDays,daysBetween,today,parseNum} from "../../core/format.js";
 import {icon} from "../../core/icons.js";
@@ -236,7 +237,99 @@ function editCountQty(ctx,r,x,which){
   }});
 }
 
+// ---------------------------------------------------------------- Análise completa (pontos de atenção do CMV)
+// Regras ajustáveis (limites usados para apontar divergências).
+const ANALISE={
+ custoDiverge:1.5,      // custo da contagem x custo médio das compras do período: 50% acima ou abaixo
+ precoCompraDiverge:1.5,// linha de nota x mediana das compras do mesmo item no período
+ cmvNegativoMin:10,     // CMV do item abaixo de −R$ 10 (consumo negativo)
+ pesoItem:0.05,         // item com mais de 5% do CMV total
+ cmvFaixa:[0.15,0.35]   // CMV sobre o faturamento esperado entre 15% e 35%
+};
+function analysisModal(ctx,r){
+ const t=r.totals,unit=x=>x.item.base_unit||"";
+ const href=doc=>"#"+String(ctx.base).replace(/^#/,"")+"/"+doc;
+ const ratio=(a,b)=>a>0&&b>0?Math.max(a/b,b/a):Infinity;
+ const purchases=x=>(r.mov.get(x.item_id)||[]).filter(m=>m.cat==="purchase"&&m.qty>0);
+ const avgBuy=x=>{const ps=purchases(x),q=ps.reduce((s,m)=>s+m.qty,0);return q>0?ps.reduce((s,m)=>s+m.total,0)/q:null};
+ const median=a=>{const s=a.slice().sort((x,y)=>x-y),k=s.length>>1;return s.length%2?s[k]:(s[k-1]+s[k])/2};
+ const groups=[];
+ const add=(tone,title,why,rows,fix)=>groups.push({tone,title,why,rows,fix});
+ const itemLink=x=>'<a href="#" data-an-item="'+e(x.item_id)+'">'+e(x.item.name)+'</a>';
+
+ // 1. Documentos que ficaram fora do cálculo.
+ add("danger","Notas pendentes de entrada no período","Entraram na loja (data de entrada no período) mas não foram recebidas: o valor não está nas compras do CMV.",
+  r.pending.invs.sort((a,b)=>String(a.entry_date).localeCompare(String(b.entry_date))).map(i=>['<a href="'+e(href("notas/"+i.id))+'" data-close-modal>Nota nº '+e(i.invoice_number)+'</a>',"Entrada "+dateBR(i.entry_date)]),
+  "Abra a nota, confira o de-para e dê entrada.");
+ add("warn","Transferências e perdas em rascunho no período","Não foram emitidas/registradas, então não entram no CMV.",
+  [...r.pending.trs.map(x=>['<a href="'+e(href("transferencias/"+x.id))+'" data-close-modal>Transferência '+e(x.number||"")+'</a>',dateBR(x.transfer_date||x.issued_at)]),
+   ...r.pending.losses.map(x=>['<a href="'+e(href("perdas/"+x.id))+'" data-close-modal>Perda</a>',dateBR(x.loss_date)+(x.reason?" · "+e(x.reason):"")])],
+  "Emita a transferência ou registre a perda, ou cancele se não vale.");
+ // 2. Contagens.
+ const drafts=[r.c1,r.c2].filter(c=>c.status==="draft");
+ add("warn","Contagens em rascunho",'Os números podem mudar até a contagem ser finalizada; o fechamento só pode ser salvo com as duas finalizadas.',
+  drafts.map(c=>['<a href="'+e(href("contagem/"+c.id))+'" data-close-modal>Contagem '+e(c.display_id)+'</a>',dateBR(c.count_date)]),"Revise e finalize as contagens.");
+ // 3. Custos da contagem muito diferentes das compras do período.
+ const costRows=[];
+ for(const x of r.rows){
+  const ab=avgBuy(x);if(!ab)continue;
+  for(const [which,label] of [["open","inicial"],["close","final"]]){
+   const l=r.lines[which].get(x.item_id);if(!l||!(Number(l.counted_quantity)>0))continue;
+   const c=Number(l.unit_cost);
+   if(ratio(c,ab)>=ANALISE.custoDiverge)costRows.push([itemLink(x),"Estoque "+label+": "+money(c)+"/"+e(unit(x))+" × compras "+money(round2(ab))+"/"+e(unit(x)),Math.abs(Number(l.counted_quantity)*(c-ab))]);
+  }
+ }
+ costRows.sort((a,b)=>b[2]-a[2]);
+ add("danger","Custo da contagem muito diferente do custo de compra","O custo unitário usado no estoque está mais de "+Math.round((ANALISE.custoDiverge-1)*100)+"% acima ou abaixo da média das compras do período. Costuma ser unidade errada (pacote × kg) ou preço digitado errado.",
+  costRows.map(([a,b,v])=>[a,b+'<small class="sub">impacto estimado '+money(round2(v))+'</small>']),"Confira a unidade e o custo na contagem (clique no estoque do item na memória de cálculo).");
+ // 4. Linhas de nota com preço fora do padrão do próprio item.
+ const priceRows=[];
+ for(const x of r.rows){
+  const ps=purchases(x);if(ps.length<2)continue;
+  const med=median(ps.map(m=>m.total/m.qty));
+  for(const m of ps){const u=m.total/m.qty;if(ratio(u,med)>=ANALISE.precoCompraDiverge)priceRows.push([itemLink(x),'<a href="'+e(href(m.doc))+'" data-close-modal>'+e(m.label)+'</a> ('+dateBR(m.date)+'): '+money(round2(u))+"/"+e(unit(x))+" × usual "+money(round2(med)),Math.abs(m.qty*(u-med))])}
+ }
+ priceRows.sort((a,b)=>b[2]-a[2]);
+ add("warn","Compras com preço fora do padrão","Linha de nota com custo unitário muito diferente das outras compras do mesmo item no período (pode ser fator do de-para errado).",
+  priceRows.map(([a,b])=>[a,b]),"Abra a nota e confira o de-para (fator de conversão) do item.");
+ // 5. CMV negativo por item.
+ const neg=r.rows.filter(x=>x.cmv<=-ANALISE.cmvNegativoMin).sort((a,b)=>a.cmv-b.cmv);
+ add("danger","Itens com CMV negativo","O estoque final ficou maior que inicial + compras + transferências: falta lançar compra/transferência ou a contagem está errada.",
+  neg.map(x=>[itemLink(x),"CMV "+money(x.cmv)+" · consumo "+num(round2(x.oq+x.pq+x.tiq-x.toq-x.cq))+" "+e(unit(x))]),"Procure nota pendente do item ou revise as contagens.");
+ // 6. Custo zerado.
+ const zero=[];
+ for(const x of r.rows)for(const [which,label] of [["open","inicial"],["close","final"]]){const l=r.lines[which].get(x.item_id);if(l&&Number(l.counted_quantity)>0&&!(Number(l.unit_cost)>0))zero.push([itemLink(x),"Estoque "+label+" com "+num(l.counted_quantity)+" "+e(unit(x))+" e custo zero"])}
+ add("warn","Estoque contado com custo zero","Quantidade contada sem valor: o item não pesa no CMV.",zero,"Informe o custo do item (custo padrão no cadastro ou compra lançada).");
+ // 7. Itens que zeraram sem compra.
+ const gone=r.rows.filter(x=>x.oq>0&&x.cq===0&&x.pq===0&&x.tiq===0&&x.ov>=50).sort((a,b)=>b.ov-a.ov);
+ add("info","Itens que zeraram sem compra no período","Tinham estoque no início e foram a zero sem nenhuma compra: confirme se foram mesmo consumidos (ou faltou contar).",
+  gone.map(x=>[itemLink(x),num(x.oq)+" "+e(unit(x))+" ("+money(x.ov)+") → 0"]),"Confira na contagem final se o item foi contado.");
+ // 8. Itens que pesam muito no CMV.
+ const heavy=t.cmv>0?r.rows.filter(x=>x.cmv/t.cmv>=ANALISE.pesoItem).sort((a,b)=>b.cmv-a.cmv):[];
+ add("info","Itens que mais pesam no CMV","Cada um responde por mais de "+Math.round(ANALISE.pesoItem*100)+"% do CMV. Vale conferir contagem e custo primeiro neles.",
+  heavy.map(x=>[itemLink(x),money(x.cmv)+" · "+pct(x.cmv/t.cmv)+" do CMV"]),"");
+ // 9. Faturamento e faixa do CMV.
+ const rev=r.revenue,fat=[];
+ if(!rev)fat.push(["Faturamento indisponível","Não foi possível ler as vendas do período."]);
+ else{
+  if(rev.daysImported<rev.daysTotal)fat.push(["Dias sem vendas importadas",rev.daysImported+" de "+rev.daysTotal+" dias: o % do CMV fica distorcido."]);
+  const p=rev.net?t.cmv/rev.net:null;
+  if(p!=null&&(p<ANALISE.cmvFaixa[0]||p>ANALISE.cmvFaixa[1]))fat.push(["CMV fora da faixa esperada",pct(p)+" do faturamento (faixa de referência "+pct(ANALISE.cmvFaixa[0])+" a "+pct(ANALISE.cmvFaixa[1])+")."]);
+ }
+ add("warn","Faturamento e percentual","Pontos que afetam a leitura do CMV sobre o faturamento.",fat,"");
+
+ const total=groups.reduce((s,g)=>s+g.rows.length,0),crit=groups.filter(g=>g.tone==="danger").reduce((s,g)=>s+g.rows.length,0);
+ const ico={danger:"alert",warn:"alert",info:"info"};
+ const body='<div class="mov-wrap an-wrap"><p class="an-sum">'+(total?'<strong>'+total+'</strong> ponto(s) de atenção'+(crit?' · <span class="text-danger">'+crit+' importante(s)</span>':''):'<strong>Nenhum ponto de atenção</strong> encontrado.')+'</p>'+
+  groups.map(g=>'<section class="mov-group an-group an-'+g.tone+(g.rows.length?'':' an-ok')+'"><header class="mov-head"><strong>'+icon(g.rows.length?ico[g.tone]:"check",15)+' '+e(g.title)+'</strong><span>'+(g.rows.length?g.rows.length:"ok")+'</span></header>'+
+   (g.rows.length?'<p class="an-why">'+e(g.why)+(g.fix?' <b>'+e(g.fix)+'</b>':'')+'</p><ul class="mov-list">'+g.rows.slice(0,50).map(([a,b])=>'<li><div>'+a+'</div><div class="an-det">'+b+'</div></li>').join("")+(g.rows.length>50?'<li class="muted">… e mais '+(g.rows.length-50)+'</li>':'')+'</ul>':'')+'</section>').join("")+'</div>';
+ const m=openModal({title:"Análise completa · CMV de "+dateBR(r.c1.count_date)+" a "+dateBR(r.c2.count_date),body,wide:true});
+ document.querySelectorAll("[data-close-modal]").forEach(a=>a.addEventListener("click",()=>m.close()));
+ document.querySelectorAll("[data-an-item]").forEach(a=>a.addEventListener("click",ev=>{ev.preventDefault();const x=r.rows.find(y=>y.item_id===a.dataset.anItem);if(x)movementsModal(ctx,r,x,"all")}));
+}
+
 function bindMemory(ctx,r){
+ ctx.el.querySelector("[data-analise]")?.addEventListener("click",()=>analysisModal(ctx,r));
  const q=ctx.el.querySelector("#q");q?.addEventListener("input",()=>{const t=searchKey(q.value).trim();ctx.el.querySelectorAll("tr[data-search]").forEach(x=>x.hidden=!!t&&!x.dataset.search.includes(t))});
  const canEditCounts=storePerm(ctx.app,ctx.storeId,"counts").e;
  // Compras recebidas: abre a lista das notas do período (valor = itens que compõem o CMV).
@@ -269,7 +362,7 @@ async function preview(ctx,s,en){
  const canSave=r.c1.status==="finalized"&&r.c2.status==="finalized";
  ctx.el.innerHTML=backLink(ctx.base+"/cmv","CMV")+
   '<div class="doc-head"><div><div class="doc-title"><h1>CMV de '+dateBR(r.c1.count_date)+' a '+dateBR(r.c2.count_date)+'</h1></div></div>'+
-  '<div class="page-actions">'+(exists?btn("Ver fechamento salvo",{variant:"secondary",href:ctx.base+"/cmv/"+exists.id}):canSave?btn("Salvar fechamento",{variant:"ok",icon:"check",attrs:"data-save"}):'')+'</div></div>'+
+  '<div class="page-actions">'+btn("Análise completa",{variant:"secondary",icon:"alert",attrs:"data-analise"})+(exists?btn("Ver fechamento salvo",{variant:"secondary",href:ctx.base+"/cmv/"+exists.id}):canSave?btn("Salvar fechamento",{variant:"ok",icon:"check",attrs:"data-save"}):'')+'</div></div>'+
   memoryView(ctx,r);
  bindMemory(ctx,r);
  ctx.el.querySelector("[data-save]")?.addEventListener("click",async ev=>{
@@ -293,7 +386,7 @@ async function detail(ctx,id){
  const changed=Math.abs(r.totals.cmv-Number(c.cmv_value))>=0.01;
  ctx.el.innerHTML=backLink(ctx.base+"/cmv","CMV")+
   '<div class="doc-head"><div><div class="doc-title"><h1>CMV de '+dateBR(c.start_date)+' a '+dateBR(c.end_date)+'</h1><span class="pill pill-ok">Fechado</span></div><p class="muted" style="margin:6px 0 0">Fechado em '+dateTimeBR(c.closed_at)+'</p></div>'+
-  '<div class="page-actions">'+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+'</div></div>'+
+  '<div class="page-actions">'+btn("Análise completa",{variant:"secondary",icon:"alert",attrs:"data-analise"})+btn("Imprimir",{variant:"secondary",icon:"printer",attrs:"data-print"})+'</div></div>'+
   (changed?alertBox("Documentos do período mudaram depois do fechamento: o cálculo atual dá "+money(r.totals.cmv)+".","warn"):'')+memoryView(ctx,r);
  bindMemory(ctx,r);ctx.el.querySelector("[data-print]").onclick=()=>window.print();
 }
