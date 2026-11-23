@@ -30,16 +30,7 @@ export async function render(ctx){
  if(!ctx.isCurrent())return;
  const sup=byId(suppliers);
  const tot=id=>round2(lines.filter(l=>l.invoice_id===id).reduce((s,l)=>s+Number(l.line_total||0),0));
- const month=today().slice(0,7);
- const monthTotal=invoices.filter(i=>i.status==="received"&&String(i.entry_date).startsWith(month)).reduce((s,i)=>s+(i.total_amount!=null?Number(i.total_amount):tot(i.id)),0);
- const openPays=pays.filter(p=>payState(p)!=="paid");
- const due7=openPays.filter(p=>p.due_date>=today()&&p.due_date<=addDays(today(),7));
- const overdue=openPays.filter(p=>payState(p)==="overdue");
  ctx.el.innerHTML=pageHead("Notas fiscais","Entradas de mercadoria, pagamentos e anexos da loja.",btn("Lançar nota",{icon:"plus",attrs:"data-new"}))+
-  '<div class="kpis">'+kpi("Compras recebidas no mês",money(monthTotal),"",{icon:"receipt"})+
-  kpi("Aguardando recebimento",invoices.filter(i=>i.status==="pending").length,"Notas lançadas sem entrada no estoque",{icon:"box",tone:"warn"})+
-  kpi("A vencer em 7 dias",money(due7.reduce((s,p)=>s+Number(p.amount||0),0)),due7.length+" parcela(s)",{icon:"calendar",tone:"info"})+
-  kpi("Vencidas",money(overdue.reduce((s,p)=>s+Number(p.amount||0),0)),overdue.length+" parcela(s)",{icon:"alert",tone:overdue.length?"warn":"ok"})+'</div>'+
   '<section class="card">'+(invoices.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Número ou fornecedor")+
    '<select class="control" id="f-st"><option value="">Todas</option><option value="pending">Pendentes</option><option value="received">Recebidas</option><option value="cancelled">Canceladas</option></select></div>'+dataTable([
    {label:"Nota",render:i=>'<span class="strong">Nº '+e(i.invoice_number)+'</span><small class="sub">'+e(sup.get(i.supplier_id)?.name||"Sem fornecedor")+'</small>'},

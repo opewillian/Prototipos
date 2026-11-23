@@ -95,13 +95,7 @@ export async function render(ctx){
  ]);
  if(!ctx.isCurrent())return;
  const counts=countsAll.filter(c=>c.status!=="cancelled");
- const last=closings[0];
- const avg=closings.length?round2(closings.reduce((s,c)=>s+Number(c.cmv_value||0),0)/closings.length):0;
  ctx.el.innerHTML=pageHead("CMV","Custo da mercadoria consumida entre duas contagens, com memória de cálculo por item.")+
-  '<div class="kpis">'+kpi("Último CMV",last?money(last.cmv_value):"—",last?dateBR(last.start_date)+" a "+dateBR(last.end_date):"Nenhum fechamento",{icon:"chart"})+
-  kpi("Média dos fechamentos",closings.length?money(avg):"—",closings.length+" fechamento(s)",{icon:"layers",tone:"info"})+
-  kpi("Perdas no último período",last?money(last.eligible_losses):"—",last&&Number(last.cmv_value)?pct(Number(last.eligible_losses)/Number(last.cmv_value))+" do CMV":"",{icon:"trash",tone:"warn"})+
-  kpi("Contagens disponíveis",counts.length,counts.filter(c=>c.status==="draft").length+" em rascunho",{icon:"clipboard",tone:"ok"})+'</div>'+
   card("Calcular CMV",counts.length<2?'<div style="padding:14px 18px">'+alertBox("São necessárias duas contagens (rascunho ou finalizadas) em datas diferentes para calcular o CMV.","info")+'</div>':
    '<div class="cal-wrap"><div class="cal-row"><button type="button" class="date-range" data-open aria-expanded="false">'+icon("calendar")+'<span data-range>Selecionar datas</span></button>'+
    btn("Calcular CMV",{icon:"chart",attrs:"data-go disabled"})+'</div>'+
