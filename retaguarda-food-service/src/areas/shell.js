@@ -6,6 +6,7 @@ import {LOGO} from "./access.js";
 import {matrizEnabled} from "./matriz/shell.js";
 import {hasMatrix,storeAllowed} from "../core/access.js";
 import {enabledModules} from "./loja/shell.js";
+import {startTour} from "../core/tour.js";
 
 const COLLAPSE_KEY="rfs-sidebar-collapsed";
 function getPref(k){try{return localStorage.getItem(k)}catch{return null}}
@@ -26,6 +27,7 @@ export function appShell(app){
   '<div class="tb-field tb-store"><span class="tb-label">Loja</span><div class="combo" id="store-combo"><button type="button" class="combo-btn" id="store-btn" aria-haspopup="listbox" aria-expanded="false"></button>'+
   '<div class="combo-pop" id="store-pop" hidden><label class="combo-search">'+icon("search",15)+'<input id="store-q" placeholder="Buscar loja por nome ou código" autocomplete="off"></label><ul class="combo-list" role="listbox" id="store-list"></ul></div></div></div>'+
   '<span class="tb-spacer"></span>'+
+  '<button type="button" class="tb-tour" data-tour title="Conheça o sistema em poucos passos">'+icon("info",16)+'<span>Tour</span></button>'+
 
   '</header><main class="content" id="content"></main></div><div class="sb-scrim" data-close-nav></div></div>';
 }
@@ -73,6 +75,7 @@ export function bindAppShell(root,app,{onStore,onEnv,onSignOut}){
  };
  root.querySelector("[data-close-nav]").onclick=()=>shell.classList.remove("nav-open");
  root.querySelectorAll("[data-signout]").forEach(b=>b.onclick=onSignOut);
+ root.querySelector("[data-tour]").onclick=()=>startTour(root);
  root.querySelector("#nav").addEventListener("click",ev=>{
   const t=ev.target.closest("[data-group-toggle]");
   if(t){
