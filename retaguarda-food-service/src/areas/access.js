@@ -7,8 +7,9 @@ import {hasMatrix,storeAllowed} from "../core/access.js";
 export const LOGO="./assets/brand/logo-mft.png";
 
 export function loginView({email="",error="",busy=false,recovery=false}={}){
- return '<main class="auth"><section class="auth-main">'+
+ return '<main class="auth"><section class="auth-main"><div class="auth-col">'+
   '<img class="auth-logo" src="'+LOGO+'" alt="MFT Gestão de Franquias">'+
+  '<div class="auth-box">'+
   '<h1>'+(recovery?"Recuperar acesso":"Bem-vindo à Retaguarda")+'</h1>'+
   '<p>'+(recovery?"Informe seu e-mail. Enviaremos um link para você definir uma nova senha.":"Entre com sua conta para acessar a Matriz ou a operação das suas lojas.")+'</p>'+
   (error?alertBox(error):'')+
@@ -17,17 +18,21 @@ export function loginView({email="",error="",busy=false,recovery=false}={}){
   (recovery?'':field("Senha",input("password","",{type:"password",required:true,attrs:'autocomplete="current-password"'})))+
   btn(busy?"Aguarde...":recovery?"Enviar link":"Entrar",{type:"submit",disabled:busy})+
   '<button type="button" class="btn btn-ghost" id="toggle-recovery">'+(recovery?"Voltar ao login":"Esqueci minha senha")+'</button>'+
-  '</form><div class="auth-foot">MFT Gestão de Franquias · Retaguarda Food Service</div></section>'+
-  '<aside class="auth-side" aria-hidden="true"><h2>Gestão de estoque, compras e CMV em um só lugar.</h2>'+
-  '<div class="auth-points"><div><strong>Contagem</strong><span>Inventário rápido por listas</span></div><div><strong>Compras</strong><span>Sugestão por consumo</span></div><div><strong>CMV</strong><span>Fechamento com memória de cálculo</span></div></div></aside></main>';
+  '</form></div><div class="auth-foot">MFT Gestão de Franquias · Retaguarda Food Service</div></div></section>'+
+  '<aside class="auth-side" aria-hidden="true"><div class="auth-side-in"><span class="auth-kicker">Retaguarda Food Service</span>'+
+  '<h2>Gestão de estoque, compras e CMV <span>em um só lugar.</span></h2>'+
+  '<ul class="auth-points">'+
+  [["clipboard","Contagem","Inventário rápido por listas"],["cart","Compras","Sugestão de pedido pelo consumo"],["chart","CMV","Fechamento com memória de cálculo"]]
+   .map(([i,t,d])=>'<li><span class="auth-ico">'+icon(i,18)+'</span><div><strong>'+t+'</strong><span>'+d+'</span></div></li>').join("")+
+  '</ul></div></aside></main>';
 }
 
 export function passwordResetView({error="",busy=false}={}){
- return '<main class="auth"><section class="auth-main"><img class="auth-logo" src="'+LOGO+'" alt="MFT Gestão de Franquias">'+
-  '<h1>Definir nova senha</h1><p>Escolha uma senha com pelo menos 8 caracteres.</p>'+(error?alertBox(error):'')+
+ return '<main class="auth"><section class="auth-main"><div class="auth-col"><img class="auth-logo" src="'+LOGO+'" alt="MFT Gestão de Franquias">'+
+  '<div class="auth-box"><h1>Definir nova senha</h1><p>Escolha uma senha com pelo menos 8 caracteres.</p>'+(error?alertBox(error):'')+
   '<form class="auth-form" id="reset-form" novalidate>'+field("Nova senha",input("password","",{type:"password",required:true,attrs:'autocomplete="new-password" minlength="8"'}))+
   field("Confirmar senha",input("confirm","",{type:"password",required:true,attrs:'autocomplete="new-password"'}))+
-  btn(busy?"Salvando...":"Salvar senha",{type:"submit",disabled:busy})+'</form></section><aside class="auth-side" aria-hidden="true"><h2>Acesso seguro.</h2></aside></main>';
+  btn(busy?"Salvando...":"Salvar senha",{type:"submit",disabled:busy})+'</form></div><div class="auth-foot">MFT Gestão de Franquias · Retaguarda Food Service</div></div></section><aside class="auth-side" aria-hidden="true"><div class="auth-side-in"><span class="auth-kicker">Retaguarda Food Service</span><h2>Acesso seguro.</h2></div></aside></main>';
 }
 
 export function userChip(app){
