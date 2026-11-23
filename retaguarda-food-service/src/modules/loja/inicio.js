@@ -14,7 +14,7 @@ import {loadSuppliers} from "../shared/catalog.js";
 import {computeCMV} from "./cmv.js";
 import {enabledModules} from "../../areas/loja/shell.js";
 
-const BRAND="#85071D",GRAY="#8E8E93",PROJ="#C2566A";
+const BRAND="#85071D",GRAY="#8E8E93",PROJ=BRAND;
 const MESES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 const ym=d=>String(d).slice(0,7);
 
@@ -44,7 +44,7 @@ export async function render(ctx){
  for(let i=1;i<=lastDay;i++){const dd=String(i).padStart(2,"0");dLabels.push(String(i));dVals.push(dayVal(Y+"-"+mm+"-"+dd))}
  const monthTotal=round2(dVals.reduce((s,v)=>s+(v||0),0));
  // Projeção (dias futuros do mês atual). A linha pontilhada começa no último dia com venda, para emendar na linha real.
- const fc=new Map(forecast.filter(f=>String(f.business_date).slice(0,10)>t).map(f=>[String(f.business_date).slice(0,10),Number(f.projected_net)]));
+ const fc=new Map(forecast.filter(f=>String(f.business_date).slice(0,10)>=t).map(f=>[String(f.business_date).slice(0,10),Number(f.projected_net)]));
  const dProj=dLabels.map((_,i)=>fc.get(Y+"-"+mm+"-"+String(i+1).padStart(2,"0"))??null);
  const fcMonth=round2(dProj.reduce((s,v)=>s+(v||0),0)),hasProj=fcMonth>0;
  if(hasProj){let k=dVals.length-1;while(k>=0&&dVals[k]==null)k--;if(k>=0&&dProj[k]==null)dProj[k]=dVals[k]}
