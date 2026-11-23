@@ -18,7 +18,8 @@
 //   • quem vê Faturamento ou CMV da loja → "resumo";
 //   • administrador da Matriz → todas as outras.
 // Ações (POST JSON {acao, ...}):
-//   "resumo"   → {storeId, de, ate}: dias, produtos e formas de pagamento do período (lido dos resumos no R2).
+//   "resumo"   → {storeId, de, ate, somenteDias?}: dias, produtos e formas de pagamento do período (lido dos resumos no R2);
+//                somenteDias:true devolve só o dia a dia (mais rápido, para gráficos).
 //   "importar" → {storeId, data}: busca o dia na Linx e grava arquivo + resumos no R2.
 //   "diario"   → para cada loja com código do Degust, reimporta os 3 dias anteriores.
 //   "resumir"  → {storeId, data, mes?}: refaz o resumo do dia a partir do arquivo já guardado (sem chamar a Linx);
@@ -198,7 +199,7 @@ async function rebuildMonth(storeId: string, ym: string) {
 const monthsBetween = (de: string, ate: string) => { const out: string[] = []; let y = +de.slice(0, 4), m = +de.slice(5, 7); const ey = +ate.slice(0, 4), em = +ate.slice(5, 7); while (y < ey || (y === ey && m <= em)) { out.push(y + "-" + String(m).padStart(2, "0")); if (++m > 12) { m = 1; y++; } } return out; };
 const lastDayOf = (ym: string) => ym + "-" + String(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate()).padStart(2, "0");
 // Resumo de um período: dia a dia + produtos + pagamentos. Mês inteiro usa o resumo do mês; mês parcial soma os dias.
-async function periodSummary(storeId: string, de: string, ate: string) {
+async function periodSummary(storeId: string, de: string, ate: string, onlyDays = false) {
   const months = monthsBetween(de, ate);
   if (months.length > 36) throw new Error("Período grande demais (máx. 36 meses).");
   const monthDocs = await Promise.all(months.map((ym) => r2GetJson<{ days: Omit<DaySum, "products" | "payments">[]; products: Prod[]; payments: Pay[] }>(keyMonthSum(storeId, ym))));
@@ -207,6 +208,7 @@ async function periodSummary(storeId: string, de: string, ate: string) {
     const doc = monthDocs[i]; if (!doc) return;
     const inRange = doc.days.filter((d) => d.business_date >= de && d.business_date <= ate);
     days.push(...inRange);
+    if (onlyDays) return;
     if (de <= ym + "-01" && ate >= lastDayOf(ym)) { prodLists.push(doc.products); payLists.push(doc.payments); return; }
     const sums = (await Promise.all(inRange.map((d) => r2GetJson<DaySum>(keyDaySum(storeId, d.business_date))))).filter(Boolean) as DaySum[];
     for (const s of sums) { prodLists.push(s.products); payLists.push(s.payments); }
@@ -282,7 +284,7 @@ Deno.serve(async (req) => {
       const { data: can, error } = await asUser.rpc("can_view_sales", { p_store: storeId });
       if (error) throw new Error("Permissão: " + error.message);
       if (!can) return json({ erro: "Sem acesso ao faturamento desta loja." }, 403);
-      return json({ ok: true, ...(await periodSummary(storeId, de, ate)) });
+      return json({ ok: true, ...(await periodSummary(storeId, de, ate, !!p.somenteDias)) });
     }
 
     const { data: m } = await admin.from("store_memberships").select("user_id")

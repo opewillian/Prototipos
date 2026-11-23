@@ -1,6 +1,7 @@
 // Loja · Início (repaginada em 23/11/2026):
 //   1) Faturamento dia a dia do mês atual (linha).
-//   2) Faturamento mês a mês (12 meses) + linha pontilhada com o mesmo mês do ano anterior.
+//   2) Faturamento mês a mês de janeiro a dezembro do ano + pontilhado com o ano anterior.
+//      No dia a dia, o pontilhado é o mesmo dia do mês no ano anterior.
 //   3) Notas pendentes de entrada no estoque.
 //   4) Últimos períodos de CMV (entre contagens seguidas) com o % sobre o faturamento.
 // Faturamento = líquido das vendas do Degust (resumos no R2, via ../shared/vendas.js), o mesmo usado no CMV. Cada bloco só aparece com o módulo liberado.
@@ -16,18 +17,16 @@ import {enabledModules} from "../../areas/loja/shell.js";
 const BRAND="#85071D",GRAY="#8E8E93";
 const MESES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 const ym=d=>String(d).slice(0,7);
-const shiftMonth=(m,n)=>{const [y,mm]=m.split("-").map(Number);const d=new Date(y,mm-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
-const monthLabel=m=>MESES[Number(m.slice(5,7))-1]+"/"+m.slice(2,4);
 
-async function salesByDay(storeId,from,to){return (await salesSummary(storeId,from,to)).days}
+async function salesByDay(storeId,from,to){return (await salesSummary(storeId,from,to,{onlyDays:true})).days}
 
 export async function render(ctx){
  const on=new Set(enabledModules(ctx.app,ctx.storeId).map(m=>m.id));
  const showSales=on.has("faturamento"),showNotes=on.has("notas"),showCmv=on.has("cmv");
  const t=today(),mStart=t.slice(0,8)+"01",curM=ym(t);
- const firstM=shiftMonth(curM,-23);   // 12 meses + os 12 do ano anterior
+ const Y=Number(t.slice(0,4)),PY=Y-1;   // ano atual e o anterior (comparativo)
  const [days,invoices,suppliers,counts]=await Promise.all([
-  showSales?salesByDay(ctx.storeId,firstM+"-01",t).catch(()=>[]):[],
+  showSales?salesByDay(ctx.storeId,PY+"-01-01",t).catch(()=>[]):[],
   showNotes?list("invoices",{select:"id,invoice_number,issue_date,entry_date,total_amount,supplier_id",eq:{store_id:ctx.storeId,status:"pending"},order:"entry_date",asc:true}):[],
   showNotes?loadSuppliers().catch(()=>[]):[],
   showCmv?list("stock_counts",{select:"id,display_id,count_date,status",eq:{store_id:ctx.storeId},order:"count_date",asc:true}):[]
@@ -35,17 +34,20 @@ export async function render(ctx){
  if(!ctx.isCurrent())return;
  const sup=new Map(suppliers.map(s=>[s.id,s.name]));
  const byDate=new Map(days.map(d=>[String(d.business_date).slice(0,10),Number(d.net||0)]));
- // Mês atual, dia a dia (dias futuros ficam sem valor; hoje só aparece se já tiver venda importada).
- const lastDay=new Date(Number(t.slice(0,4)),Number(t.slice(5,7)),0).getDate();
- const dLabels=[],dVals=[];
- for(let i=1;i<=lastDay;i++){const d=mStart.slice(0,8)+String(i).padStart(2,"0");dLabels.push(String(i));dVals.push(d<=t?(byDate.get(d)??(d<t?0:null)):null)}
+ // Primeiro dia com vendas importadas: antes dele não há dado (linha vazia, não zero).
+ const firstDay=[...byDate.keys()].sort()[0]||"9999";
+ const dayVal=d=>d>t||d<firstDay?null:(byDate.get(d)??(d<t?0:null));
+ // Mês atual, dia a dia, e o MESMO DIA do ano anterior (linha pontilhada).
+ const lastDay=new Date(Y,Number(t.slice(5,7)),0).getDate(),mm=t.slice(5,7);
+ const dLabels=[],dVals=[],dPrev=[];
+ for(let i=1;i<=lastDay;i++){const dd=String(i).padStart(2,"0");dLabels.push(String(i));dVals.push(dayVal(Y+"-"+mm+"-"+dd));
+  const pd=PY+"-"+mm+"-"+dd;dPrev.push(i<=new Date(PY,Number(mm),0).getDate()?dayVal(pd):null)}
  const monthTotal=round2(dVals.reduce((s,v)=>s+(v||0),0));
- // Mês a mês: últimos 12 meses e o mesmo mês do ano anterior (antes do início da importação: sem dado).
+ // Mês a mês: janeiro a dezembro do ano atual e, pontilhado, o mesmo mês do ano anterior.
  const byMonth=new Map();for(const [d,v] of byDate)byMonth.set(ym(d),(byMonth.get(ym(d))||0)+v);
- const months=[];for(let i=11;i>=0;i--)months.push(shiftMonth(curM,-i));
- const firstData=[...byMonth.keys()].sort()[0];
- const val=m=>firstData&&m>=firstData?round2(byMonth.get(m)||0):null;
- const mCur=months.map(val),mPrev=months.map(m=>val(shiftMonth(m,-12)));
+ const months=MESES.map((_,i)=>String(i+1).padStart(2,"0"));
+ const monVal=m=>m>curM||m<ym(firstDay)?null:round2(byMonth.get(m)||0);
+ const mCur=months.map(m=>monVal(Y+"-"+m)),mPrev=months.map(m=>monVal(PY+"-"+m));
 
  // Períodos de CMV: cada par de contagens seguidas (sem as canceladas), do mais recente para trás (até 6).
  let periods=[];
@@ -88,11 +90,11 @@ export async function render(ctx){
    view=v;try{localStorage.setItem("rfs-inicio-fat",v)}catch{}
    ctx.el.querySelectorAll("[data-view]").forEach(b=>{const on=b.dataset.view===v;b.classList.toggle("on",on);b.setAttribute("aria-selected",String(on))});
    if(v==="dia"){
-    tot.textContent=money(monthTotal);sub.textContent=" no mês de "+MESES[Number(t.slice(5,7))-1]+"/"+t.slice(0,4);
-    lineChart(box,{labels:dLabels,series:[{name:"Faturamento",color:BRAND,values:dVals}],format:money,tickEvery:5,ariaLabel:"Faturamento por dia no mês atual"});
+    tot.textContent=money(monthTotal);sub.textContent=" no mês de "+MESES[Number(mm)-1]+"/"+Y;
+    lineChart(box,{labels:dLabels,series:[{name:MESES[Number(mm)-1]+"/"+Y,color:BRAND,values:dVals},{name:"Mesmo dia em "+PY,color:GRAY,dash:true,values:dPrev}],format:money,tickEvery:5,ariaLabel:"Faturamento por dia no mês atual e no mesmo mês do ano anterior"});
    }else{
-    tot.textContent=money(yearTotal);sub.textContent=" nos últimos 12 meses";
-    lineChart(box,{labels:months.map(monthLabel),series:[{name:"Faturamento",color:BRAND,values:mCur},{name:"Mesmo mês do ano anterior",color:GRAY,dash:true,values:mPrev}],format:money,tickEvery:2,ariaLabel:"Faturamento por mês"});
+    tot.textContent=money(yearTotal);sub.textContent=" em "+Y;
+    lineChart(box,{labels:MESES,series:[{name:String(Y),color:BRAND,values:mCur},{name:String(PY),color:GRAY,dash:true,values:mPrev}],format:money,tickEvery:1,ariaLabel:"Faturamento por mês no ano atual e no anterior"});
    }
   };
   ctx.el.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>show(b.dataset.view));

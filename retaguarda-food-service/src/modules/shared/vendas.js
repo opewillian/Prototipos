@@ -9,10 +9,11 @@ import {supabase} from "../../core/db.js";
 
 const cache=new Map();const TTL=5*60*1000;
 
-export async function salesSummary(storeId,de,ate){
- const k=storeId+"|"+de+"|"+ate,hit=cache.get(k);
+/** opts.onlyDays: só o dia a dia (gráficos); produtos e pagamentos vêm vazios. */
+export async function salesSummary(storeId,de,ate,opts={}){
+ const k=storeId+"|"+de+"|"+ate+(opts.onlyDays?"|d":""),hit=cache.get(k);
  if(hit&&Date.now()-hit.t<TTL)return hit.v;
- const r=await supabase.functions.invoke("degust",{body:{acao:"resumo",storeId,de,ate}});
+ const r=await supabase.functions.invoke("degust",{body:{acao:"resumo",storeId,de,ate,somenteDias:!!opts.onlyDays}});
  if(r.error){let msg=r.error.message;try{msg=JSON.parse(await r.error.context.text()).erro||msg}catch{}throw Error(msg)}
  const v={days:r.data.days||[],products:r.data.products||[],payments:r.data.payments||[],imported:r.data.imported||[]};
  cache.set(k,{t:Date.now(),v});return v;
