@@ -124,7 +124,14 @@ export async function render(ctx){
 
 function memoryView(ctx,r){
  const t=r.totals;
- return '<div class="grid-3">'+card("Itens · memória de cálculo",'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item")+'</div>'+dataTable([
+ return card("Resumo do período",'<ul class="list-plain calc"><li><span>Estoque inicial ('+dateBR(r.c1.count_date)+')</span><strong>'+money(t.opening)+'</strong></li>'+
+   '<li><span>+ Compras recebidas ('+r.docs.invs.length+' nota(s))</span><strong>'+money(t.purchases)+'</strong></li>'+
+   '<li><span>+ Transferências recebidas</span><strong>'+money(t.tin)+'</strong></li><li><span>− Transferências enviadas</span><strong>'+money(t.tout)+'</strong></li>'+
+   '<li><span>− Estoque final ('+dateBR(r.c2.count_date)+')</span><strong>'+money(t.closing)+'</strong></li><li class="total"><span class="label">CMV do período</span><strong>'+money(t.cmv)+'</strong></li>'+
+   '<li><span class="muted">Perdas registradas (já incluídas no CMV)</span><strong class="text-warn">'+money(t.losses)+'</strong></li>'+
+   '<li><span class="muted">Documentos de</span><strong>'+dateBR(r.from)+' a '+dateBR(r.to)+'</strong></li>'+
+   '<li><span class="muted">Período</span><strong>'+r.days+' dias</strong></li></ul>',{flush:true})+
+  card("Itens · memória de cálculo",'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item")+'</div>'+dataTable([
    {label:"Item",render:x=>'<span class="strong">'+e(x.item.name)+'</span><small class="sub">'+e(x.item.base_unit||"")+'</small>'},
    {label:"Inicial",cls:"num",render:x=>num(x.oq)+'<small class="sub">'+money(x.ov)+'</small>'},
    {label:"Compras",cls:"num",render:x=>num(x.pq)+'<small class="sub">'+money(x.pv)+'</small>'},
@@ -132,14 +139,7 @@ function memoryView(ctx,r){
    {label:"Final",cls:"num",render:x=>num(x.cq)+'<small class="sub">'+money(x.cv)+'</small>'},
    {label:"Perdas",cls:"num",render:x=>x.lq?num(x.lq)+'<small class="sub">'+money(x.lv)+'</small>':'<span class="muted">—</span>'},
    {label:"CMV",cls:"num",render:x=>'<strong>'+money(x.cmv)+'</strong>'}
-  ],r.rows,{rowAttrs:x=>'data-search="'+e(searchKey(x.item.name,x.item.code))+'"'}),{flush:true})+
-  card("Resumo do período",'<ul class="list-plain calc"><li><span>Estoque inicial ('+dateBR(r.c1.count_date)+')</span><strong>'+money(t.opening)+'</strong></li>'+
-   '<li><span>+ Compras recebidas ('+r.docs.invs.length+' nota(s))</span><strong>'+money(t.purchases)+'</strong></li>'+
-   '<li><span>+ Transferências recebidas</span><strong>'+money(t.tin)+'</strong></li><li><span>− Transferências enviadas</span><strong>'+money(t.tout)+'</strong></li>'+
-   '<li><span>− Estoque final ('+dateBR(r.c2.count_date)+')</span><strong>'+money(t.closing)+'</strong></li><li class="total"><span class="label">CMV do período</span><strong>'+money(t.cmv)+'</strong></li>'+
-   '<li><span class="muted">Perdas registradas (já incluídas no CMV)</span><strong class="text-warn">'+money(t.losses)+'</strong></li>'+
-   '<li><span class="muted">Documentos de</span><strong>'+dateBR(r.from)+' a '+dateBR(r.to)+'</strong></li>'+
-   '<li><span class="muted">Período</span><strong>'+r.days+' dias</strong></li></ul>',{flush:true})+'</div>';
+  ],r.rows,{rowAttrs:x=>'data-search="'+e(searchKey(x.item.name,x.item.code))+'"'}),{flush:true});
 }
 function bindMemory(ctx){const q=ctx.el.querySelector("#q");q?.addEventListener("input",()=>{const t=searchKey(q.value).trim();ctx.el.querySelectorAll("tr[data-search]").forEach(x=>x.hidden=!!t&&!x.dataset.search.includes(t))})}
 
