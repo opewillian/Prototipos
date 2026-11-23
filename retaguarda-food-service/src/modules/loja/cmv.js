@@ -48,12 +48,13 @@ export async function computeCMV(storeId,startId,endId){
  const sum=k=>round2(list2.reduce((s,r)=>s+r[k],0));
  const t={opening:sum("ov"),purchases:sum("pv"),tin:sum("tiv"),tout:sum("tov"),losses:sum("lv"),closing:sum("cv")};
  t.cmv=round2(t.opening+t.purchases+t.tin-t.tout-t.closing);
- // Faturamento líquido do mesmo período (vendas do Degust por dia de caixa; canceladas fora).
+ // Faturamento BRUTO do mesmo período (vendas do Degust por dia de caixa, antes dos descontos; canceladas fora).
+ // sales_by_day.gross já é o bruto certo (valProduto + desconto dos itens).
  let revenue=null;
  try{
   const [{data:byDay,error},imp]=await Promise.all([supabase.rpc("sales_by_day",{p_store:storeId,p_from:from,p_to:to}),list("sales_imports",{select:"business_date",eq:{store_id:storeId},gte:{business_date:from},lte:{business_date:to}})]);
   if(error)throw error;
-  revenue={net:round2((byDay||[]).reduce((s,d)=>s+Number(d.net||0),0)),daysImported:imp.length,daysTotal:daysBetween(from,to)+1};
+  revenue={gross:round2((byDay||[]).reduce((s,d)=>s+Number(d.gross||0),0)),daysImported:imp.length,daysTotal:daysBetween(from,to)+1};
  }catch(error){console.warn("Faturamento do período indisponível:",error)}
  return {c1,c2,from,to,rows:list2,totals:t,docs:{invs,trs,losses},pending,revenue,days:daysBetween(c1.count_date,c2.count_date)};
 }
@@ -135,10 +136,10 @@ function memoryView(ctx,r){
    '<li><span>+ Compras recebidas ('+r.docs.invs.length+' nota(s))</span><strong>'+money(t.purchases)+'</strong></li>'+
    '<li><span>+ Transferências recebidas</span><strong>'+money(t.tin)+'</strong></li><li><span>− Transferências enviadas</span><strong>'+money(t.tout)+'</strong></li>'+
    '<li><span>− Estoque final ('+dateBR(r.c2.count_date)+')</span><strong>'+money(t.closing)+'</strong></li><li class="total"><span class="label">CMV do período</span><strong>'+money(t.cmv)+'</strong></li>'+
-   (r.revenue?'<li><span>Faturamento líquido do período'+(r.revenue.daysImported<r.revenue.daysTotal?' <small class="text-warn">('+r.revenue.daysImported+' de '+r.revenue.daysTotal+' dias importados)</small>':'')+'</span><strong>'+money(r.revenue.net)+'</strong></li>'+
-    '<li class="total"><span class="label">CMV sobre o faturamento</span><strong>'+(r.revenue.net?pct(t.cmv/r.revenue.net):'—')+'</strong></li>':'')+
+   (r.revenue?'<li><span>Faturamento bruto do período'+(r.revenue.daysImported<r.revenue.daysTotal?' <small class="text-warn">('+r.revenue.daysImported+' de '+r.revenue.daysTotal+' dias importados)</small>':'')+'</span><strong>'+money(r.revenue.gross)+'</strong></li>'+
+    '<li class="total"><span class="label">CMV sobre o faturamento</span><strong>'+(r.revenue.gross?pct(t.cmv/r.revenue.gross):'—')+'</strong></li>':'')+
    '<li><span class="muted">Perdas registradas (já incluídas no CMV)</span><strong class="text-warn">'+money(t.losses)+'</strong></li>'+
-   (r.revenue?'<li><span class="muted">Perdas sobre o faturamento</span><strong class="text-warn">'+(r.revenue.net?pct(t.losses/r.revenue.net):'—')+'</strong></li>':'')+
+   (r.revenue?'<li><span class="muted">Perdas sobre o faturamento</span><strong class="text-warn">'+(r.revenue.gross?pct(t.losses/r.revenue.gross):'—')+'</strong></li>':'')+
    '<li><span class="muted">Documentos de</span><strong>'+dateBR(r.from)+' a '+dateBR(r.to)+'</strong></li>'+
    '<li><span class="muted">Período</span><strong>'+r.days+' dias</strong></li></ul>',{flush:true})+
   card("Itens · memória de cálculo",'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item")+'</div>'+dataTable([
