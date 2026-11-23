@@ -18,13 +18,7 @@ export async function render(ctx){
  if(!ctx.isCurrent())return;
  const tot=id=>round2(lines.filter(l=>l.order_id===id).reduce((s,l)=>s+Number(l.line_total||0),0));
  const qn=id=>lines.filter(l=>l.order_id===id&&Number(l.requested_quantity)>0).length;
- const open=orders.filter(o=>["sent","realizing"].includes(o.status));
- const late=open.filter(o=>o.delivery_date<today());
  ctx.el.innerHTML=pageHead("Pedidos de compra","Sugestões calculadas pela contagem, consumo e pedidos em aberto.",btn("Novo pedido",{icon:"plus",attrs:"data-new"}))+
-  '<div class="kpis">'+kpi("Rascunhos",orders.filter(o=>o.status==="draft").length,"",{icon:"edit"})+
-  kpi("Em aberto",open.length,money(open.reduce((s,o)=>s+tot(o.id),0)),{icon:"cart",tone:"info"})+
-  kpi("Entregas atrasadas",late.length,"",{icon:"alert",tone:late.length?"warn":"ok"})+
-  kpi("Realizados no mês",orders.filter(o=>o.status==="realized"&&String(o.realized_at||"").startsWith(today().slice(0,7))).length,"",{icon:"check",tone:"ok"})+'</div>'+
   '<section class="card">'+(orders.length?dataTable([
    {label:"Pedido",render:o=>'<span class="strong">'+e(o.number)+'</span>'+(o.observation?'<small class="sub">'+e(o.observation)+'</small>':'')},
    {label:"Entrega",render:o=>dateBR(o.delivery_date)+(["sent","realizing"].includes(o.status)&&o.delivery_date<today()?' <span class="pill pill-danger">Atrasado</span>':'')},
