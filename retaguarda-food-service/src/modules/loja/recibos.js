@@ -53,7 +53,8 @@ export async function receiptsModal(ctx,day){
 
 /** O recibo em estilo cartoon, na frente do popin. */
 function receiptCartoon(c,store,day){
- const items=c.itens.filter(i=>!i.cancelado);
+ // Recibo cancelado: mostra os itens (riscados), que vêm marcados como cancelados.
+ const items=c.cancelada?c.itens:c.itens.filter(i=>!i.cancelado);
  const line=(l,r,cls="")=>'<div class="rcp-line '+cls+'"><span>'+l+'</span><span>'+r+'</span></div>';
  let k=0;const st=()=>' style="--i:'+(k++)+'"';
  const body=
@@ -63,7 +64,7 @@ function receiptCartoon(c,store,day){
   items.map(i=>'<div class="rcp-item"'+st()+'><div class="rcp-iname"><b>'+num(i.qtd)+'×</b> '+e(i.nome)+'</div><div class="rcp-ival">'+money(i.total)+
    (i.desconto?'<small>− '+money(i.desconto)+'</small>':'')+'</div>'+(i.qtd!==1?'<small class="rcp-unit">'+money(i.unit)+' / '+e(i.unid.toLowerCase()||"un")+'</small>':'')+'</div>').join("")+
   '<div class="rcp-cut"'+st()+'></div>'+
-  '<div class="rcp-tot"'+st()+'>'+line("Subtotal",money(c.bruto))+(c.desconto?line("Descontos","− "+money(c.desconto),"rcp-disc"):"")+(c.acrescimo?line("Acréscimos","+ "+money(c.acrescimo)):"")+
+  '<div class="rcp-tot"'+st()+'>'+(c.cancelada?"":line("Subtotal",money(c.bruto)))+(c.desconto?line("Descontos","− "+money(c.desconto),"rcp-disc"):"")+(c.acrescimo?line("Acréscimos","+ "+money(c.acrescimo)):"")+
   line("TOTAL",money(c.liquido),"rcp-big")+'</div>'+
   '<div class="rcp-pays"'+st()+'>'+c.pagamentos.map(p=>'<div class="rcp-pay"><span class="rcp-chip">'+e(p.forma)+'</span><span>'+(p.adm?'<small>'+e(p.adm)+(p.parcelas>1?' · '+p.parcelas+'x':'')+'</small>':'')+money(p.valor)+'</span></div>').join("")+
   (c.troco?line("Troco",money(c.troco)):"")+'</div>'+
