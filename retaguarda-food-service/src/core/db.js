@@ -76,7 +76,12 @@ export function randomCode(prefix,digits=6){
 export async function insertWithCode(table,column,prefix,row,tries=5){
  for(let i=0;i<tries;i++){
   try{return await insert(table,{...row,[column]:randomCode(prefix)})}
-  catch(error){if(!(error?.code==="23505"||/duplicate key/i.test(String(error?.message))))throw error}
+  catch(error){
+   const msg=String(error?.message||"");
+   if(!(error?.code==="23505"||/duplicate key/i.test(msg)))throw error;
+   // Só sorteia de novo se o duplicado for o próprio código (outra regra única, ex.: data da contagem, sobe o erro).
+   const k=(msg.match(/constraint "([^"]+)"/)||[])[1];if(k&&!k.includes(column))throw error;
+  }
  }
  throw Error("Não foi possível gerar um código único. Tente de novo.");
 }

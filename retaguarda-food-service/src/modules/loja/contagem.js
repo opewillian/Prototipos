@@ -5,7 +5,7 @@
 // Custo = última compra recebida na loja; sem compra, custo padrão do item.
 // Finalizar gera o ajuste de estoque no banco e bloqueia o documento.
 // Uma contagem por loja e data (fora as canceladas): o app avisa e o banco garante.
-import {list,get,insert,update,remove,nextNumber} from "../../core/db.js";
+import {list,get,insert,update,remove,insertWithCode} from "../../core/db.js";
 import {e,money,num,inputNum,parseNum,dateBR,today,round2} from "../../core/format.js";
 import {icon} from "../../core/icons.js";
 import {pageHead,btn,dataTable,field,input,toast,confirmDialog,statusPill,emptyState,backLink,errorMessage,searchBox,searchKey,kpi,alertBox} from "../../core/ui.js";
@@ -48,9 +48,9 @@ async function newCount(ctx){
  try{
   const same=(await list("stock_counts",{select:"id,display_id,status",eq:{store_id:ctx.storeId,count_date:today()}})).find(c=>c.status!=="cancelled");
   if(same){toast("Já existe a contagem "+same.display_id+" com a data de hoje. Uma loja não pode ter duas contagens na mesma data.","danger");return ctx.go(ctx.base+"/contagem/"+same.id)}
-  const display_id=await nextNumber("stock_counts","display_id","store_id",ctx.storeId,"CT");
-  const c=await insert("stock_counts",{store_id:ctx.storeId,display_id,count_date:today(),status:"draft",created_by:ctx.userId}).catch(err=>{throw dupDate(err)});
-  toast("Contagem "+display_id+" iniciada.");ctx.go(ctx.base+"/contagem/"+c.id);
+  // Código aleatório em hexadecimal (ex.: CT-7F3A9C); se repetir, sorteia outro.
+  const c=await insertWithCode("stock_counts","display_id","CT",{store_id:ctx.storeId,count_date:today(),status:"draft",created_by:ctx.userId}).catch(err=>{throw dupDate(err)});
+  toast("Contagem "+c.display_id+" iniciada.");ctx.go(ctx.base+"/contagem/"+c.id);
  }catch(error){toast(errorMessage(error),"danger")}
  finally{creating=false}
 }
