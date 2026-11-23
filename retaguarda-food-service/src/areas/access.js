@@ -20,7 +20,7 @@ export function loginView({email="",error="",busy=false,recovery=false}={}){
   '<button type="button" class="btn btn-ghost" id="toggle-recovery">'+(recovery?"Voltar ao login":"Esqueci minha senha")+'</button>'+
   '</form></div><div class="auth-foot">MFT Gestão de Franquias · Retaguarda Food Service</div></div></section>'+
   '<aside class="auth-side" aria-hidden="true"><div class="auth-side-in"><span class="auth-kicker">Retaguarda Food Service</span>'+
-  '<h2>Gestão de estoque, compras e CMV <span>em um só lugar.</span></h2>'+
+  '<h2>Gestão de estoque,<br>compras e CMV <span>em um só lugar.</span></h2>'+
   '<ul class="auth-points">'+
   [["clipboard","Contagem","Inventário rápido por listas"],["cart","Compras","Sugestão de pedido pelo consumo"],["chart","CMV","Fechamento com memória de cálculo"]]
    .map(([i,t,d])=>'<li><span class="auth-ico">'+icon(i,18)+'</span><div><strong>'+t+'</strong><span>'+d+'</span></div></li>').join("")+
