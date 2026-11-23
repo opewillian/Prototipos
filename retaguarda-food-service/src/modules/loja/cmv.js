@@ -143,25 +143,14 @@ function memoryView(ctx,r){
 }
 function bindMemory(ctx){const q=ctx.el.querySelector("#q");q?.addEventListener("input",()=>{const t=searchKey(q.value).trim();ctx.el.querySelectorAll("tr[data-search]").forEach(x=>x.hidden=!!t&&!x.dataset.search.includes(t))})}
 
-// Avisos do que ficou de fora: contagens em rascunho e documentos ainda não lançados no período.
-function warnings(r){
- const out=[];const drafts=[r.c1,r.c2].filter(c=>c.status==="draft");
- if(drafts.length)out.push(alertBox("Contagem em rascunho: "+drafts.map(c=>c.display_id+" ("+dateBR(c.count_date)+")").join(" e ")+". O cálculo usa as quantidades digitadas até agora; para salvar o fechamento, finalize as contagens.","info"));
- const p=r.pending,parts=[];
- if(p.invs.length)parts.push(p.invs.length+" nota(s) pendente(s)");if(p.trs.length)parts.push(p.trs.length+" transferência(s) em rascunho");if(p.losses.length)parts.push(p.losses.length+" perda(s) em rascunho");
- if(parts.length)out.push(alertBox("Fora do cálculo, no período de "+dateBR(r.from)+" a "+dateBR(r.to)+": "+parts.join(", ")+". Receba/emita/registre para entrarem no CMV.","warn"));
- return out.join("");
-}
-
 async function preview(ctx,s,en){
  const r=await computeCMV(ctx.storeId,s,en);
  if(!ctx.isCurrent())return;
  const exists=(await list("cmv_closings",{select:"id",eq:{store_id:ctx.storeId,start_count_id:s,end_count_id:en}}))[0];
  const canSave=r.c1.status==="finalized"&&r.c2.status==="finalized";
  ctx.el.innerHTML=backLink(ctx.base+"/cmv","CMV")+
-  '<div class="doc-head"><div><div class="doc-title"><h1>CMV de '+dateBR(r.c1.count_date)+' a '+dateBR(r.c2.count_date)+'</h1><span class="pill pill-warn">Prévia</span></div><p class="muted" style="margin:6px 0 0">Estoque inicial '+e(r.c1.display_id)+' ('+stLabel(r.c1)+') → estoque final '+e(r.c2.display_id)+' ('+stLabel(r.c2)+') · documentos de '+dateBR(r.from)+' a '+dateBR(r.to)+'</p></div>'+
+  '<div class="doc-head"><div><div class="doc-title"><h1>CMV de '+dateBR(r.c1.count_date)+' a '+dateBR(r.c2.count_date)+'</h1><span class="pill pill-warn">Prévia</span></div></div>'+
   '<div class="page-actions">'+(exists?btn("Ver fechamento salvo",{variant:"secondary",href:ctx.base+"/cmv/"+exists.id}):canSave?btn("Salvar fechamento",{variant:"ok",icon:"check",attrs:"data-save"}):'')+'</div></div>'+
-  warnings(r)+
   memoryView(ctx,r);
  bindMemory(ctx);
  ctx.el.querySelector("[data-save]")?.addEventListener("click",async ev=>{
