@@ -932,3 +932,4 @@ Depois:
 - Script 35: pg_cron + pg_net, job 'degust-vendas-diario' às 09:00 UTC (06:00 BRT) com x-cron-key (integration_tokens 'cron') + apikey publishable. Teste manual OK (20–22/11 reimportados). "Verify JWT" da função continua LIGADO (desligar foi bloqueado; não precisou).
 - Tela Loja › Financeiro › Faturamento (primeiro grupo do menu, logo após Início) (loja/faturamento.js, liberação 'cmv'): período De/Até + atalhos; resumo; por dia; produtos (com busca); formas de pagamento; botão de importar o período (só admin).
 
+- CMV (loja/cmv.js): resumo mostra faturamento líquido do período (sales_by_day de from a to, mesmo período dos documentos), CMV % e perdas % sobre o faturamento; avisa quando faltam dias importados. Out/26 CGH: faturamento 263.758,72, CMV 22,6%.
