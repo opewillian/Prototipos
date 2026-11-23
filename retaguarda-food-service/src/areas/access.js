@@ -19,7 +19,6 @@ export function loginView({email="",error="",busy=false,recovery=false}={}){
   '<button type="button" class="btn btn-ghost" id="toggle-recovery">'+(recovery?"Voltar ao login":"Esqueci minha senha")+'</button>'+
   '</form><div class="auth-foot">MFT Gestão de Franquias · Retaguarda Food Service</div></section>'+
   '<aside class="auth-side" aria-hidden="true"><h2>Gestão de estoque, compras e CMV em um só lugar.</h2>'+
-  '<p>Cadastros centralizados na Matriz e rotina operacional independente para cada loja.</p>'+
   '<div class="auth-points"><div><strong>Contagem</strong><span>Inventário rápido por listas</span></div><div><strong>Compras</strong><span>Sugestão por consumo</span></div><div><strong>CMV</strong><span>Fechamento com memória de cálculo</span></div></div></aside></main>';
 }
 
