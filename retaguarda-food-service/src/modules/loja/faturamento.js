@@ -12,6 +12,8 @@ import {pageHead,btn,dataTable,card,toast,alertBox,searchBox,searchKey,errorMess
 const range={};          // período escolhido por loja (enquanto a página estiver aberta)
 const pct=(a,b)=>b?(Math.round(a/b*1000)/10).toLocaleString("pt-BR")+"%":"—";
 const days=(from,to)=>{const out=[];for(let d=from;d<=to;d=addDays(d,1))out.push(d);return out};
+// Quadro retrátil (fechado ao abrir a página): só o Resumo do período fica sempre aberto.
+const fold=(title,body,opts={})=>'<details class="card fold"><summary class="card-head"><h2>'+e(title)+'</h2><span class="fold-right">'+(opts.actions||"")+'<span class="fold-chev" aria-hidden="true"></span></span></summary><div class="card-body flush">'+body+'</div></details>';
 const weekday=d=>new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","");
 
 
@@ -50,7 +52,7 @@ export async function render(ctx){
    '<li class="total"><span class="label">Faturamento líquido</span><strong>'+money(round2(t.net))+'</strong></li>'+
    '<li><span class="muted">Ticket médio</span><strong>'+money(ticket)+'</strong></li>'+
    '<li><span class="muted">Vendas canceladas (fora dos valores)</span><strong>'+num(t.cancelled,0)+'</strong></li></ul>',{flush:true})+
-  card("Por dia",dataTable([
+  fold("Por dia",dataTable([
    {label:"Dia",render:d=>'<span class="strong">'+dateBR(d)+'</span><small class="sub">'+weekday(d)+'</small>'},
    {label:"Vendas",cls:"num",render:d=>dayMap.has(d)?num(N(dayMap.get(d).sales),0):(imported.has(d)?'0':'<span class="muted">não importado</span>')},
    {label:"Canceladas",cls:"num",render:d=>dayMap.has(d)?num(N(dayMap.get(d).cancelled),0):'<span class="muted">—</span>'},
@@ -59,19 +61,18 @@ export async function render(ctx){
    {label:"Líquido",cls:"num",render:d=>dayMap.has(d)?'<strong>'+money(N(dayMap.get(d).net))+'</strong>':'<span class="muted">—</span>'},
    {label:"Ticket médio",cls:"num",render:d=>{const x=dayMap.get(d);return x&&N(x.sales)?money(round2(N(x.net)/N(x.sales))):'<span class="muted">—</span>'}}
   ],allDays.slice().reverse(),{rowAttrs:d=>dayMap.has(d)&&N(dayMap.get(d).sales)+N(dayMap.get(d).cancelled)>0?'class="day-link" data-day="'+d+'" tabindex="0" title="Ver os recibos do dia"':""}),{flush:true,actions:'<small class="muted">Clique em um dia para ver os recibos</small>'})+
-  '<div class="grid-3">'+
-  card("Produtos vendidos ("+byProd.length+")",'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("qp","Buscar produto")+'</div>'+dataTable([
+  fold("Produtos vendidos ("+byProd.length+")",'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("qp","Buscar produto")+'</div>'+dataTable([
    {label:"Produto",render:p=>'<span class="strong">'+e(p.product_name||"Produto")+'</span><small class="sub">Cód. '+e(p.product_code??"")+'</small>'},
    {label:"Qtd",cls:"num",render:p=>num(N(p.quantity))},
    {label:"Bruto",cls:"num",render:p=>money(N(p.total))+(N(p.discount)?'<small class="sub">− '+money(N(p.discount))+'</small>':'')},
    {label:"Líquido",cls:"num",render:p=>'<strong>'+money(N(p.net))+'</strong>'},
    {label:"% do total",cls:"num",render:p=>pct(N(p.net),prodTotal)}
   ],byProd,{rowAttrs:p=>'data-search="'+e(searchKey(p.product_name||"",String(p.product_code??"")))+'"',empty:'<p class="muted" style="padding:14px 18px;margin:0">Nenhuma venda no período.</p>'}),{flush:true})+
-  card("Formas de pagamento",dataTable([
+  fold("Formas de pagamento",dataTable([
    {label:"Forma",render:p=>'<span class="strong">'+e(p.method)+'</span>'+(p.brand?'<small class="sub">'+e(p.brand)+'</small>':'')},
    {label:"Qtd",cls:"num",render:p=>num(N(p.payments),0)},
    {label:"Valor",cls:"num",render:p=>money(N(p.amount))+'<small class="sub">'+pct(N(p.amount),payTotal)+'</small>'}
-  ],byPay,{empty:'<p class="muted" style="padding:14px 18px;margin:0">Nenhum pagamento no período.</p>'}),{flush:true})+'</div>';
+  ],byPay,{empty:'<p class="muted" style="padding:14px 18px;margin:0">Nenhum pagamento no período.</p>'}),{flush:true});
 
  // Período
  const setRange=(from,to)=>{if(!from||!to)return;if(to<from)[from,to]=[to,from];range[ctx.storeId]={from,to};ctx.reload()};

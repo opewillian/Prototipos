@@ -612,3 +612,15 @@ td:has(> .item-link){cursor:pointer}
 @keyframes rcp-blink{to{background:#2E7D4F}}
 @keyframes rcp-fadeout{to{opacity:0}}
 @media (prefers-reduced-motion:reduce){.rcp-overlay *,.rcp-overlay{animation:none!important}}
+
+/* ---- Quadro retrátil (Faturamento: Por dia, Produtos vendidos, Formas de pagamento) ---- */
+details.fold>summary{list-style:none;cursor:pointer;user-select:none}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold:not([open])>summary{border-bottom:0}
+details.fold>summary:hover h2{color:var(--brand)}
+details.fold>summary:focus-visible{outline:3px solid var(--brand-100);outline-offset:-3px;border-radius:var(--radius)}
+.fold-right{display:flex;align-items:center;gap:12px}
+.fold-chev{width:26px;height:26px;border-radius:50%;background:var(--brand-50);flex:none;position:relative;transition:transform .2s}
+.fold-chev:before{content:"";position:absolute;left:9px;top:7px;width:7px;height:7px;border-right:2px solid var(--brand);border-bottom:2px solid var(--brand);transform:rotate(45deg)}
+details.fold[open] .fold-chev{transform:rotate(180deg)}
+details.fold:not([open]) .fold-right small{display:none}
