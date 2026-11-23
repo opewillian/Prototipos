@@ -52,6 +52,9 @@ async function newCount(ctx){
 // Quantidades por coluna. Linha antiga (antes das colunas por lista) vira só "Quantidade".
 const MANUAL="manual";
 const partsOf=l=>{const p=l?.parts&&typeof l.parts==="object"?{...l.parts}:{};if(l&&!Object.keys(p).length&&l.counted_quantity!=null)p[MANUAL]=Number(l.counted_quantity);return p};
+// Valor unitário com até 4 casas (custos de sachê, copo etc.).
+const unitBRL=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:4});
+const mu=v=>unitBRL.format(Number(v||0));
 const sumParts=p=>round2(Object.values(p).reduce((s,v)=>s+Number(v||0),0));
 
 async function detail(ctx,id){
@@ -89,7 +92,10 @@ async function detail(ctx,id){
    '<td data-label="Item"><span class="strong">'+e(it.name)+'</span><small class="sub">'+e(it.code||"")+'</small></td>'+
    '<td data-label="Unid.">'+e(it.base_unit||"")+'</td>'+
    '<td class="num strong" data-label="Total" data-total>'+(l?num(l.counted_quantity):'<span class="muted">—</span>')+'</td>'+
-   cell(it,MANUAL,p)+cols.map(c=>cell(it,c.id,p)).join("")+'</tr>';
+   cell(it,MANUAL,p)+cols.map(c=>cell(it,c.id,p)).join("")+
+   // Valor unitário = custo da linha (ou o custo que será usado, em cinza, se ainda não contado); valor total = qtd × custo.
+   '<td class="num" data-label="Valor unit." data-unit>'+(l?mu(l.unit_cost):'<span class="muted">'+mu(costOf(it.id))+'</span>')+'</td>'+
+   '<td class="num strong" data-label="Valor total" data-vtotal>'+(l?money(l.line_total):'<span class="muted">—</span>')+'</td></tr>';
  };
  const draw=()=>{
   const q=ctx.el.querySelector("#q")?.value||"";
@@ -105,7 +111,7 @@ async function detail(ctx,id){
    (rows.length?'<div class="toolbar" style="padding:14px 18px 0">'+searchBox("q","Buscar item na contagem")+(editable?'<span class="muted">Digite a quantidade e tecle Enter para ir ao próximo. Vazio = não contado; 0 = sem estoque. O total soma a coluna Padrão e as listas.</span>':'')+'</div>'+
     '<div class="table-wrap table-scroll"><table class="table"><thead><tr><th>Item</th><th>Unid.</th><th class="num">Total</th><th class="num">Padrão</th>'+
     cols.map(c=>'<th class="num">'+(editable?'<span class="th-col"><button class="th-btn" data-edit-col="'+e(c.id)+'" title="Editar as quantidades desta lista">'+e(c.name)+' '+icon("edit",13)+'</button><button class="th-x" data-remove-col="'+e(c.id)+'" title="Remover a lista da contagem" aria-label="Remover a lista '+e(c.name)+' da contagem">'+icon("x",13)+'</button></span>':e(c.name))+'</th>').join("")+
-    '</tr></thead><tbody>'+rows.map(rowHTML).join("")+'</tbody></table></div>'
+    '<th class="num">Valor unit.</th><th class="num">Valor total</th></tr></thead><tbody>'+rows.map(rowHTML).join("")+'</tbody></table></div>'
     :emptyState("clipboard","Nenhum item liberado para a loja","Os itens aparecem aqui quando tiverem a marca da loja ou a marca Global."))+summary()+'</section>';
   bind();
   const qi=ctx.el.querySelector("#q");if(q&&qi){qi.value=q;qi.dispatchEvent(new Event("input"))}
@@ -114,6 +120,8 @@ async function detail(ctx,id){
   const tr=ctx.el.querySelector('tr[data-item="'+CSS.escape(itemId)+'"]');if(!tr)return;
   const l=byItem.get(itemId);tr.classList.toggle("is-pending",!l);
   tr.querySelector("[data-total]").innerHTML=l?num(l.counted_quantity):'<span class="muted">—</span>';
+  tr.querySelector("[data-unit]").innerHTML=l?mu(l.unit_cost):'<span class="muted">'+mu(costOf(itemId))+'</span>';
+  tr.querySelector("[data-vtotal]").innerHTML=l?money(l.line_total):'<span class="muted">—</span>';
   const s=ctx.el.querySelector("[data-summary]");if(s)s.outerHTML=summary();
  };
  /** Grava as quantidades de um item (parts) e recalcula total e valor. Tudo vazio = item volta a "não contado". */
