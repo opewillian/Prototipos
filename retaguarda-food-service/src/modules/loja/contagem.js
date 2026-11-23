@@ -4,6 +4,7 @@
 // Regras: vazio = não contado (não é gravado); 0 = contado sem estoque; decimais aceitos.
 // Custo = última compra recebida na loja; sem compra, custo padrão do item.
 // Finalizar gera o ajuste de estoque no banco e bloqueia o documento.
+// Uma contagem por loja e data (fora as canceladas): o app avisa e o banco garante.
 import {list,get,insert,update,remove,nextNumber} from "../../core/db.js";
 import {e,money,num,inputNum,parseNum,dateBR,today,round2} from "../../core/format.js";
 import {icon} from "../../core/icons.js";
@@ -37,13 +38,18 @@ export async function render(ctx){
  bindFilters(ctx.el,{noun:["contagem","contagens"]});
 }
 
+// Regra do banco (script 31): uma contagem por loja e data (canceladas não contam).
+const dupDate=err=>/stock_counts_store_date_key/i.test(String(err?.message||err))?Error("Já existe outra contagem desta loja nessa data. Uma loja não pode ter duas contagens na mesma data."):err;
+
 // "Nova contagem" cria o rascunho na hora (data de hoje) e abre a contagem; data e observações se ajustam lá dentro.
 let creating=false;
 async function newCount(ctx){
  if(creating)return;creating=true;
  try{
+  const same=(await list("stock_counts",{select:"id,display_id,status",eq:{store_id:ctx.storeId,count_date:today()}})).find(c=>c.status!=="cancelled");
+  if(same){toast("Já existe a contagem "+same.display_id+" com a data de hoje. Uma loja não pode ter duas contagens na mesma data.","danger");return ctx.go(ctx.base+"/contagem/"+same.id)}
   const display_id=await nextNumber("stock_counts","display_id","store_id",ctx.storeId,"CT");
-  const c=await insert("stock_counts",{store_id:ctx.storeId,display_id,count_date:today(),status:"draft",created_by:ctx.userId});
+  const c=await insert("stock_counts",{store_id:ctx.storeId,display_id,count_date:today(),status:"draft",created_by:ctx.userId}).catch(err=>{throw dupDate(err)});
   toast("Contagem "+display_id+" iniciada.");ctx.go(ctx.base+"/contagem/"+c.id);
  }catch(error){toast(errorMessage(error),"danger")}
  finally{creating=false}
@@ -222,7 +228,7 @@ async function detail(ctx,id){
    const patch=el.name==="count_date"?{count_date:el.value}:{notes:el.value.trim()||null};
    if(el.name==="count_date"&&!el.value){el.value=count.count_date;return toast("Informe a data.","danger")}
    try{Object.assign(count,await update("stock_counts",id,patch,{status:"draft"}));toast(el.name==="count_date"?"Data atualizada.":"Observações salvas.")}
-   catch(error){toast(errorMessage(error),"danger")}
+   catch(error){if(el.name==="count_date")el.value=count.count_date;toast(errorMessage(dupDate(error)),"danger")}
   }));
   const q=ctx.el.querySelector("#q");
   q?.addEventListener("input",()=>{const t=searchKey(q.value).trim();ctx.el.querySelectorAll("tr[data-search]").forEach(r=>r.hidden=!!t&&!r.dataset.search.includes(t))});

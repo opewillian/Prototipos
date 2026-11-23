@@ -902,3 +902,7 @@ Depois:
 **18/11/2026 — auditoria técnica e teste autenticado:** ver seção 10 (auditoria, teste funcional e entrega "Contagem com listas"). Próximos passos: homologar a contagem com listas na Teste; depois Fase 2 (vínculo item × loja × fornecedor, busca em Itens/Fornecedores) e Listas (busca, impressão, ordenação).
 
 **Este arquivo não é uma especificação congelada.** Deve evoluir junto do produto, mas decisões não devem desaparecer sem explicação ou aprovação explícita.
+
+### Script 31 (23/11/2026) — contagem única por data
+- Índice único parcial `stock_counts_store_date_key` em (store_id, count_date) onde status <> 'cancelled': uma loja não pode ter duas contagens na mesma data (canceladas não contam).
+- App (loja/contagem.js): "Nova contagem" avisa e abre a contagem já existente de hoje; mudar a data para uma já usada mostra o aviso e volta a data anterior.
