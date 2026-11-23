@@ -914,4 +914,4 @@ Depois:
 
 
 ### Script 32 (23/11/2026) — datas de entrada out/26 CGH
-- Planilha de entregas de out/26 (31 notas) conferida: 29 já tinham a data certa; 121188 (planilha "121.138", R$ 7.671,11) passou para 28/10; Eurofoods 6636 (R$ 15,00, 27/10) NÃO existe na Retaguarda (não veio no import do Everest). "SPAL 181.961" da planilha é a Sendas 181961.
+- Planilha de entregas de out/26 (31 notas) conferida: 29 já tinham a data certa; 121188 (planilha "121.138", R$ 7.671,11) passou para 28/10; Eurofoods 6636 (R$ 15,00, 27/10) NÃO existe na Retaguarda: foi EXCLUÍDA no Monitor de DANFEs do Everest (emp 57) em 09/11/2026 17:10; decisão do usuário: fica fora. "SPAL 181.961" da planilha é a Sendas 181961.
