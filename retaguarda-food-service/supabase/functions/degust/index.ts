@@ -151,13 +151,19 @@ const keyMonthSum = (storeId: string, ym: string) => "resumo/" + folder(storeId,
 // ---------------------------------------------------------------- Resumos
 type Prod = { product_code: number | null; product_name: string; quantity: number; total: number; discount: number; net: number };
 type Pay = { method: string; brand: string; payments: number; amount: number };
-// hours / hoursN: líquido e nº de vendas por hora do dia (0 a 23, pela hora de inclusão da venda). Só nos dias resumidos a partir do arquivo completo.
+// hours / hoursN: líquido e nº de vendas por hora do dia (0 a 23, pela hora da venda = 1º item lançado). Só nos dias resumidos a partir do arquivo completo.
 type DaySum = { business_date: string; sales: number; cancelled: number; gross: number; discount: number; net: number; hours?: number[]; hoursN?: number[]; products: Prod[]; payments: Pay[] };
 
+// Hora da venda: a do 1º item lançado no caixa (datHoraLancamento). dataHoraInclusao é a hora em que a venda CHEGOU ao
+// Degust — com o caixa sem internet, dezenas de vendas chegam juntas às 23h/0h (visto em 03, 04, 12, 14 e 19/11/2026).
+const horaVenda = (v: Record<string, any>) => {
+  const hs = (v.itens ?? []).map((it: Record<string, any>) => String(it.datHoraLancamento ?? "")).filter((h: string) => /^\d{4}-\d{2}-\d{2} \d{2}:/.test(h)).sort();
+  return hs[0] ?? String(v.dataHoraInclusao ?? "");
+};
 // Cupom para a tela de recibos (Faturamento › clicar no dia). Só os campos usados no recibo; sem dados do cliente.
-// hora = dataHoraInclusao ("AAAA-MM-DD HH:MM:SS"); bruto/desconto/líquido com a mesma regra do resumo.
+// hora = horaVenda ("AAAA-MM-DD HH:MM:SS"); bruto/desconto/líquido com a mesma regra do resumo.
 const cupom = (v: Record<string, any>) => ({
-  id: v.controle, hora: String(v.dataHoraInclusao ?? ""), pdv: v.numPdv ?? "", nfce: v.documento?.[0]?.numero ?? null,
+  id: v.controle, hora: horaVenda(v), pdv: v.numPdv ?? "", nfce: v.documento?.[0]?.numero ?? null,
   cancelada: yes(v.cancelada),
   bruto: r2d(n(v.valProduto) + n(v.valDescontoItem)), desconto: r2d(n(v.valDesconto) + n(v.valDescontoItem)),
   acrescimo: r2d(n(v.valAcrescimo)), liquido: r2d(n(v.valLiquido)), troco: r2d(n(v.valTroco)),
@@ -176,8 +182,8 @@ function summarizeDay(dia: string, vendas: Record<string, any>[]): DaySum {
     if (yes(v.cancelada)) { s.cancelled++; continue; }
     s.sales++;
     s.gross += n(v.valProduto) + n(v.valDescontoItem); s.discount += n(v.valDesconto) + n(v.valDescontoItem); s.net += n(v.valLiquido);
-    const h = Number(String(v.dataHoraInclusao ?? "").slice(11, 13));
-    if (h >= 0 && h < 24 && String(v.dataHoraInclusao ?? "").length >= 13) { s.hours![h] += n(v.valLiquido); s.hoursN![h]++; }
+    const hv = horaVenda(v), h = Number(hv.slice(11, 13));
+    if (h >= 0 && h < 24 && hv.length >= 13) { s.hours![h] += n(v.valLiquido); s.hoursN![h]++; }
     for (const it of v.itens ?? []) {
       if (yes(it.cancelado)) continue;
       const k = String(it.codProduto ?? "");
