@@ -99,7 +99,7 @@
 .tb-tour:focus-visible{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-50)}
 .tour{position:fixed;inset:0;z-index:1000}
 .tour-hole{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(20,8,10,.55);outline:2px solid #fff;pointer-events:none;transition:left .2s,top .2s,width .2s,height .2s}
-.tour:has(.tour-hole[hidden]){background:rgba(20,8,10,.55)}
+.tour.tour-dim{background:rgba(20,8,10,.55)}
 .tour-card{position:fixed;background:#fff;border-radius:14px;box-shadow:0 18px 48px rgba(0,0,0,.28);padding:18px 18px 14px;transition:left .2s,top .2s}
 .tour-step{font-size:12px;font-weight:600;color:var(--brand);letter-spacing:.04em;text-transform:uppercase}
 .tour-card h3{font-size:18px;margin:6px 0 6px}

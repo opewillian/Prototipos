@@ -52,6 +52,7 @@ export function startTour(root){
   const s=list[i],el=target(s);
   const vw=window.innerWidth,vh=window.innerHeight,cw=Math.min(360,vw-32);
   card.style.width=cw+"px";
+  ov.classList.toggle("tour-dim",!el);
   if(!el){hole.hidden=true;card.style.left=Math.round((vw-cw)/2)+"px";card.style.top=Math.round(Math.max(16,(vh-card.offsetHeight)/2))+"px";card.classList.add("center");return}
   card.classList.remove("center");
   const r=el.getBoundingClientRect(),pad=6;
