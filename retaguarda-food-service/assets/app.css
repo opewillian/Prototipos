@@ -571,7 +571,7 @@ td:has(> .item-link){cursor:pointer}
 /* ---- Recibo em estilo cartoon ---- */
 .rcp-overlay{--ink:#2B1418;--paper:#FFFDF4;position:fixed;inset:0;z-index:95;display:grid;place-items:center;padding:16px;background:rgba(25,10,14,.55);animation:fade .2s}
 .rcp-overlay.out{animation:rcp-fadeout .22s forwards}
-.rcp-stage{position:relative;width:min(460px,94vw);display:flex;flex-direction:column;align-items:stretch}
+.rcp-stage{position:relative;width:min(600px,94vw);display:flex;flex-direction:column;align-items:stretch}
 .rcp-printer{position:relative;z-index:2;height:46px;background:var(--brand);border:3px solid var(--ink);border-radius:18px;box-shadow:0 6px 0 var(--ink);display:flex;align-items:center;padding:0 16px;animation:rcp-shake .45s ease-in-out 2}
 .rcp-led{width:12px;height:12px;border-radius:50%;background:#7CFF9B;border:2px solid var(--ink);animation:rcp-blink .5s steps(2) 4}
 .rcp-slot{position:absolute;left:22px;right:22px;bottom:7px;height:7px;border-radius:6px;background:var(--ink)}
