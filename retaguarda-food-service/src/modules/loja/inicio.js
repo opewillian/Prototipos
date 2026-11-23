@@ -1,6 +1,7 @@
 // Loja · Início (repaginada em 23/11/2026):
 //   1) Faturamento dia a dia do mês atual (linha).
 //   2) Faturamento mês a mês de janeiro a dezembro do ano + pontilhado com o ano anterior.
+//   Nos dois, linha pontilhada vinho = projeção (tabela sales_forecast, recalculada todo dia às 06:30).
 //   3) Últimos períodos de CMV (entre contagens seguidas) com o % sobre o faturamento.
 //   4) Notas pendentes de entrada no estoque.
 // Faturamento = líquido das vendas do Degust (resumos no R2, via ../shared/vendas.js), o mesmo usado no CMV. Cada bloco só aparece com o módulo liberado.
@@ -13,7 +14,7 @@ import {loadSuppliers} from "../shared/catalog.js";
 import {computeCMV} from "./cmv.js";
 import {enabledModules} from "../../areas/loja/shell.js";
 
-const BRAND="#85071D",GRAY="#8E8E93";
+const BRAND="#85071D",GRAY="#8E8E93",PROJ="#C2566A";
 const MESES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 const ym=d=>String(d).slice(0,7);
 
@@ -24,8 +25,9 @@ export async function render(ctx){
  const showSales=on.has("faturamento"),showNotes=on.has("notas"),showCmv=on.has("cmv");
  const t=today(),mStart=t.slice(0,8)+"01",curM=ym(t);
  const Y=Number(t.slice(0,4)),PY=Y-1;   // ano atual e o anterior (comparativo)
- const [days,invoices,suppliers,counts]=await Promise.all([
+ const [days,forecast,invoices,suppliers,counts]=await Promise.all([
   showSales?salesByDay(ctx.storeId,PY+"-01-01",t).catch(()=>[]):[],
+  showSales?list("sales_forecast",{select:"business_date,projected_net",eq:{store_id:ctx.storeId},order:"business_date",asc:true}).catch(()=>[]):[],
   showNotes?list("invoices",{select:"id,invoice_number,issue_date,entry_date,total_amount,supplier_id",eq:{store_id:ctx.storeId,status:"pending"},order:"entry_date",asc:true}):[],
   showNotes?loadSuppliers().catch(()=>[]):[],
   showCmv?list("stock_counts",{select:"id,display_id,count_date,status",eq:{store_id:ctx.storeId},order:"count_date",asc:true}):[]
@@ -41,11 +43,19 @@ export async function render(ctx){
  const dLabels=[],dVals=[];
  for(let i=1;i<=lastDay;i++){const dd=String(i).padStart(2,"0");dLabels.push(String(i));dVals.push(dayVal(Y+"-"+mm+"-"+dd))}
  const monthTotal=round2(dVals.reduce((s,v)=>s+(v||0),0));
+ // Projeção (dias futuros do mês atual). A linha pontilhada começa no último dia com venda, para emendar na linha real.
+ const fc=new Map(forecast.filter(f=>String(f.business_date).slice(0,10)>t).map(f=>[String(f.business_date).slice(0,10),Number(f.projected_net)]));
+ const dProj=dLabels.map((_,i)=>fc.get(Y+"-"+mm+"-"+String(i+1).padStart(2,"0"))??null);
+ const fcMonth=round2(dProj.reduce((s,v)=>s+(v||0),0)),hasProj=fcMonth>0;
+ if(hasProj){let k=dVals.length-1;while(k>=0&&dVals[k]==null)k--;if(k>=0&&dProj[k]==null)dProj[k]=dVals[k]}
  // Mês a mês: janeiro a dezembro do ano atual e, pontilhado, o mesmo mês do ano anterior.
  const byMonth=new Map();for(const [d,v] of byDate)byMonth.set(ym(d),(byMonth.get(ym(d))||0)+v);
  const months=MESES.map((_,i)=>String(i+1).padStart(2,"0"));
  const monVal=m=>m>curM||m<ym(firstDay)?null:round2(byMonth.get(m)||0);
  const mCur=months.map(m=>monVal(Y+"-"+m)),mPrev=months.map(m=>monVal(PY+"-"+m));
+ // Mês atual projetado = vendido até agora + projeção dos dias que faltam; emenda no mês anterior.
+ const ci=Number(mm)-1,mProj=months.map(()=>null);
+ if(hasProj){mProj[ci]=round2((mCur[ci]||0)+fcMonth);if(ci>0&&mCur[ci-1]!=null)mProj[ci-1]=mCur[ci-1]}
 
  // Períodos de CMV: cada par de contagens seguidas (sem as canceladas), do mais recente para trás (até 6).
  let periods=[];
@@ -88,11 +98,11 @@ export async function render(ctx){
    view=v;try{localStorage.setItem("rfs-inicio-fat",v)}catch{}
    ctx.el.querySelectorAll("[data-view]").forEach(b=>{const on=b.dataset.view===v;b.classList.toggle("on",on);b.setAttribute("aria-selected",String(on))});
    if(v==="dia"){
-    tot.textContent=money(monthTotal);sub.textContent=" no mês de "+MESES[Number(mm)-1]+"/"+Y;
-    lineChart(box,{labels:dLabels,series:[{name:"Faturamento",color:BRAND,values:dVals}],format:money,tickEvery:5,ariaLabel:"Faturamento por dia no mês atual"});
+    tot.textContent=money(monthTotal);sub.textContent=" no mês de "+MESES[Number(mm)-1]+"/"+Y+(hasProj?" · projeção do mês "+money(round2(monthTotal+fcMonth)):"");
+    lineChart(box,{labels:dLabels,series:[{name:"Faturamento",color:BRAND,values:dVals},...(hasProj?[{name:"Projeção",color:PROJ,dash:true,values:dProj}]:[])],format:money,tickEvery:5,ariaLabel:"Faturamento por dia no mês atual, com projeção"});
    }else{
     tot.textContent=money(yearTotal);sub.textContent=" em "+Y;
-    lineChart(box,{labels:MESES,series:[{name:String(Y),color:BRAND,values:mCur},{name:String(PY),color:GRAY,dash:true,values:mPrev}],format:money,tickEvery:1,ariaLabel:"Faturamento por mês no ano atual e no anterior"});
+    lineChart(box,{labels:MESES,series:[{name:String(Y),color:BRAND,values:mCur},...(hasProj?[{name:"Projeção "+Y,color:PROJ,dash:true,values:mProj}]:[]),{name:String(PY),color:GRAY,dash:true,values:mPrev}],format:money,tickEvery:1,ariaLabel:"Faturamento por mês no ano atual e no anterior"});
    }
   };
   ctx.el.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>show(b.dataset.view));
