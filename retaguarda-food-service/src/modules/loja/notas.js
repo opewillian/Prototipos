@@ -7,6 +7,7 @@ import {pageHead,btn,dataTable,openDrawer,field,input,select,textarea,toast,conf
 import {loadItems,loadSuppliers,byId,loadLastCosts,unitCost,lineTotal} from "../shared/catalog.js";
 import {mountLines} from "../shared/doclines.js";
 import {loadMaps,syncNfe,nfeItemsCard,openNfeDepara,otherCostsCard,bindOtherCosts,costsTotal} from "../shared/nfe.js";
+import {canReverse,reverseInvoiceDialog} from "../shared/estorno.js";
 
 export const ATTACH_BUCKET="retaguarda-anexos";
 const PAY={pending:"pending",paid:"paid"};
@@ -80,13 +81,14 @@ async function editHeader(ctx,inv,suppliers){
 }
 
 async function detail(ctx,id){
- const [inv,lines,pays,atts,items,suppliers,lastCosts,nfe,costs]=await Promise.all([
+ const [inv,lines,pays,atts,items,suppliers,lastCosts,nfe,costs,revs]=await Promise.all([
   get("invoices",id),list("invoice_items",{eq:{invoice_id:id},order:"created_at",asc:true}),
   list("invoice_payments",{eq:{invoice_id:id},order:"due_date",asc:true}),
   list("invoice_attachments",{eq:{invoice_id:id},order:"created_at",asc:true}).catch(()=>[]),
   loadItems({store:ctx.store}),loadSuppliers(),loadLastCosts(ctx.storeId),
   list("invoice_nfe_items",{eq:{invoice_id:id},order:"seq",asc:true}).catch(()=>[]),
-  list("invoice_other_costs",{eq:{invoice_id:id},order:"created_at",asc:true}).catch(()=>[])
+  list("invoice_other_costs",{eq:{invoice_id:id},order:"created_at",asc:true}).catch(()=>[]),
+  list("invoice_reversals",{eq:{invoice_id:id},order:"reversed_at"}).catch(()=>[])
  ]);
  const adj=costsTotal(costs);
  if(!ctx.isCurrent())return;
@@ -110,11 +112,14 @@ async function detail(ctx,id){
  const itemsTotal=()=>round2(itemsSum()+adj);
  ctx.el.innerHTML=backLink(ctx.base+"/notas","Notas fiscais")+
   '<div class="doc-head"><div><div class="doc-title"><h1>Nota nº '+e(inv.invoice_number)+'</h1>'+statusPill(inv.status)+'</div><p class="muted" style="margin:6px 0 0">'+e(supplier?.name||"Sem fornecedor")+'</p></div>'+
-  '<div class="page-actions">'+(editable?btn("Editar dados",{variant:"secondary",icon:"edit",attrs:"data-edit"})+btn("Cancelar nota",{variant:"ghost",attrs:"data-cancel"})+btn("Dar entrada no estoque",{variant:"ok",icon:"check",attrs:"data-receive"}):'')+'</div></div>'+
+  '<div class="page-actions">'+(editable?btn("Editar dados",{variant:"secondary",icon:"edit",attrs:"data-edit"})+btn("Cancelar nota",{variant:"ghost",attrs:"data-cancel"})+btn("Dar entrada no estoque",{variant:"ok",icon:"check",attrs:"data-receive"}):'')+
+   // Estorno: só administrador da Matriz, em nota recebida (tira do estoque e volta para pendente).
+   (inv.status==="received"&&canReverse(ctx.app)?btn("Estornar nota",{variant:"secondary",icon:"undo",attrs:"data-reverse"}):'')+'</div></div>'+
   '<div class="doc-meta"><div><small>Emissão</small><strong>'+dateBR(inv.issue_date)+'</strong></div><div><small>Entrada</small><strong>'+dateBR(inv.entry_date)+'</strong></div>'+
   '<div><small>Pedido vinculado</small><strong>'+(order?'<a href="'+ctx.base+'/pedidos/'+order.id+'">'+e(order.number)+'</a>':"—")+'</strong></div><div><small>Total da nota</small><strong data-items-total>'+money(itemsTotal())+'</strong></div></div>'+
   (inv.access_key?'<p class="muted" style="margin:-8px 0 16px;font-size:12px">'+(inv.series?'Série '+e(inv.series)+' · ':'')+'Chave: '+e(inv.access_key)+(inv.origin==="everest"?' · importada do Everest':'')+'</p>':'')+
 
+  (revs.length&&inv.status==="pending"?alertBox("Nota estornada em "+dateBR(String(revs[0].reversed_at).slice(0,10))+": "+revs[0].reason+". Corrija e dê entrada de novo.","warn"):'')+
   (inv.status==="received"?alertBox("Entrada registrada em "+dateBR(inv.received_at)+". Os itens já compõem o estoque da loja.","ok"):'')+
   (nfeMode?nfeItemsCard({inv,nfe,lines,items:map,maps}):card("Itens da nota",'<div data-lines></div>',{flush:true,actions:editable&&order?btn("Importar itens do pedido "+order.number,{variant:"secondary",sm:true,icon:"download",attrs:"data-import"}):''}))+
   otherCostsCard({inv,costs,itemsSum:itemsSum(),editable,nfeMode})+
@@ -224,6 +229,7 @@ async function detail(ctx,id){
   ev.target.value="";drawAtts();
  });
 
+ ctx.el.querySelector("[data-reverse]")?.addEventListener("click",()=>reverseInvoiceDialog({inv,storeName:ctx.store?.name||"",supplierName:supplier?.name,onDone:()=>ctx.reload()}));
  if(!editable)return;
  ctx.el.querySelector("[data-edit]").onclick=()=>editHeader(ctx,inv,suppliers);
  ctx.el.querySelector("[data-import]")?.addEventListener("click",async()=>{
