@@ -7,6 +7,7 @@ import * as pedidos from "../../modules/loja/pedidos.js";
 import * as transferencias from "../../modules/loja/transferencias.js";
 import * as perdas from "../../modules/loja/perdas.js";
 import * as cmv from "../../modules/loja/cmv.js";
+import * as faturamento from "../../modules/loja/faturamento.js";
 import {storePerm} from "../../core/access.js";
 
 // feature = código em store_feature_flags; módulos sem liberação não aparecem.
@@ -18,7 +19,8 @@ export const lojaModules=[
  {id:"perdas",label:"Perdas",icon:"trash",group:"Estoque",feature:"losses",mod:perdas},
  {id:"pedidos",label:"Pedidos de compra",icon:"cart",group:"Compras",groupIcon:"cart",feature:"orders",mod:pedidos},
  {id:"notas",label:"Notas fiscais",icon:"receipt",group:"Compras",feature:"notes",mod:notas},
- {id:"cmv",label:"CMV",icon:"chart",group:"Análise",groupIcon:"chart",feature:"cmv",mod:cmv}
+ {id:"faturamento",label:"Faturamento",icon:"receipt",group:"Análise",groupIcon:"chart",feature:"cmv",mod:faturamento},
+ {id:"cmv",label:"CMV",icon:"chart",group:"Análise",feature:"cmv",mod:cmv}
 ];
 export function enabledModules(app,storeId){
  const flags=app.flags[storeId]||{};

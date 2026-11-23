@@ -4,6 +4,7 @@
 // Ações (POST JSON {acao, ...}):
 //   "lojas"  → lista as lojas da franquia no Degust (código, nome, CNPJ, cidade).
 //   "vendas" → relatório de vendas de uma loja num período (máx. 30 dias): {codLoja, dataInicial, dataFinal, resumo?}
+//   "importar" → grava UM dia de caixa da loja nas tabelas sales/sale_items/sale_payments: {storeId, data}
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const BASE = "https://lx-degust-api-integracao-prd.azurewebsites.net";
@@ -106,6 +107,74 @@ Deno.serve(async (req) => {
         });
       }
       return json({ ok: true, vendas });
+    }
+    if (p.acao === "importar") {
+      // Importa UM dia de caixa de uma loja: apaga o que havia do dia e grava de novo (pega cancelamentos tardios).
+      const dia = String(p.data ?? "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return json({ erro: "Informe a data (AAAA-MM-DD)." }, 400);
+      const { data: st } = await admin.from("stores").select("id,degust_code").eq("id", p.storeId).maybeSingle();
+      if (!st?.degust_code) return json({ erro: "Loja sem código do Degust." }, 400);
+      const r = await linx("POST", "/api/venda/relatorio-vendas", {
+        body: { dataInicial: dia, dataFinal: dia, codFranqueador: franqueador(), codLoja: st.degust_code, exibirVendasCanceladas: true, tipoData: "C" },
+      });
+      const vendas: Record<string, any>[] = Array.isArray(r) ? r : [];
+      const n = (v: unknown) => Number(String(v ?? 0).replace(",", ".")) || 0;
+      const yes = (v: unknown) => String(v ?? "").trim().toUpperCase() === "S";
+      // Mesmo controle repetido no dia: fica o último.
+      const byCtl = new Map<number, Record<string, any>>();
+      for (const v of vendas) byCtl.set(Number(v.controle), v);
+      const lista = [...byCtl.values()];
+      const del = await admin.from("sales").delete().eq("store_id", st.id).eq("business_date", dia);
+      if (del.error) throw new Error("Apagar dia: " + del.error.message);
+      let gravadas = 0, itens = 0, pagtos = 0;
+      for (let i = 0; i < lista.length; i += 200) {
+        const lote = lista.slice(i, i + 200);
+        const rows = lote.map((v) => {
+          const doc = (v.documento ?? [])[0] ?? {};
+          return {
+            store_id: st.id, business_date: dia, control: Number(v.controle), sale_date: v.dataVenda ?? null, created_raw: v.dataHoraInclusao ?? null,
+            pdv: v.numPdv ?? null, opening: v.numAbertura ?? null, sale_type: v.tipoVenda ?? null, cancelled: yes(v.cancelada),
+            gross: n(v.valProduto), discount: n(v.valDesconto), item_discount: n(v.valDescontoItem), surcharge: n(v.valAcrescimo),
+            net: n(v.valLiquido), change_amount: n(v.valTroco), has_customer_doc: yes(v.possuiCpfCnpj),
+            doc_model: doc.modelo ?? null, doc_number: doc.numero ?? null, doc_key: doc.chave ?? null, doc_status: doc.situacaoSefaz ?? null,
+          };
+        });
+        const ins = await admin.from("sales").insert(rows).select("id,control");
+        if (ins.error) throw new Error("Gravar vendas: " + ins.error.message);
+        const idOf = new Map((ins.data ?? []).map((x: { id: string; control: number }) => [Number(x.control), x.id]));
+        gravadas += ins.data?.length ?? 0;
+        const its: Record<string, unknown>[] = [], pgs: Record<string, unknown>[] = [];
+        for (const v of lote) {
+          const sid = idOf.get(Number(v.controle));
+          if (!sid) continue;
+          for (const it of v.itens ?? []) its.push({
+            sale_id: sid, store_id: st.id, business_date: dia, line: it.numLancto ?? null, main_line: it.numLanctoItemPrincipal ?? null,
+            product_code: it.codProduto ?? null, product_name: it.descricaoProduto ?? null, unit: it.unidadeProduto ?? null,
+            quantity: n(it.quantidade), unit_price: n(it.valUnitario), total: n(it.valTotal), discount: n(it.valDesconto),
+            cancelled: yes(it.cancelado), stock_item_code: it.fiscal?.codItemEstoque ?? null,
+          });
+          for (const pg of v.formaPagamento ?? []) pgs.push({
+            sale_id: sid, store_id: st.id, business_date: dia, seq: pg.sequencia ?? null, method: pg.formaPgto ?? null,
+            method_code: pg.codFormaPagamento ?? null, brand: pg.bandeira ?? null, amount: n(pg.valor), installments: pg.tefQtdeParcela ?? null,
+          });
+        }
+        for (let k = 0; k < its.length; k += 500) {
+          const e = await admin.from("sale_items").insert(its.slice(k, k + 500));
+          if (e.error) throw new Error("Gravar itens: " + e.error.message);
+        }
+        for (let k = 0; k < pgs.length; k += 500) {
+          const e = await admin.from("sale_payments").insert(pgs.slice(k, k + 500));
+          if (e.error) throw new Error("Gravar pagamentos: " + e.error.message);
+        }
+        itens += its.length; pagtos += pgs.length;
+      }
+      const ok = lista.filter((v) => !yes(v.cancelada));
+      const liquido = Math.round(ok.reduce((s, v) => s + n(v.valLiquido), 0) * 100) / 100;
+      await admin.from("sales_imports").upsert({
+        store_id: st.id, business_date: dia, sales: ok.length, cancelled: lista.length - ok.length, net: liquido,
+        imported_at: new Date().toISOString(), imported_by: u.user.id,
+      });
+      return json({ ok: true, data: dia, vendas: ok.length, canceladas: lista.length - ok.length, liquido, gravadas, itens, pagamentos: pagtos });
     }
     return json({ erro: "Ação desconhecida." }, 400);
   } catch (e) {
