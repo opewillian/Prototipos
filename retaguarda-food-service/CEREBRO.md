@@ -926,4 +926,9 @@ Depois:
 - Segredos no Supabase (Edge Functions → Secrets): DEGUST_USUARIO, DEGUST_SENHA, DEGUST_FRANQUEADOR (cadastrados pelo usuário; ninguém vê o valor).
 - Edge Function `degust` (supabase/functions/degust/index.ts, publicada pelo editor do painel): só admin da Matriz; ações "lojas" e "vendas" (relatorio-vendas, máx. 30 dias, tipoData C = data do caixa). Token guardado em public.integration_tokens (script 33, sem acesso do app).
 - Teste OK: 131 lojas na franquia; CGH = codLoja 12 "DELTA AERO CONGONHAS 09-03 - PUBLICA". 20/11/2026: 254 vendas, 39 canceladas, líquido R$ 8.088,50.
-- Próximo: tabelas de vendas, vínculo loja ↔ código Degust, importação diária e tela de Faturamento.
+- Script 34: stores.degust_code (CGH 'teste' = 12); tabelas sales / sale_items / sale_payments / sales_imports (gravação só pela função; leitura pela aba 'cmv'); funções sales_by_day / sales_by_product / sales_by_payment. Sem CPF do consumidor (só has_customer_doc).
+- Regra de valores da Linx: valProduto (gross) já vem SEM o desconto dos itens → bruto = gross + item_discount; descontos = discount + item_discount; líquido = valLiquido = gross − discount + surcharge. Out/26 CGH: bruto 268.979,00 − desc 5.220,28 = líquido 263.758,72 (= soma dos pagamentos).
+- Função degust: ação "importar" (1 dia por chamada: apaga o dia e regrava) e "diario" (últimos 3 dias de cada loja com degust_code). Histórico CGH carregado 01/08–22/11/2026: 114 dias, 25.282 vendas, R$ 957.141,99 líquido.
+- Script 35: pg_cron + pg_net, job 'degust-vendas-diario' às 09:00 UTC (06:00 BRT) com x-cron-key (integration_tokens 'cron') + apikey publishable. Teste manual OK (20–22/11 reimportados). "Verify JWT" da função continua LIGADO (desligar foi bloqueado; não precisou).
+- Tela Loja › Análise › Faturamento (loja/faturamento.js, liberação 'cmv'): período De/Até + atalhos; resumo; por dia; produtos (com busca); formas de pagamento; botão de importar o período (só admin).
+

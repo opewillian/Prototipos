@@ -95,7 +95,8 @@ language sql stable security invoker set search_path = '' as $$
   select s.business_date,
          count(*) filter (where not s.cancelled),
          count(*) filter (where s.cancelled),
-         coalesce(sum(s.gross) filter (where not s.cancelled),0),
+         -- valProduto (gross) da Linx já vem sem o desconto dos itens: bruto = gross + item_discount; líquido = bruto − descontos.
+         coalesce(sum(s.gross + s.item_discount) filter (where not s.cancelled),0),
          coalesce(sum(s.discount + s.item_discount) filter (where not s.cancelled),0),
          coalesce(sum(s.net) filter (where not s.cancelled),0)
   from public.sales s
