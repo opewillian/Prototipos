@@ -920,3 +920,10 @@ Depois:
 - Das 30 notas da planilha (de-para completo + data revisada), 19 receberam entrada pelo app (de-para/rateio iguais à tela): 111 movimentos, R$ 43.502,91.
 - 11 ficaram PENDENTES porque a soma dos itens não fecha com o valor da nota (faltam descontos/impostos em "Outros custos"): Sendas 177919, 178953, 179616, 179704, 180447, 180877, 181113, 181961, 182114 (itens acima da nota = desconto); SPAL 16946833 e 16979884 (itens abaixo da nota = IPI/ST/frete).
 - Depois (a pedido do usuário): nas 11 pendentes a diferença foi lançada em Outros custos ("Desconto" nas 9 da Sendas; "ICMS ST" nas 2 da SPAL: 4,82 e 190,62), com descrição "Diferença para fechar com o valor da nota", rateio reaplicado e entrada dada. Resultado: 30/30 notas de out/26 recebidas, 154 movimentos, R$ 47.866,68 (notas somam 47.867,27; 0,59 é arredondamento do custo unitário em 4 casas).
+
+### Integração Linx Degust One — faturamento (23/11/2026)
+- API: https://lx-degust-api-integracao-prd.azurewebsites.net (swagger em /swagger). Login POST /api/usuario/autenticar → {statusCode, acesso:{token}} (token 4 h; não gerar toda hora).
+- Segredos no Supabase (Edge Functions → Secrets): DEGUST_USUARIO, DEGUST_SENHA, DEGUST_FRANQUEADOR (cadastrados pelo usuário; ninguém vê o valor).
+- Edge Function `degust` (supabase/functions/degust/index.ts, publicada pelo editor do painel): só admin da Matriz; ações "lojas" e "vendas" (relatorio-vendas, máx. 30 dias, tipoData C = data do caixa). Token guardado em public.integration_tokens (script 33, sem acesso do app).
+- Teste OK: 131 lojas na franquia; CGH = codLoja 12 "DELTA AERO CONGONHAS 09-03 - PUBLICA". 20/11/2026: 254 vendas, 39 canceladas, líquido R$ 8.088,50.
+- Próximo: tabelas de vendas, vínculo loja ↔ código Degust, importação diária e tela de Faturamento.
