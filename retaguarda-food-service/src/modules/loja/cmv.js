@@ -7,7 +7,7 @@
 // Memória de cálculo clicável: o nome do item abre todas as movimentações dele (por categoria e data); cada número abre o
 // detalhe daquela categoria. Estoque inicial/final de contagem em RASCUNHO abre a edição da quantidade (grava e recalcula).
 import {list,get,insert,insertMany,update,remove,supabase} from "../../core/db.js";
-import {e,money,num,dateBR,dateTimeBR,round2,pct,addDays,daysBetween,today} from "../../core/format.js";
+import {e,money,num,dateBR,dateTimeBR,round2,pct,addDays,daysBetween,today,parseNum} from "../../core/format.js";
 import {icon} from "../../core/icons.js";
 import {pageHead,btn,dataTable,toast,emptyState,backLink,errorMessage,card,alertBox,searchBox,searchKey,openModal,openDrawer,field,input} from "../../core/ui.js";
 import {loadItems,byId,loadSuppliers,loadLastCosts,unitCost,lineTotal} from "../shared/catalog.js";
@@ -216,8 +216,8 @@ function editCountQty(ctx,r,x,which){
    const p={};
    for(const el of form.querySelectorAll("[data-part]")){
     const raw=el.value.trim();if(!raw)continue;
-    const v=Number(raw.replace(/\./g,"").replace(",","."));
-    if(!Number.isFinite(v)||v<0)throw Error("Quantidade inválida.");
+    const v=parseNum(raw);
+    if(v==null||!Number.isFinite(v))throw Error("Quantidade inválida: use só números (ex.: 12 ou 1,5).");
     p[el.dataset.part]=v;
    }
    if(!Object.keys(p).length){if(line)await remove("stock_count_items",line.id)}

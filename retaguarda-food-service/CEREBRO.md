@@ -933,3 +933,4 @@ Depois:
 - Tela Loja › Financeiro › Faturamento (primeiro grupo do menu, logo após Início) (loja/faturamento.js, liberação 'cmv'): período De/Até + atalhos; resumo; por dia; produtos (com busca); formas de pagamento; botão de importar o período (só admin).
 
 - CMV (loja/cmv.js): resumo mostra faturamento líquido do período (sales_by_day de from a to, mesmo período dos documentos), CMV % e perdas % sobre o faturamento; avisa quando faltam dias importados. Out/26 CGH: faturamento 263.758,72, CMV 22,6%.
+- CMV memória de cálculo clicável: nome do item abre popin com todas as movimentações (estoque inicial, compras, transf. recebidas/enviadas, perdas, estoque final; por data, com link para o documento) e o CMV do item; cada número abre só aquela categoria. Estoque inicial/final de contagem em RASCUNHO (com lápis) abre a edição da quantidade (colunas da contagem; grava em stock_count_items e recalcula).
