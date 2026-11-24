@@ -24,6 +24,9 @@
 //   "resumo"   → {storeId, de, ate, somenteDias?}: dias (com vendas por hora quando houver), produtos e formas de pagamento do período (lido dos resumos no R2);
 //                somenteDias:true devolve só o dia a dia (mais rápido, para gráficos).
 //   "importar" → {storeId, data}: busca o dia na Linx e grava arquivo + resumos no R2.
+//   "fila"     → processa a fila sales_import_jobs por até ~110 s (cron "degust-fila" a cada minuto, ou admin).
+//   "periodo_teste" → {codLoja, de, ate}: separa um período por dia sem gravar (conferência).
+// Lojas com vários pontos no Degust: stores.degust_codes (as vendas de todos entram somadas na loja).
 //   "diario"   → para cada loja com código do Degust, reimporta os 3 dias anteriores.
 //   "resumir"  → {storeId, data, mes?}: refaz o resumo do dia a partir do arquivo já guardado (sem chamar a Linx);
 //                mes:true também refaz o resumo do mês.
@@ -248,14 +251,30 @@ async function periodSummary(storeId: string, de: string, ate: string, onlyDays 
 
 // ---------------------------------------------------------------- Importação
 // Busca UM dia de caixa na Linx e grava no R2: arquivo completo + resumo do dia + resumo do mês. Regravar substitui.
-async function importDay(storeId: string, degustCode: number, dia: string, userId: string | null, rebuild = true) {
-  const r = await linx("POST", "/api/venda/relatorio-vendas", {
-    body: { dataInicial: dia, dataFinal: dia, codFranqueador: franqueador(), codLoja: degustCode, exibirVendasCanceladas: true, tipoData: "C" },
-  });
-  const byCtl = new Map<number, Record<string, any>>();   // mesmo controle repetido no dia: fica o último
-  for (const v of (Array.isArray(r) ? r : [])) byCtl.set(Number(v.controle), v);
-  const lista = [...byCtl.values()].map(({ docConsumidor: _a, docConsumidorDesconto: _b, ...v }) => v);
-  const doc = JSON.stringify({ loja: storeId, codLojaDegust: degustCode, data: dia, geradoEm: new Date().toISOString(), vendas: lista });
+// Pontos de venda do Degust de uma loja: stores.degust_codes (vários pontos com o mesmo CNPJ, somados na loja) ou degust_code.
+type StoreRow = { id: string; degust_code: number | null; degust_codes?: number[] | null };
+const codesOf = (st: StoreRow) => ((st.degust_codes?.length ? st.degust_codes : [st.degust_code]) ?? []).filter((c): c is number => Number(c) > 0);
+// Dia de caixa da venda: dataVenda (dd/mm/aaaa); sem ela, datMovimento; sem as duas, o dia pedido.
+const diaDaVenda = (v: Record<string, any>, padrao: string) => {
+  const m = String(v.dataVenda ?? v.datMovimento ?? "").match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return m[3] + "-" + m[2] + "-" + m[1];
+  const iso = String(v.datMovimento ?? "").match(/^\d{4}-\d{2}-\d{2}/);
+  return iso ? iso[0] : padrao;
+};
+/** Busca as vendas de um período (até 30 dias) em todos os pontos da loja; tira duplicadas e o documento do consumidor. */
+async function fetchSales(codes: number[], de: string, ate: string) {
+  const byKey = new Map<string, Record<string, any>>();   // mesmo controle repetido: fica o último
+  for (const cod of codes) {
+    const r = await linx("POST", "/api/venda/relatorio-vendas", {
+      body: { dataInicial: de, dataFinal: ate, codFranqueador: franqueador(), codLoja: cod, exibirVendasCanceladas: true, tipoData: "C" },
+    });
+    for (const v of (Array.isArray(r) ? r : [])) byKey.set(cod + "|" + Number(v.controle), { ...v, codLoja: v.codLoja ?? cod });
+  }
+  return [...byKey.values()].map(({ docConsumidor: _a, docConsumidorDesconto: _b, ...v }) => v);
+}
+/** Grava um dia: arquivo completo (a partir de DETALHE_DESDE), resumo do dia e registro em sales_imports. */
+async function writeDay(storeId: string, codes: number[], dia: string, lista: Record<string, any>[], userId: string | null, rebuild: boolean) {
+  const doc = JSON.stringify({ loja: storeId, codLojaDegust: codes.length === 1 ? codes[0] : codes, data: dia, geradoEm: new Date().toISOString(), vendas: lista });
   let gz: Uint8Array | null = null;
   if (dia >= DETALHE_DESDE) { gz = await gzip(doc); await r2Put(keyDetail(storeId, dia), gz, "application/gzip"); }
   const sum = summarizeDay(dia, lista);
@@ -263,6 +282,67 @@ async function importDay(storeId: string, degustCode: number, dia: string, userI
   if (rebuild) await rebuildMonth(storeId, dia.slice(0, 7));
   await admin.from("sales_imports").upsert({ store_id: storeId, business_date: dia, sales: sum.sales, cancelled: sum.cancelled, net: sum.net, imported_at: new Date().toISOString(), imported_by: userId });
   return { data: dia, vendas: sum.sales, canceladas: sum.cancelled, liquido: sum.net, arquivo: gz ? { bytes: gz.length, bytesSemCompactar: enc.encode(doc).length } : "só resumo" };
+}
+// Busca UM dia de caixa na Linx e grava no R2. Regravar substitui.
+async function importDay(storeId: string, codes: number[], dia: string, userId: string | null, rebuild = true) {
+  return writeDay(storeId, codes, dia, await fetchSales(codes, dia, dia), userId, rebuild);
+}
+const addDia = (dia: string, n: number) => { const d = new Date(dia + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+/** Importa um período (até 30 dias) de uma vez: uma chamada por ponto, separa por dia e grava os dias em paralelo
+ *  (5 por vez) e o registro em sales_imports numa chamada só. Não refaz o mês (o trabalho "mes" da fila faz). */
+async function importRange(storeId: string, codes: number[], de: string, ate: string, userId: string | null) {
+  const lista = await fetchSales(codes, de, ate);
+  const porDia = new Map<string, Record<string, any>[]>();
+  for (const v of lista) { const d = diaDaVenda(v, de); (porDia.get(d) ?? porDia.set(d, []).get(d)!).push(v); }
+  const dias: string[] = [];
+  for (let d = de; d <= ate; d = addDia(d, 1)) dias.push(d);
+  const regs: Record<string, unknown>[] = [];
+  let vendas = 0;
+  for (let i = 0; i < dias.length; i += 5) {
+    await Promise.all(dias.slice(i, i + 5).map(async (d) => {
+      const vs = porDia.get(d) ?? [];
+      if (d >= DETALHE_DESDE) {
+        const doc = JSON.stringify({ loja: storeId, codLojaDegust: codes.length === 1 ? codes[0] : codes, data: d, geradoEm: new Date().toISOString(), vendas: vs });
+        await r2Put(keyDetail(storeId, d), await gzip(doc), "application/gzip");
+      }
+      const sum = summarizeDay(d, vs);
+      await r2PutJson(keyDaySum(storeId, d), sum);
+      vendas += sum.sales;
+      regs.push({ store_id: storeId, business_date: d, sales: sum.sales, cancelled: sum.cancelled, net: sum.net, imported_at: new Date().toISOString(), imported_by: userId });
+    }));
+  }
+  const { error } = await admin.from("sales_imports").upsert(regs);
+  if (error) throw new Error("sales_imports: " + error.message);
+  const fora = [...porDia.keys()].filter((d) => d < de || d > ate);
+  return { dias: dias.length, vendas, fora };
+}
+// ---------------------------------------------------------------- Fila de importação (tabela sales_import_jobs)
+// kind "dias" = importRange(de..ate); kind "mes" = rebuildMonth(mês de "de"). Quem pega o trabalho: public.claim_sales_import_job().
+async function runQueue(budgetMs: number) {
+  const t0 = Date.now(); let feitos = 0, erros = 0;
+  const lojas = new Map<string, number[]>();
+  while (Date.now() - t0 < budgetMs) {
+    const { data: job, error } = await admin.rpc("claim_sales_import_job");
+    if (error) throw new Error("Fila: " + error.message);
+    const j = Array.isArray(job) ? job[0] : job;
+    if (!j?.id) break;
+    try {
+      if (j.kind === "mes") { await rebuildMonth(j.store_id, String(j.de).slice(0, 7)); }
+      else {
+        if (!lojas.has(j.store_id)) { const { data: st } = await admin.from("stores").select("id,degust_code,degust_codes").eq("id", j.store_id).maybeSingle(); lojas.set(j.store_id, st ? codesOf(st as StoreRow) : []); }
+        const codes = lojas.get(j.store_id)!;
+        if (!codes.length) throw new Error("Loja sem código do Degust.");
+        await importRange(j.store_id, codes, j.de, j.ate, null);
+      }
+      await admin.from("sales_import_jobs").update({ status: "ok", error: null, updated_at: new Date().toISOString() }).eq("id", j.id);
+      feitos++;
+    } catch (e) {
+      erros++;
+      const msg = String((e as Error).message ?? e).replace(/eyJ[\w.-]+/g, "[token]").slice(0, 500);
+      await admin.from("sales_import_jobs").update({ status: j.tries >= 4 ? "erro" : "pending", error: msg, updated_at: new Date().toISOString() }).eq("id", j.id);
+    }
+  }
+  return { feitos, erros, ms: Date.now() - t0 };
 }
 // Refaz o resumo do dia a partir do arquivo já guardado (sem chamar a Linx).
 async function resummarize(storeId: string, dia: string, month: boolean) {
@@ -291,14 +371,18 @@ Deno.serve(async (req) => {
     if (cronKey) {
       const { data: k } = await admin.from("integration_tokens").select("token").eq("provider", "cron").maybeSingle();
       if (!k?.token || k.token !== cronKey) return json({ erro: "Chave do agendamento inválida." }, 401);
-      if (p.acao !== "diario") return json({ erro: "O agendamento só pode rodar a ação diario." }, 400);
-      const { data: lojas } = await admin.from("stores").select("id,degust_code").not("degust_code", "is", null).eq("active", true);
-      const res: unknown[] = [];
-      for (const st of lojas ?? []) for (const d of [3, 2, 1]) {
-        try { res.push({ loja: st.id, ...(await importDay(st.id, st.degust_code, diaSP(d), null)) }); }
-        catch (e) { res.push({ loja: st.id, data: diaSP(d), erro: String((e as Error).message ?? e) }); }
+      if (p.acao === "fila") return json({ ok: true, ...(await runQueue(110_000)) });
+      if (p.acao !== "diario") return json({ erro: "O agendamento só pode rodar as ações diario e fila." }, 400);
+      // Diário: põe na fila os 3 últimos dias de cada loja com Degust (e o resumo dos meses tocados) e já processa a fila.
+      const { data: lojas } = await admin.from("stores").select("id,degust_code,degust_codes").eq("active", true);
+      const de = diaSP(3), ate = diaSP(1), jobs: Record<string, unknown>[] = [];
+      for (const st of (lojas ?? []) as StoreRow[]) {
+        if (!codesOf(st).length) continue;
+        jobs.push({ store_id: st.id, kind: "dias", de, ate, priority: 0 });
+        for (const ym of new Set([de.slice(0, 7), ate.slice(0, 7)])) jobs.push({ store_id: st.id, kind: "mes", de: ym + "-01", ate: ym + "-01", priority: 0 });
       }
-      return json({ ok: true, resultado: res });
+      if (jobs.length) { const { error } = await admin.from("sales_import_jobs").insert(jobs); if (error) throw new Error("Fila: " + error.message); }
+      return json({ ok: true, enfileirados: jobs.length, ...(await runQueue(110_000)) });
     }
 
     const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -334,6 +418,16 @@ Deno.serve(async (req) => {
       .eq("user_id", u.user.id).eq("store_id", "matriz").eq("role", "matrix_admin").eq("active", true).limit(1);
     if (!m?.length) return json({ erro: "Somente administradores da Matriz." }, 403);
 
+    // Teste: separa por dia um período de UM ponto (sem gravar), para conferir com a importação dia a dia.
+    if (p.acao === "periodo_teste") {
+      const de = String(p.de ?? ""), ate = String(p.ate ?? "");
+      if (!isDay(de) || !isDay(ate)) return json({ erro: "Período inválido." }, 400);
+      const lista = await fetchSales([Number(p.codLoja)], de, ate);
+      const out: Record<string, { n: number; liq: number }> = {};
+      for (const v of lista) { if (yes(v.cancelada)) continue; const d = diaDaVenda(v, de); const o = out[d] ?? (out[d] = { n: 0, liq: 0 }); o.n++; o.liq = r2d(o.liq + n(v.valLiquido)); }
+      return json({ ok: true, dias: out });
+    }
+    if (p.acao === "fila") return json({ ok: true, ...(await runQueue(Math.min(Number(p.ms) || 60_000, 110_000))) });
     if (p.acao === "lojas") {
       const r = await linx("GET", "/api/loja/listarLojasFranquia", { query: { codigoFranquia: franqueador() } });
       return json({ ok: true, lojas: (Array.isArray(r) ? r : []).map((l: Record<string, unknown>) => ({ codigoLoja: l.codigoLoja, nomeLoja: l.nomeLoja, razaoSocial: l.razaoSocial, cnpj: l.cnpj, cidade: l.cidade, uf: l.uf, tipo: l.tipo })) });
@@ -364,9 +458,10 @@ Deno.serve(async (req) => {
     }
     if (p.acao === "importar") {
       if (!isDay(dia)) return json({ erro: "Informe a data (AAAA-MM-DD)." }, 400);
-      const { data: st } = await admin.from("stores").select("id,degust_code").eq("id", storeId).maybeSingle();
-      if (!st?.degust_code) return json({ erro: "Loja sem código do Degust." }, 400);
-      return json({ ok: true, ...(await importDay(st.id, st.degust_code, dia, u.user.id, p.mes !== false)) });
+      const { data: st } = await admin.from("stores").select("id,degust_code,degust_codes").eq("id", storeId).maybeSingle();
+      const codes = st ? codesOf(st as StoreRow) : [];
+      if (!codes.length) return json({ erro: "Loja sem código do Degust." }, 400);
+      return json({ ok: true, ...(await importDay(st!.id, codes, dia, u.user.id, p.mes !== false)) });
     }
     return json({ erro: "Ação desconhecida." }, 400);
   } catch (e) {
