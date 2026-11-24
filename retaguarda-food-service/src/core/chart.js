@@ -1,13 +1,14 @@
 // Gráfico de linha em SVG (sem biblioteca). Um eixo só; grade discreta; linha de 2px com pontas arredondadas;
 // passar o mouse mostra a linha vertical (crosshair) e a dica com todos os valores daquele ponto.
 // series: [{name, color, dash?:boolean, values:[number|null,...]}]  labels: rótulos do eixo X (mesmo tamanho de values).
+// extra(i): HTML a mais na dica do ponto i (ex.: passageiros, cupons). yFormat: rótulo do eixo Y (padrão: número compacto).
 import {e} from "./format.js";
 
 const niceMax=v=>{if(!(v>0))return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const n=v/p;return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p};
 const compact=v=>new Intl.NumberFormat("pt-BR",{notation:"compact",maximumFractionDigits:1}).format(v);
 
 /** Desenha dentro de `el`. Retorna uma função para redesenhar (ex.: ao redimensionar). */
-export function lineChart(el,{labels,series,format=v=>String(v),tickEvery=1,height=240,ariaLabel=""}){
+export function lineChart(el,{labels,series,format=v=>String(v),tickEvery=1,height=240,ariaLabel="",extra=null,yFormat=compact}){
  const draw=()=>{
   const W=Math.max(280,el.clientWidth||600),H=height,pad={l:52,r:14,t:12,b:28};
   const iw=W-pad.l-pad.r,ih=H-pad.t-pad.b,n=labels.length;
@@ -15,7 +16,7 @@ export function lineChart(el,{labels,series,format=v=>String(v),tickEvery=1,heig
   const x=i=>pad.l+(n<=1?iw/2:i*iw/(n-1)),y=v=>pad.t+ih-(v/max)*ih;
   const ticks=[0,.25,.5,.75,1].map(f=>f*max);
   let svg='<svg class="lc-svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+e(ariaLabel)+'">';
-  svg+=ticks.map(t=>'<line class="lc-grid" x1="'+pad.l+'" x2="'+(W-pad.r)+'" y1="'+y(t)+'" y2="'+y(t)+'"/><text class="lc-ytick" x="'+(pad.l-8)+'" y="'+(y(t)+4)+'">'+e(compact(t))+'</text>').join("");
+  svg+=ticks.map(t=>'<line class="lc-grid" x1="'+pad.l+'" x2="'+(W-pad.r)+'" y1="'+y(t)+'" y2="'+y(t)+'"/><text class="lc-ytick" x="'+(pad.l-8)+'" y="'+(y(t)+4)+'">'+e(yFormat(t))+'</text>').join("");
   svg+=labels.map((l,i)=>i%tickEvery===0||i===n-1?'<text class="lc-xtick" x="'+x(i)+'" y="'+(H-8)+'">'+e(l)+'</text>':'').join("");
   for(const s of series){
    // Quebra a linha onde não há valor (null).
@@ -38,7 +39,7 @@ export function lineChart(el,{labels,series,format=v=>String(v),tickEvery=1,heig
    if(series.every(s=>s.values[i]==null))return hide();
    cross.setAttribute("x1",x(i));cross.setAttribute("x2",x(i));cross.removeAttribute("hidden");
    dots.forEach((d,k)=>{const v=series[k].values[i];if(v==null)d.setAttribute("hidden","");else{d.setAttribute("cx",x(i));d.setAttribute("cy",y(v));d.removeAttribute("hidden")}});
-   tip.innerHTML='<strong>'+e(labels[i])+'</strong>'+series.map(s=>'<div><i class="lc-key'+(s.dash?" dash":"")+'" style="--c:'+s.color+'"></i><span>'+e(s.name)+'</span><b>'+(s.values[i]==null?"—":e(format(s.values[i])))+'</b></div>').join("");
+   tip.innerHTML='<strong>'+e(labels[i])+'</strong>'+series.map(s=>'<div><i class="lc-key'+(s.dash?" dash":"")+'" style="--c:'+s.color+'"></i><span>'+e(s.name)+'</span><b>'+(s.values[i]==null?"—":e(format(s.values[i])))+'</b></div>').join("")+(extra?(extra(i)||""):"");
    tip.hidden=false;const left=x(i)*(r.width/W);tip.style.left=Math.min(Math.max(left,70),r.width-70)+"px";
   };
   const hit=el.querySelector(".lc-hit");

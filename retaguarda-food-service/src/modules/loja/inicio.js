@@ -26,13 +26,15 @@ export async function render(ctx){
  const showSales=on.has("faturamento"),showCmv=on.has("cmv"),showNotes=on.has("notas");
  const t=today(),mStart=t.slice(0,8)+"01",curM=ym(t);
  const Y=Number(t.slice(0,4)),PY=Y-1;   // ano atual e o anterior (comparativo)
- const [days,ranking,forecast,counts,invoices,suppliers]=await Promise.all([
+ const [days,ranking,forecast,counts,invoices,suppliers,storeAir,paxRows]=await Promise.all([
   showSales?salesByDay(ctx.storeId,PY+"-01-01",t).catch(()=>[]):[],
   showSales?salesRanking(ctx.storeId).catch(error=>({erro:error.message})):null,
   showSales?list("sales_forecast",{select:"business_date,projected_net",eq:{store_id:ctx.storeId},order:"business_date",asc:true}).catch(()=>[]):[],
   showCmv?list("stock_counts",{select:"id,display_id,count_date,status",eq:{store_id:ctx.storeId},order:"count_date",asc:true}):[],
   showNotes?list("invoices",{select:"id,invoice_number,issue_date,entry_date,total_amount,supplier_id",eq:{store_id:ctx.storeId,status:"pending"}}).catch(()=>[]):[],
-  showNotes?loadSuppliers().catch(()=>[]):[]
+  showNotes?loadSuppliers().catch(()=>[]):[],
+  showSales?list("stores",{select:"airport_iata,airport_area",eq:{id:ctx.storeId}}).catch(()=>[]):[],
+  showSales?list("airport_passengers",{select:"iata,month,emb_dom,emb_int,des_dom,des_int"}).catch(()=>[]):[]
  ]);
  if(!ctx.isCurrent())return;
  // ---- Vendas (gráfico): três medidas — Faturamento (líquido), Ticket médio (líquido ÷ cupons) e Cupons (nº de vendas).
@@ -66,6 +68,19 @@ export async function render(ctx){
  /** Valores da hora: faturamento e cupons = média por dia; ticket = líquido ÷ cupons da hora. */
  const hourVals=(H,met)=>H.days?H.h.map(x=>met==="tkt"?(x.n?round2(x.net/x.n):null):met==="cup"?round2(x.n/H.days):round2(x.net/H.days)):Array(24).fill(null);
 
+ // Taxa de oportunidade: faturamento ÷ passageiros da área da loja no mês (ANAC, tabela airport_passengers).
+ // Mês com dias fechados: passageiros proporcionais aos dias com venda. Sem passageiros do mês (ANAC atrasa ~1 mês): sem valor.
+ const air=storeAir[0]||{},AREA_PAX={checkin:p=>p.emb_dom+p.emb_int,praca_land:p=>p.emb_dom+p.emb_int,praca_air:p=>p.emb_dom+p.emb_int,
+  publica:p=>p.emb_dom+p.emb_int+p.des_dom+p.des_int,emb_dom:p=>p.emb_dom,emb_int:p=>p.emb_int,desembarque:p=>p.des_dom+p.des_int,des_int:p=>p.des_int};
+ const paxOf=AREA_PAX[air.airport_area],paxMap=new Map(paxRows.filter(p=>p.iata===air.airport_iata).map(p=>[String(p.month).slice(0,7),p]));
+ const openDays=new Map();for(const [d,r] of dayRec)if(r.n>0)openDays.set(ym(d),(openDays.get(ym(d))||0)+1);
+ const opoOf=m=>{const p=paxMap.get(m),r=byMonth.get(m);if(!p||!paxOf||!r||!r.n)return null;
+  const dm=new Date(+m.slice(0,4),+m.slice(5,7),0).getDate(),od=openDays.get(m)||0;if(!od)return null;
+  const pax=Math.round(paxOf({emb_dom:+p.emb_dom,emb_int:+p.emb_int,des_dom:+p.des_dom,des_int:+p.des_int})*od/dm);
+  return {pax,net:r.net,n:r.n,rs:pax?r.net/pax:null,mil:pax?r.n/pax*1000:null,od,dm}};
+ const hasOpo=!!paxOf&&paxMap.size>0;
+ const AREA_NOME={checkin:"check-in",publica:"área pública",emb_dom:"embarque doméstico",emb_int:"embarque internacional",desembarque:"desembarque",des_int:"desembarque internacional",praca_land:"praça antes do raio-x",praca_air:"praça depois do raio-x"};
+
  // Períodos de CMV: cada par de contagens seguidas (sem as canceladas), do mais recente para trás (até 6).
  let periods=[];
  if(showCmv){
@@ -80,7 +95,7 @@ export async function render(ctx){
 
  ctx.el.innerHTML='<header class="page-head"><div><h1>'+e(ctx.store.name)+'</h1></div></header>'+
   (showSales?card("Vendas",'<div class="chart-total"><span data-chart-total></span><small data-chart-sub></small></div><div data-chart></div>',
-    {actions:'<div class="chart-ctrls"><div class="seg" role="tablist" aria-label="Medida"><button type="button" role="tab" data-met="fat">Faturamento</button><button type="button" role="tab" data-met="tkt">Ticket médio</button><button type="button" role="tab" data-met="cup">Cupons</button></div>'+
+    {actions:'<div class="chart-ctrls"><div class="seg" role="tablist" aria-label="Medida"><button type="button" role="tab" data-met="fat">Faturamento</button><button type="button" role="tab" data-met="tkt">Ticket médio</button><button type="button" role="tab" data-met="cup">Cupons</button>'+(hasOpo?'<button type="button" role="tab" data-met="opo">Taxa de oportunidade</button>':'')+'</div>'+
      '<div class="seg" role="tablist" aria-label="Visualização"><button type="button" role="tab" data-view="dia">Dia a dia</button><button type="button" role="tab" data-view="mes">Mês a mês</button><button type="button" role="tab" data-view="hora">Por hora</button></div></div>'}):'')+
   (showSales?rankingCard(ctx,ranking):'')+
   (showCmv?card("CMV por período",periods.length?dataTable([
@@ -103,7 +118,24 @@ export async function render(ctx){
    try{localStorage.setItem("rfs-inicio-fat",view);localStorage.setItem("rfs-inicio-met",metric)}catch{}
    ctx.el.querySelectorAll("[data-view]").forEach(b=>{const on=b.dataset.view===view;b.classList.toggle("on",on);b.setAttribute("aria-selected",String(on))});
    ctx.el.querySelectorAll("[data-met]").forEach(b=>{const on=b.dataset.met===metric;b.classList.toggle("on",on);b.setAttribute("aria-selected",String(on))});
+   // Taxa de oportunidade só existe por mês (passageiros da ANAC são mensais): dia a dia e por hora ficam indisponíveis.
+   if(metric==="opo"&&!hasOpo)metric="fat";
+   const opo=metric==="opo";if(opo)view="mes";
+   ctx.el.querySelectorAll("[data-view]").forEach(b=>{const off=opo&&b.dataset.view!=="mes";b.disabled=off;b.classList.toggle("off",off);b.title=off?"Indisponível na taxa de oportunidade (passageiros são mensais)":"";b.classList.toggle("on",b.dataset.view===view);b.setAttribute("aria-selected",String(b.dataset.view===view))});
+   ctx.el.querySelectorAll("[data-met]").forEach(b=>{const on=b.dataset.met===metric;b.classList.toggle("on",on);b.setAttribute("aria-selected",String(on))});
    const met=metric,fmt=met==="cup"?(v=>num(v,v%1?1:0)):money,proj=met==="fat"&&hasProj;
+   if(opo){
+    const rsFmt=v=>"R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:3});
+    const cur=months.map(m=>opoOf(Y+"-"+m)),prev=months.map(m=>opoOf(PY+"-"+m));
+    const last=[...cur].reverse().find(Boolean),lastM=cur.lastIndexOf(last);
+    tot.textContent=last?rsFmt(last.rs):"—";
+    sub.textContent=last?" por passageiro em "+MESES[lastM]+"/"+Y+" · "+last.mil.toLocaleString("pt-BR",{maximumFractionDigits:2})+" cupons a cada mil passageiros ("+(AREA_NOME[air.airport_area]||"")+", "+air.airport_iata+")":" sem passageiros no período";
+    const linha=(ano,o)=>o?'<div class="lc-extra"><b>'+ano+'</b> '+num(o.pax,0)+' passageiros'+(o.od<o.dm?' ('+o.od+'/'+o.dm+' dias abertos)':'')+'<br>'+num(o.n,0)+' cupons · '+o.mil.toLocaleString("pt-BR",{maximumFractionDigits:2})+' por mil · '+money(o.net)+'</div>':'';
+    lineChart(box,{labels:MESES,series:[{name:String(Y),color:BRAND,values:cur.map(o=>o?Math.round(o.rs*1000)/1000:null)},{name:String(PY),color:GRAY,dash:true,values:prev.map(o=>o?Math.round(o.rs*1000)/1000:null)}],
+     format:rsFmt,yFormat:v=>v.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}),tickEvery:1,ariaLabel:"Taxa de oportunidade: faturamento por passageiro, por mês",
+     extra:i=>linha(Y,cur[i])+linha(PY,prev[i])});
+    return;
+   }
    if(view==="dia"){
     const vals=dKeys.map(d=>{const r=dayOf(d);return r?val(met,r.net,r.n):null});
     let pj=null;
@@ -198,4 +230,4 @@ function drawNotes(ctx,invoices,sup,page){
  box.querySelectorAll("[data-nt-go]").forEach(b=>b.onclick=()=>drawNotes(ctx,invoices,sup,Number(b.dataset.ntGo)));
 }
 let view=(()=>{try{const v=localStorage.getItem("rfs-inicio-fat");return v==="mes"||v==="hora"?v:"dia"}catch{return "dia"}})();
-let metric=(()=>{try{const v=localStorage.getItem("rfs-inicio-met");return v==="tkt"||v==="cup"?v:"fat"}catch{return "fat"}})();
+let metric=(()=>{try{const v=localStorage.getItem("rfs-inicio-met");return v==="tkt"||v==="cup"||v==="opo"?v:"fat"}catch{return "fat"}})();
