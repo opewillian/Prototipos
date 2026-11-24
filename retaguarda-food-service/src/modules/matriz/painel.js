@@ -1,6 +1,7 @@
 // Matriz · Painel (refeito em 24/11/2026, pedido do usuário): uma tabela com todas as lojas e o faturamento líquido
 // de cada dia do mês. Linhas agrupadas pelo prefixo do código (marca: DEL primeiro, as outras em ordem alfabética) e,
 // dentro do grupo, ordenadas pelo 2º pedaço do código (aeroporto). Rolagem horizontal, sem quebra de texto.
+// Ordem fixa (data, loja) é obrigatória: a leitura vem em páginas de 1000 e, sem ordem, linhas se repetem ou somem.
 // Fonte: public.sales_imports (líquido por loja e dia, gravado pela importação do Degust; RLS = quem vê Faturamento/CMV).
 import {list} from "../../core/db.js";
 import {e,money,today,addDays} from "../../core/format.js";
@@ -21,7 +22,7 @@ export async function render(ctx){
  const days=[];for(let d=ini;d<=fim;d=addDays(d,1))days.push(d);
 
  const stores=ctx.app.stores.filter(s=>s.store_type==="operational");
- const rows=days.length?await list("sales_imports",{select:"store_id,business_date,net",gte:{business_date:ini},lte:{business_date:fim},limit:50000}):[];
+ const rows=days.length?await list("sales_imports",{select:"store_id,business_date,net",gte:{business_date:ini},lte:{business_date:fim},order:"business_date",asc:true,order2:"store_id",asc2:true,limit:50000}):[];
  if(!ctx.isCurrent())return;
 
  const val=new Map();for(const r of rows)val.set(r.store_id+"|"+r.business_date,Number(r.net)||0);
