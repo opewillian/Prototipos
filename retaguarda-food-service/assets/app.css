@@ -646,3 +646,26 @@ details.fold:not([open]) .fold-right small{display:none}
 /* Início › taxa de oportunidade */
 .seg button.off,.seg button:disabled{opacity:.4;cursor:not-allowed}
 .lc-extra{margin-top:6px;padding-top:6px;border-top:1px solid var(--line-2);font-size:12px;line-height:1.45;color:var(--graphite);white-space:nowrap}
+/* Matriz › Painel: faturamento por loja, dia a dia (rolagem horizontal, sem quebra de texto) */
+.pm-month{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.pm-month strong{min-width:150px;text-align:center;text-transform:capitalize;color:var(--ink)}
+.pm-scroll{overflow-x:auto;max-height:calc(100vh - 190px);overflow-y:auto}
+.pm-table{border-collapse:separate;border-spacing:0;font-size:13px;white-space:nowrap}
+.pm-table th,.pm-table td{white-space:nowrap;padding:7px 12px;border-bottom:1px solid var(--line-2);background:var(--surface)}
+.pm-table td.num,.pm-table th.num{text-align:right;font-variant-numeric:tabular-nums}
+.pm-table thead th{position:sticky;top:0;z-index:2;background:var(--brand);color:#fff;font-size:11.5px;font-weight:600;letter-spacing:.03em}
+.pm-table thead th small{display:block;font-weight:500;opacity:.8;text-transform:lowercase}
+.pm-table thead th.pm-wk{background:var(--brand-600)}
+.pm-table .pm-name{position:sticky;left:0;z-index:1;text-align:left;min-width:170px;border-right:1px solid var(--line)}
+.pm-table thead .pm-name{z-index:3}
+.pm-table td.pm-tot{font-weight:600;color:var(--ink);border-right:1px solid var(--line)}
+.pm-table td.pm-wk{background:var(--surface-2)}
+.pm-table tr.pm-group th,.pm-table tr.pm-group td{background:var(--brand-50);font-weight:600;color:var(--ink);border-top:1px solid var(--brand-100)}
+.pm-table tr.pm-group small{font-weight:500;color:var(--muted)}
+.pm-grp{color:var(--brand);font-weight:700}
+.pm-table tr.pm-store th{font-weight:400;padding-left:22px}
+.pm-table tr.pm-store{cursor:pointer}
+.pm-table tr.pm-store:hover th,.pm-table tr.pm-store:hover td{background:#f3eff0}
+.pm-table tfoot th,.pm-table tfoot td{position:sticky;bottom:0;background:var(--graphite);color:#fff;font-weight:700;border-bottom:0}
+.pm-table tfoot .pm-name{z-index:3}
+.pm-table tfoot .muted{color:rgba(255,255,255,.6)}

@@ -1,47 +1,62 @@
-// Matriz · Painel: visão consolidada das lojas (somente dados reais).
-import {list,count} from "../../core/db.js";
-import {e,money,dateBR,today,addDays} from "../../core/format.js";
-import {pageHead,kpi,card,dataTable,statusPill,emptyState} from "../../core/ui.js";
+// Matriz · Painel (refeito em 24/11/2026, pedido do usuário): uma tabela com todas as lojas e o faturamento líquido
+// de cada dia do mês. Linhas agrupadas pelo prefixo do código (marca: DEL primeiro, as outras em ordem alfabética) e,
+// dentro do grupo, ordenadas pelo 2º pedaço do código (aeroporto). Rolagem horizontal, sem quebra de texto.
+// Fonte: public.sales_imports (líquido por loja e dia, gravado pela importação do Degust; RLS = quem vê Faturamento/CMV).
+import {list} from "../../core/db.js";
+import {e,money,today,addDays} from "../../core/format.js";
+import {pageHead,card,emptyState} from "../../core/ui.js";
+
+const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const SEM=["dom","seg","ter","qua","qui","sex","sáb"];
+const int=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
+let month=null; // "AAAA-MM" escolhido (fica enquanto o app estiver aberto)
 
 export async function render(ctx){
+ const hoje=today();
+ if(!month)month=hoje.slice(0,7);
+ const ini=month+"-01",last=new Date(+month.slice(0,4),+month.slice(5,7),0).getDate();
+ // Dias do mês até ontem (o dia de hoje ainda está em andamento e a importação é feita no dia seguinte).
+ const ontem=addDays(hoje,-1);
+ const fimMes=month+"-"+String(last).padStart(2,"0"),fim=fimMes<ontem?fimMes:ontem;
+ const days=[];for(let d=ini;d<=fim;d=addDays(d,1))days.push(d);
+
  const stores=ctx.app.stores.filter(s=>s.store_type==="operational");
- const since=addDays(today(),-30);
- const [items,suppliers,orders,invoices,counts,closings]=await Promise.all([
-  count("items",{eq:{active:true}}),count("suppliers",{eq:{active:true}}),
-  list("purchase_orders",{select:"id,number,store_id,delivery_date,status,created_at",order:"created_at"}),
-  list("invoices",{select:"id,store_id,status,entry_date",gte:{entry_date:since}}),
-  list("stock_counts",{select:"id,store_id,status,count_date",order:"count_date"}),
-  list("cmv_closings",{select:"*",order:"end_date"})
- ]);
+ const rows=days.length?await list("sales_imports",{select:"store_id,business_date,net",gte:{business_date:ini},lte:{business_date:fim},limit:50000}):[];
  if(!ctx.isCurrent())return;
- const open=orders.filter(o=>["draft","sent","realizing"].includes(o.status));
- const late=open.filter(o=>o.delivery_date&&o.delivery_date<today()&&o.status!=="draft");
- const pendingInv=invoices.filter(i=>i.status==="pending");
- const name=id=>stores.find(s=>s.id===id)?.name||id;
- const rows=stores.map(s=>{
-  const c=counts.filter(x=>x.store_id===s.id&&x.status==="finalized");
-  const last=c[0];const cmv=closings.find(x=>x.store_id===s.id);
-  return {store:s,open:open.filter(o=>o.store_id===s.id).length,pending:pendingInv.filter(i=>i.store_id===s.id).length,lastCount:last?.count_date,cmv};
- });
- ctx.el.innerHTML=pageHead("Painel da Matriz","Visão geral das "+stores.length+" loja(s) em operação.")+
-  '<div class="kpis">'+kpi("Pedidos em aberto",open.length,late.length?late.length+" com entrega atrasada":"Nenhum atraso",{icon:"cart",tone:late.length?"warn":"",href:"#/matriz/pedidos"})+
-  kpi("Notas pendentes (30 dias)",pendingInv.length,"Aguardando recebimento",{icon:"receipt",tone:"info"})+
-  kpi("Itens ativos",items,"Catálogo central",{icon:"box",tone:"ok",href:"#/matriz/itens"})+
-  kpi("Fornecedores ativos",suppliers,"Cadastro central",{icon:"truck",href:"#/matriz/fornecedores"})+'</div>'+
-  '<div class="grid-3">'+card("Lojas",rows.length?dataTable([
-   {label:"Loja",render:r=>'<span class="strong">'+e(r.store.name)+'</span><small class="sub">'+e(r.store.code||"")+'</small>'},
-   {label:"Pedidos abertos",cls:"num",render:r=>String(r.open)},
-   {label:"Notas pendentes",cls:"num",render:r=>String(r.pending)},
-   {label:"Última contagem",render:r=>r.lastCount?dateBR(r.lastCount):'<span class="muted">Nenhuma</span>'},
-   {label:"Último CMV",cls:"num",render:r=>r.cmv?money(r.cmv.cmv_value):'<span class="muted">—</span>'}
-  ],rows,{rowHref:r=>"#/loja/"+encodeURIComponent(r.store.id)}):emptyState("store","Nenhuma loja em operação"),{flush:true})+
-  card("Pedidos recentes",open.length||orders.length?dataTable([
-   {label:"Pedido",render:o=>'<span class="strong">'+e(o.number)+'</span><small class="sub">'+e(name(o.store_id))+'</small>'},
-   {label:"Entrega",render:o=>dateBR(o.delivery_date)},
-   {label:"",render:o=>statusPill(o.status)}
-  ],orders.slice(0,6),{rowHref:o=>"#/loja/"+encodeURIComponent(o.store_id)+"/pedidos/"+o.id}):emptyState("cart","Nenhum pedido ainda"),{flush:true,actions:'<a class="btn btn-ghost btn-sm" href="#/matriz/pedidos">Ver todos</a>'})+'</div>';
- bindRows(ctx.el);
-}
-function bindRows(el){
- el.querySelectorAll("tr[data-href]").forEach(tr=>tr.addEventListener("click",()=>{location.hash=tr.dataset.href.replace(/^#/,"")}));
+
+ const val=new Map();for(const r of rows)val.set(r.store_id+"|"+r.business_date,Number(r.net)||0);
+ const parts=s=>String(s.code||s.id).split("-");
+ const groups=new Map();
+ for(const s of stores){const g=parts(s)[0]||"—";(groups.get(g)||groups.set(g,[]).get(g)).push(s)}
+ const order=[...groups.keys()].sort((a,b)=>(a==="DEL"?-1:b==="DEL"?1:a.localeCompare(b)));
+ for(const g of order)groups.get(g).sort((a,b)=>(parts(a)[1]||"").localeCompare(parts(b)[1]||"")||String(a.code).localeCompare(String(b.code)));
+
+ const cell=(v,cls="")=>'<td class="num'+cls+'"'+(v?' title="'+e(money(v))+'"':'')+'>'+(v?int.format(v):'<span class="muted">—</span>')+'</td>';
+ const wkd=d=>{const w=new Date(d+"T12:00:00").getDay();return w===0||w===6?" pm-wk":""};
+ const sumOf=(ls,d)=>ls.reduce((t,s)=>t+(val.get(s.id+"|"+d)||0),0);
+ const rowHtml=(label,ls,cls,href)=>{
+  const per=days.map(d=>sumOf(ls,d)),tot=per.reduce((a,b)=>a+b,0);
+  return '<tr class="'+cls+'"'+(href?' data-href="'+e(href)+'"':'')+'><th scope="row" class="pm-name">'+label+'</th>'+cell(tot," pm-tot")+per.map((v,i)=>cell(v,wkd(days[i]))).join("")+'</tr>';
+ };
+ let body="";
+ for(const g of order){
+  const ls=groups.get(g);
+  body+=rowHtml('<span class="pm-grp">'+e(g)+'</span><small> · '+ls.length+(ls.length===1?' loja':' lojas')+'</small>',ls,"pm-group");
+  for(const s of ls)body+=rowHtml('<span class="strong">'+e(s.code||s.id)+'</span>',[s],"pm-store","#/loja/"+encodeURIComponent(s.id)+"/faturamento");
+ }
+ const head='<tr><th scope="col" class="pm-name">Loja</th><th scope="col" class="num pm-tot">Total</th>'+
+  days.map(d=>'<th scope="col" class="num'+wkd(d)+'">'+d.slice(8)+'<small>'+SEM[new Date(d+"T12:00:00").getDay()]+'</small></th>').join("")+'</tr>';
+ const foot=rowHtml("Total da rede",stores,"pm-net");
+
+ const [y,m]=month.split("-").map(Number);
+ const prev=addDays(ini,-1).slice(0,7),next=addDays(fimMes,1).slice(0,7),canNext=next<=hoje.slice(0,7);
+ const nav='<div class="pm-month"><button type="button" class="icon-btn" data-m="'+prev+'" aria-label="Mês anterior">‹</button>'+
+  '<strong>'+MESES[m-1]+' de '+y+'</strong>'+
+  '<button type="button" class="icon-btn" data-m="'+next+'" aria-label="Próximo mês"'+(canNext?'':' disabled')+'>›</button></div>';
+ const table=days.length&&stores.length?'<div class="pm-scroll"><table class="pm-table"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>':
+  emptyState("chart",stores.length?"Sem dias fechados neste mês":"Nenhuma loja em operação",stores.length?"Os valores aparecem a partir do dia seguinte.":"");
+ ctx.el.innerHTML=pageHead("Painel da Matriz","Faturamento líquido (R$) de cada loja, dia a dia, até ontem. Clique na loja para abrir o faturamento dela.",nav)+
+  card("",table,{flush:true});
+ ctx.el.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{month=b.dataset.m;render(ctx)});
+ ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
 }

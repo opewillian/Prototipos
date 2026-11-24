@@ -28,10 +28,9 @@ const head=()=>$("#content .page-head")||$("#content .doc-head");
 const SCREENS={
  // ---------------- Matriz
  "matriz:painel":[
-  {title:"Painel da Matriz",text:"Visão geral da rede: como estão as lojas e os pedidos, sem precisar entrar em cada uma."},
-  {sel:inContent(".kpis"),title:"Números da rede",text:"Pedidos em aberto (e atrasados), notas pendentes dos últimos 30 dias, itens e fornecedores ativos. Alguns cards levam direto à lista."},
-  {find:cardT("Lojas"),title:"Lojas",text:"Cada loja com pedidos abertos, notas pendentes, data da última contagem e do último CMV. Ajuda a ver quem está atrasado."},
-  {find:cardT("Pedidos recentes"),title:"Pedidos recentes",text:"Últimos pedidos de compra feitos pelas lojas. \"Ver todos\" abre Pedidos das lojas."}
+  {title:"Painel da Matriz",text:"O faturamento líquido de todas as lojas, dia a dia, numa tabela só."},
+  {sel:inContent(".pm-month"),title:"Mês",text:"Troque o mês nas setas. O mês atual vai até ontem (as vendas entram no dia seguinte)."},
+  {sel:inContent(".pm-table"),title:"Lojas por marca",text:"Lojas agrupadas pela marca (DEL primeiro) e ordenadas pelo aeroporto. A linha da marca soma as lojas; a última linha é a rede. Role para o lado para ver todos os dias; a coluna Total é o mês. Clique numa loja para abrir o faturamento dela."}
  ],
  "matriz:pedidos":[
   {title:"Pedidos das lojas",text:"Todos os pedidos de compra feitos pelas lojas, em um lugar só."},
@@ -215,7 +214,7 @@ function generalSteps(area){
   {sel:grp("Análise"),side:"right",title:"Análise · CMV",text:"Escolha duas contagens e veja o CMV com a memória de cálculo e a Análise completa."}
  ];
  const matriz=[
-  {sel:'#nav a[href$="/painel"]',side:"right",title:"Painel",text:"Visão consolidada das lojas em operação e dos pedidos mais recentes."},
+  {sel:'#nav a[href$="/painel"]',side:"right",title:"Painel",text:"Faturamento de todas as lojas, dia a dia, agrupadas por marca."},
   {sel:'#nav a[href$="/pedidos"]',side:"right",title:"Pedidos das lojas",text:"Todos os pedidos de compra das lojas, com filtro por loja, fornecedor e situação."},
   {sel:'#nav a[href$="/notas"]',side:"right",title:"Notas fiscais",text:"Notas de todas as lojas que você acessa, para acompanhar o que está pendente de entrada."},
   {sel:grp("Cadastros"),side:"right",title:"Cadastros",text:"Itens, marcas, fornecedores e de-para valem para todas as lojas. Em Usuários e acessos você libera lojas e módulos; o Log mostra quem mudou o quê."}
