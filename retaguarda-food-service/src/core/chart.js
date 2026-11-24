@@ -4,7 +4,8 @@
 // extra(i): HTML a mais na dica do ponto i (ex.: passageiros, cupons). yFormat: rótulo do eixo Y (padrão: número compacto).
 import {e} from "./format.js";
 
-const niceMax=v=>{if(!(v>0))return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const n=v/p;return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p};
+// Teto do eixo: o menor "número redondo" acima do máximo, com passos que dão marcas de 1/4 legíveis (ex.: 10,7 mi → 12 mi, não 20 mi).
+const niceMax=v=>{if(!(v>0))return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));const n=v/p;return ([1,1.2,1.6,2,2.4,3,4,5,6,8,10].find(k=>n<=k+1e-9))*p};
 const compact=v=>new Intl.NumberFormat("pt-BR",{notation:"compact",maximumFractionDigits:1}).format(v);
 
 /** Desenha dentro de `el`. Retorna uma função para redesenhar (ex.: ao redimensionar). */
