@@ -82,7 +82,7 @@ export async function render(ctx){
  const sc=ctx.el.querySelector(".pm-scroll");if(sc)sc.scrollLeft=sc.scrollWidth;
 }
 
-// Ranking de faturamento (realizado no mês, até ontem): loja, valor e % de participação na rede. Só lojas com venda.
+// Ranking de faturamento (realizado no mês, até ontem): loja, valor e % de participação na rede. Só lojas com venda; páginas de 10.
 // Tem o próprio seletor de mês; só este card é refeito ao trocar.
 async function drawRanking(ctx,stores){
  const box=ctx.el.querySelector("[data-rk-card]");if(!box)return;
@@ -101,11 +101,22 @@ async function drawRanking(ctx,stores){
  const tot=new Map();for(const r of rows)tot.set(r.store_id,(tot.get(r.store_id)||0)+(Number(r.net)||0));
  const rk=stores.map(st=>({st,v:tot.get(st.id)||0})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
  const rkTot=rk.reduce((t,x)=>t+x.v,0),pctF=new Intl.NumberFormat("pt-BR",{style:"percent",minimumFractionDigits:2,maximumFractionDigits:2});
- const body=rk.length?'<div class="pm-scroll pm-rk-scroll"><table class="pm-table pm-rk"><thead><tr><th scope="col" class="num">#</th><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">Participação</th></tr></thead><tbody>'+
-  rk.map((x,i)=>{const p=rkTot?x.v/rkTot:0;return '<tr class="pm-store" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td class="num muted">'+(i+1)+'º</td><td><span class="strong">'+e(x.st.code||x.st.id)+'</span>'+(x.st.name&&x.st.name!==x.st.code?' <span class="muted">· '+e(x.st.name)+'</span>':'')+'</td>'+
-   '<td class="num">'+money(x.v)+'</td><td class="num"><span class="pm-bar"><i style="width:'+(p/(rk[0].v/rkTot)*100).toFixed(1)+'%"></i></span>'+pctF.format(p)+'</td></tr>'}).join("")+
-  '</tbody><tfoot><tr><td></td><td>Total da rede · '+rk.length+' lojas</td><td class="num">'+money(rkTot)+'</td><td class="num">'+pctF.format(1)+'</td></tr></tfoot></table></div>':
-  emptyState("chart","Sem faturamento no mês");
- box.innerHTML=head(fim<fimMes&&fim>=ini?"até "+fim.slice(8)+"/"+fim.slice(5,7):"")+'<div class="card-body flush">'+body+'</div>';bind();
- box.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
+ const PG=10,pages=Math.ceil(rk.length/PG);
+ const pager=page=>'<div class="rk-pager"><span class="muted">'+(rk.length?(page*PG+1)+'–'+Math.min(rk.length,page*PG+PG)+' de '+rk.length+' lojas':'')+'</span>'+
+  (pages>1?'<span class="rk-pages"><button type="button" class="icon-btn" data-rkp="'+(page-1)+'"'+(page===0?' disabled':'')+' aria-label="Página anterior">‹</button>'+
+  Array.from({length:pages},(_,k)=>'<button type="button" class="rk-pg'+(k===page?' on':'')+'" data-rkp="'+k+'"'+(k===page?' aria-current="page"':'')+'>'+(k+1)+'</button>').join("")+
+  '<button type="button" class="icon-btn" data-rkp="'+(page+1)+'"'+(page===pages-1?' disabled':'')+' aria-label="Próxima página">›</button></span>':'')+'</div>';
+ const sub=fim<fimMes&&fim>=ini?"até "+fim.slice(8)+"/"+fim.slice(5,7):"";
+ const draw=page=>{
+  page=Math.max(0,Math.min(pages-1,page));
+  const body=rk.length?'<div class="pm-scroll pm-rk-scroll"><table class="pm-table pm-rk"><thead><tr><th scope="col" class="num">#</th><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">Participação</th></tr></thead><tbody>'+
+   rk.slice(page*PG,page*PG+PG).map((x,k)=>{const i=page*PG+k,p=rkTot?x.v/rkTot:0;return '<tr class="pm-store'+(i<3?' pm-top':'')+'" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td class="num muted">'+(i+1)+'º</td><td><span class="strong">'+e(x.st.code||x.st.id)+'</span>'+(x.st.name&&x.st.name!==x.st.code?' <span class="muted">· '+e(x.st.name)+'</span>':'')+'</td>'+
+    '<td class="num">'+money(x.v)+'</td><td class="num"><span class="pm-bar"><i style="width:'+(p/(rk[0].v/rkTot)*100).toFixed(1)+'%"></i></span>'+pctF.format(p)+'</td></tr>'}).join("")+
+   '</tbody><tfoot><tr><td></td><td>Total da rede · '+rk.length+' lojas</td><td class="num">'+money(rkTot)+'</td><td class="num">'+pctF.format(1)+'</td></tr></tfoot></table></div>'+pager(page):
+   emptyState("chart","Sem faturamento no mês");
+  box.innerHTML=head(sub)+'<div class="card-body flush">'+body+'</div>';bind();
+  box.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
+  box.querySelectorAll("[data-rkp]").forEach(b=>b.onclick=()=>draw(Number(b.dataset.rkp)));
+ };
+ draw(0);
 }
