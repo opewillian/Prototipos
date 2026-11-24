@@ -74,7 +74,6 @@ export async function render(ctx){
   card("",table,{flush:true});
  ctx.el.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{month=b.dataset.m;render(ctx)});
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
- // Abre mostrando o dia de hoje (as últimas colunas) quando o mês tem projeção.
- const sc=ctx.el.querySelector(".pm-scroll"),th=ctx.el.querySelector("thead th.pm-proj");
- if(sc&&th)sc.scrollLeft=Math.max(0,th.offsetLeft-sc.querySelector(".pm-name").offsetWidth-6*th.offsetWidth);
+ // Abre rolada até o fim: últimos dias (com a projeção) e as colunas de total à vista.
+ const sc=ctx.el.querySelector(".pm-scroll");if(sc)sc.scrollLeft=sc.scrollWidth;
 }
