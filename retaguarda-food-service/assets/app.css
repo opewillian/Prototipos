@@ -624,3 +624,6 @@ details.fold>summary:focus-visible{outline:3px solid var(--brand-100);outline-of
 .fold-chev:before{content:"";position:absolute;left:9px;top:7px;width:7px;height:7px;border-right:2px solid var(--brand);border-bottom:2px solid var(--brand);transform:rotate(45deg)}
 details.fold[open] .fold-chev{transform:rotate(180deg)}
 details.fold:not([open]) .fold-right small{display:none}
+
+/* Início › gráfico Vendas: seletor de medida + visão */
+.chart-ctrls{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}

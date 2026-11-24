@@ -88,8 +88,8 @@ const SCREENS={
  // ---------------- Loja
  "loja:inicio":[
   {title:"Início da loja",text:"O resumo da loja: faturamento, CMV e notas pendentes."},
-  {find:()=>$("#content [data-chart]")?.closest(".card"),title:"Faturamento",text:"Linha cheia: o que já foi vendido. Pontilhada vinho: a projeção até o fim do mês (recalculada todo dia às 6h30). Passe o mouse para ver os valores."},
-  {sel:inContent(".seg"),title:"Dia a dia, mês a mês ou por hora",text:"Troque a visão. No mês a mês, a linha cinza tracejada é o ano anterior. Por hora mostra quanto a loja vende, em média por dia, em cada hora — e o horário de pico — comparando com o mês anterior."},
+  {find:()=>$("#content [data-chart]")?.closest(".card"),title:"Vendas",text:"Linha cheia: o que já foi vendido. Pontilhada vinho: a projeção até o fim do mês (recalculada todo dia às 6h30). Passe o mouse para ver os valores."},
+  {sel:inContent(".chart-ctrls"),title:"Medida e visão",text:"Escolha o que ver — Faturamento, Ticket médio ou Cupons — e a visão. No mês a mês, a linha cinza tracejada é o ano anterior. Por hora mostra quanto a loja vende, em média por dia, em cada hora — e o horário de pico — comparando com o mês anterior."},
   {find:cardT("CMV por período"),title:"CMV por período",text:"Cada período entre duas contagens seguidas, com o CMV e o percentual sobre o faturamento. Clique para abrir o cálculo."},
   {find:cardT("Notas pendentes"),title:"Notas pendentes de entrada",text:"Notas lançadas que ainda não entraram no estoque. Enquanto pendentes, ficam fora do CMV."}
  ],
