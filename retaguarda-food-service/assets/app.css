@@ -691,3 +691,4 @@ details.fold:not([open]) .fold-right small{display:none}
 .pm-rk tbody tr:nth-child(-n+3) td:first-child{color:var(--brand);font-weight:700}
 .pm-bar{display:inline-block;vertical-align:middle;width:90px;height:6px;margin-right:10px;border-radius:3px;background:var(--line-2);overflow:hidden}
 .pm-bar i{display:block;height:100%;background:var(--brand);border-radius:3px}
+.pm-rk-sub{font-size:12px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0;margin-left:6px}

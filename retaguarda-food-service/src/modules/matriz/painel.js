@@ -14,6 +14,7 @@ const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agos
 const SEM=["dom","seg","ter","qua","qui","sex","sáb"];
 const int=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
 let month=null; // "AAAA-MM" escolhido (fica enquanto o app estiver aberto)
+let rkMonth=null; // mês do ranking (independente da tabela diária)
 
 export async function render(ctx){
  const hoje=today();
@@ -71,20 +72,40 @@ export async function render(ctx){
  const table=stores.length?'<div class="pm-scroll"><table class="pm-table"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>':
   emptyState("store","Nenhuma loja em operação");
  const temProj=days.some(isProj);
- // Ranking de faturamento (realizado no mês): loja, valor e % de participação na rede. Só lojas com venda.
- const realOf=st=>days.reduce((t,d)=>t+(isProj(d)?0:(val.get(st.id+"|"+d)||0)),0);
- const rk=stores.map(st=>({st,v:realOf(st)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
- const rkTot=rk.reduce((t,x)=>t+x.v,0),pctF=new Intl.NumberFormat("pt-BR",{style:"percent",minimumFractionDigits:2,maximumFractionDigits:2});
- const rkHtml=rk.length?'<div class="pm-scroll pm-rk-scroll"><table class="pm-table pm-rk"><thead><tr><th scope="col" class="num">#</th><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">Participação</th></tr></thead><tbody>'+
-  rk.map((x,i)=>{const p=rkTot?x.v/rkTot:0;return '<tr class="pm-store" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td class="num muted">'+(i+1)+'º</td><td><span class="strong">'+e(x.st.code||x.st.id)+'</span>'+(x.st.name&&x.st.name!==x.st.code?' <span class="muted">· '+e(x.st.name)+'</span>':'')+'</td>'+
-   '<td class="num">'+money(x.v)+'</td><td class="num"><span class="pm-bar"><i style="width:'+(p/(rk[0].v/rkTot)*100).toFixed(1)+'%"></i></span>'+pctF.format(p)+'</td></tr>'}).join("")+
-  '</tbody><tfoot><tr><td></td><td>Total da rede · '+rk.length+' lojas</td><td class="num">'+money(rkTot)+'</td><td class="num">'+pctF.format(rkTot?1:0)+'</td></tr></tfoot></table></div>':
-  emptyState("chart","Sem faturamento no mês");
- const rkTitle="Ranking de faturamento · "+MESES[m-1]+" de "+y+(fimReal<fimMes&&fimReal>=ini?" (até "+fimReal.slice(8)+"/"+fimReal.slice(5,7)+")":"");
  ctx.el.innerHTML=pageHead("Painel da Matriz","Faturamento líquido (R$) de cada loja, dia a dia"+(temProj?"; de hoje em diante, em itálico, a projeção":"")+". Clique na loja para abrir o faturamento dela.",nav)+
-  card("",table,{flush:true})+card(rkTitle,rkHtml,{flush:true});
+  card("",table,{flush:true})+'<section class="card" data-rk-card></section>';
  ctx.el.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{month=b.dataset.m;render(ctx)});
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
+ if(!rkMonth)rkMonth=month;
+ drawRanking(ctx,stores);
  // Abre rolada até o fim: últimos dias (com a projeção) e as colunas de total à vista.
  const sc=ctx.el.querySelector(".pm-scroll");if(sc)sc.scrollLeft=sc.scrollWidth;
+}
+
+// Ranking de faturamento (realizado no mês, até ontem): loja, valor e % de participação na rede. Só lojas com venda.
+// Tem o próprio seletor de mês; só este card é refeito ao trocar.
+async function drawRanking(ctx,stores){
+ const box=ctx.el.querySelector("[data-rk-card]");if(!box)return;
+ const hoje=today(),ontem=addDays(hoje,-1),mm=rkMonth;
+ const ini=mm+"-01",fimMes=mm+"-"+String(new Date(+mm.slice(0,4),+mm.slice(5,7),0).getDate()).padStart(2,"0"),fim=fimMes<ontem?fimMes:ontem;
+ const [y,m]=mm.split("-").map(Number);
+ const prev=addDays(ini,-1).slice(0,7),next=addDays(fimMes,1).slice(0,7),canNext=next<=hoje.slice(0,7);
+ const nav='<div class="pm-month"><button type="button" class="icon-btn" data-rkm="'+prev+'" aria-label="Mês anterior do ranking">‹</button>'+
+  '<strong>'+MESES[m-1][0].toUpperCase()+MESES[m-1].slice(1)+' de '+y+'</strong>'+
+  '<button type="button" class="icon-btn" data-rkm="'+next+'" aria-label="Próximo mês do ranking"'+(canNext?'':' disabled')+'>›</button></div>';
+ const head=sub=>'<header class="card-head"><h2>Ranking de faturamento'+(sub?'<small class="pm-rk-sub"> '+sub+'</small>':'')+'</h2>'+nav+'</header>';
+ const bind=()=>box.querySelectorAll("[data-rkm]").forEach(b=>b.onclick=()=>{rkMonth=b.dataset.rkm;drawRanking(ctx,stores)});
+ box.innerHTML=head("")+'<div class="card-body"><p class="muted" style="margin:0">Carregando…</p></div>';bind();
+ const rows=fim>=ini?await list("sales_imports",{select:"store_id,net",gte:{business_date:ini},lte:{business_date:fim},order:"business_date",asc:true,order2:"store_id",asc2:true,limit:50000}):[];
+ if(!ctx.isCurrent()||mm!==rkMonth)return;
+ const tot=new Map();for(const r of rows)tot.set(r.store_id,(tot.get(r.store_id)||0)+(Number(r.net)||0));
+ const rk=stores.map(st=>({st,v:tot.get(st.id)||0})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+ const rkTot=rk.reduce((t,x)=>t+x.v,0),pctF=new Intl.NumberFormat("pt-BR",{style:"percent",minimumFractionDigits:2,maximumFractionDigits:2});
+ const body=rk.length?'<div class="pm-scroll pm-rk-scroll"><table class="pm-table pm-rk"><thead><tr><th scope="col" class="num">#</th><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">Participação</th></tr></thead><tbody>'+
+  rk.map((x,i)=>{const p=rkTot?x.v/rkTot:0;return '<tr class="pm-store" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td class="num muted">'+(i+1)+'º</td><td><span class="strong">'+e(x.st.code||x.st.id)+'</span>'+(x.st.name&&x.st.name!==x.st.code?' <span class="muted">· '+e(x.st.name)+'</span>':'')+'</td>'+
+   '<td class="num">'+money(x.v)+'</td><td class="num"><span class="pm-bar"><i style="width:'+(p/(rk[0].v/rkTot)*100).toFixed(1)+'%"></i></span>'+pctF.format(p)+'</td></tr>'}).join("")+
+  '</tbody><tfoot><tr><td></td><td>Total da rede · '+rk.length+' lojas</td><td class="num">'+money(rkTot)+'</td><td class="num">'+pctF.format(1)+'</td></tr></tfoot></table></div>':
+  emptyState("chart","Sem faturamento no mês");
+ box.innerHTML=head(fim<fimMes&&fim>=ini?"até "+fim.slice(8)+"/"+fim.slice(5,7):"")+'<div class="card-body flush">'+body+'</div>';bind();
+ box.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
 }
