@@ -41,7 +41,7 @@ export function lineChart(el,{labels,series,format=v=>String(v),tickEvery=1,heig
    cross.setAttribute("x1",x(i));cross.setAttribute("x2",x(i));cross.removeAttribute("hidden");
    dots.forEach((d,k)=>{const v=series[k].values[i];if(v==null)d.setAttribute("hidden","");else{d.setAttribute("cx",x(i));d.setAttribute("cy",y(v));d.removeAttribute("hidden")}});
    tip.innerHTML='<strong>'+e(labels[i])+'</strong>'+series.map(s=>'<div><i class="lc-key'+(s.dash?" dash":"")+'" style="--c:'+s.color+'"></i><span>'+e(s.name)+'</span><b>'+(s.values[i]==null?"—":e(format(s.values[i])))+'</b></div>').join("")+(extra?(extra(i)||""):"");
-   tip.hidden=false;const left=x(i)*(r.width/W);tip.style.left=Math.min(Math.max(left,70),r.width-70)+"px";
+   tip.hidden=false;const left=x(i)*(r.width/W),hw=Math.max(70,tip.offsetWidth/2+4);tip.style.left=Math.min(Math.max(left,hw),r.width-hw)+"px"; // dica larga não passa da borda
   };
   const hit=el.querySelector(".lc-hit");
   hit.addEventListener("mousemove",ev=>show(ev.clientX));hit.addEventListener("mouseleave",hide);
