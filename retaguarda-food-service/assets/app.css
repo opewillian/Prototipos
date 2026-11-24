@@ -682,3 +682,12 @@ details.fold:not([open]) .fold-right small{display:none}
 .pm-table thead th.pm-tot,.pm-table tfoot td.pm-tot{z-index:3}
 .pm-table tbody td.pm-tot{background:var(--surface)}
 .pm-table tr.pm-group td.pm-tot{background:var(--brand-50)}
+/* Painel › ranking de faturamento */
+.pm-rk-scroll{max-height:none;overflow-y:visible}
+.pm-rk{width:100%}
+.pm-rk td,.pm-rk th{white-space:nowrap}
+.pm-rk thead th{position:static}
+.pm-rk tfoot td{position:static;background:var(--graphite);color:#fff;font-weight:700}
+.pm-rk tbody tr:nth-child(-n+3) td:first-child{color:var(--brand);font-weight:700}
+.pm-bar{display:inline-block;vertical-align:middle;width:90px;height:6px;margin-right:10px;border-radius:3px;background:var(--line-2);overflow:hidden}
+.pm-bar i{display:block;height:100%;background:var(--brand);border-radius:3px}
