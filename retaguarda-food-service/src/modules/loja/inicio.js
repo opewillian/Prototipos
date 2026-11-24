@@ -79,7 +79,7 @@ export async function render(ctx){
   (showSales?card("Vendas",'<div class="chart-total"><span data-chart-total></span><small data-chart-sub></small></div><div data-chart></div>',
     {actions:'<div class="chart-ctrls"><div class="seg" role="tablist" aria-label="Medida"><button type="button" role="tab" data-met="fat">Faturamento</button><button type="button" role="tab" data-met="tkt">Ticket médio</button><button type="button" role="tab" data-met="cup">Cupons</button></div>'+
      '<div class="seg" role="tablist" aria-label="Visualização"><button type="button" role="tab" data-view="dia">Dia a dia</button><button type="button" role="tab" data-view="mes">Mês a mês</button><button type="button" role="tab" data-view="hora">Por hora</button></div></div>'}):'')+
-  ((showSales||showCmv)?'<div class="grid-2 inicio-duo">':'')+(showSales?rankingCard(ctx,ranking):'')+
+  (showSales?rankingCard(ctx,ranking):'')+
   (showCmv?card("CMV por período",periods.length?dataTable([
     {label:"Período",render:p=>'<span class="strong">'+dateBR(p.a.count_date)+' a '+dateBR(p.b.count_date)+'</span><small class="sub">'+e(p.a.display_id)+' → '+e(p.b.display_id)+((p.a.status==="draft"||p.b.status==="draft")?' · contagem em rascunho':'')+'</small>'},
     {label:"CMV",cls:"num",render:p=>p.error?'<span class="muted">—</span>':money(p.cmv)},
@@ -87,7 +87,6 @@ export async function render(ctx){
     {label:"CMV / faturamento",cls:"num",render:p=>p.rev?'<strong>'+pct(p.cmv/p.rev)+'</strong>':'<span class="muted">—</span>'}
    ],periods,{rowHref:p=>ctx.base+"/cmv/novo/"+p.a.id+"/"+p.b.id})
    :emptyState("chart","Nenhum período de CMV","São necessárias duas contagens em datas diferentes."),{flush:true}):'')+
-  ((showSales||showCmv)?'</div>':'')+
   (!showSales&&!showCmv?alertBox("Nenhum módulo com resumo liberado para esta loja.","info"):'');
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
  if(showSales&&ranking&&!ranking.erro)drawRanking(ctx,ranking,null);
@@ -132,7 +131,7 @@ export async function render(ctx){
  }
 }
 // Ranking de ticket médio da marca: mês passado x este mês (até ontem), ordenado pela variação; a loja vista em destaque.
-// Meia largura (ao lado do CMV por período) e páginas de 10 em 10; abre na página da loja vista.
+// Largura total, páginas de 10 em 10; abre na página da loja vista.
 const MES_N=m=>MESES[Number(String(m).slice(5,7))-1]+"/"+String(m).slice(0,4);
 const RK_PAGE=10;
 function rankingRows(R){
