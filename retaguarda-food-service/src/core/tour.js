@@ -32,7 +32,7 @@ const SCREENS={
   {sel:inContent(".pm-month"),title:"Mês",text:"Troque o mês nas setas. O mês atual vai até ontem (as vendas entram no dia seguinte)."},
   {sel:inContent(".pm-table"),title:"Lojas por marca",text:"Lojas agrupadas pela marca (DEL primeiro) e ordenadas pelo aeroporto. A linha da marca soma as lojas; a última linha é a rede. A tabela abre no fim do mês; role para o lado para ver os outros dias. De hoje em diante os valores são a projeção (em itálico). As duas últimas colunas são o Total geral (realizado até ontem) e o Total projetado (realizado + projeção até o fim do mês). Clique numa loja para abrir o faturamento dela."},
   {find:cardT("Ranking de faturamento"),title:"Ranking de faturamento",text:"As lojas do maior para o menor faturamento realizado no mês, com a participação de cada uma no total da rede. Tem o próprio seletor de mês e mostra 10 lojas por página."},
-  {sel:inContent(".pm-pies"),title:"Participação por marca e aeroporto",text:"Pizzas com a participação de cada marca (1º pedaço do código) e de cada aeroporto (2º pedaço) no faturamento do mês. Clique numa fatia ou na legenda para ver as lojas daquele grupo."}
+  {sel:inContent(".pm-pies"),title:"Participação por marca e aeroporto",text:"Pizzas com a participação de cada marca (1º pedaço do código) e de cada aeroporto (2º pedaço) no faturamento do mês. Clique numa fatia ou na legenda para abrir uma tela com as lojas daquele grupo."}
  ],
  "matriz:pedidos":[
   {title:"Pedidos das lojas",text:"Todos os pedidos de compra feitos pelas lojas, em um lugar só."},

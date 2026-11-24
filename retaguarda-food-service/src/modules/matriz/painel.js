@@ -8,7 +8,7 @@
 // Fonte: public.sales_imports (líquido por loja e dia, gravado pela importação do Degust; RLS = quem vê Faturamento/CMV).
 import {list} from "../../core/db.js";
 import {e,money,today,addDays} from "../../core/format.js";
-import {pageHead,card,emptyState} from "../../core/ui.js";
+import {pageHead,card,emptyState,openModal} from "../../core/ui.js";
 
 const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 const SEM=["dom","seg","ter","qua","qui","sex","sáb"];
@@ -84,7 +84,7 @@ export async function render(ctx){
 
 // Ranking de faturamento (realizado no mês, até ontem): loja, valor e % de participação na rede. Só lojas com venda; páginas de no mínimo 10 (até o fim do card, ao lado das pizzas); largura das colunas fixa.
 // Tem o próprio seletor de mês; só este card é refeito ao trocar. À direita: pizzas de participação por marca (1º prefixo)
-// e por aeroporto (2º prefixo); clique na fatia mostra as lojas daquele prefixo.
+// e por aeroporto (2º prefixo); clique na fatia abre uma tela popin com as lojas daquele prefixo.
 async function drawRanking(ctx,stores){
  const box=ctx.el.querySelector("[data-rk-card]");if(!box)return;
  const hoje=today(),ontem=addDays(hoje,-1),mm=rkMonth;
@@ -161,7 +161,7 @@ function groupBy(rk,idx){
  const rest=gs.slice(7);
  return [...gs.slice(0,7),{k:"Outros",v:rest.reduce((t,g)=>t+g.v,0),items:rest.flatMap(g=>g.items),other:rest.map(g=>g.k),subs:rest}];
 }
-const pieState={};
+const pieState={},pieTitle={};
 function pieCard(id,title,gs,tot,pctF){
  pieState[id]=gs;
  const R=80,C=90;let a0=-Math.PI/2;
@@ -174,27 +174,29 @@ function pieCard(id,title,gs,tot,pctF){
   return '<path d="'+d+'" fill="'+col+'" data-pie="'+id+'" data-i="'+i+'" tabindex="0" role="button" aria-label="'+e(g.k+": "+pctF.format(frac))+'"><title>'+e(g.k+" · "+pctF.format(frac)+" · "+money(g.v))+'</title></path>';
  }).join("");
  const leg=gs.map((g,i)=>'<button type="button" class="pm-leg" data-pie="'+id+'" data-i="'+i+'"><i style="background:'+(g.other?PIE_OTHER:PIE_COLORS[i])+'"></i><span class="pm-leg-k">'+e(g.k)+'</span><span class="pm-leg-p">'+pctF.format(tot?g.v/tot:0)+'</span><span class="pm-leg-v muted">'+money(g.v)+'</span></button>').join("");
+ pieTitle[id]=title;
  return '<div class="pm-pie" data-pie-box="'+id+'"><h3>'+e(title)+'</h3><div class="pm-pie-row"><svg viewBox="0 0 180 180" width="130" height="130" class="pm-pie-svg" aria-label="'+e(title)+'">'+arcs+'</svg><div class="pm-legend">'+leg+'</div></div>'+
-  '<div class="pm-pie-det" data-pie-det="'+id+'"><p class="muted">Clique numa fatia ou na legenda para ver as lojas.</p></div></div>';
+  '<p class="pm-pie-hint muted">Clique numa fatia ou na legenda para ver as lojas.</p></div>';
 }
 function bindPies(box,tot,pctF){
  const detRow=(x,gv,ind)=>'<tr class="pm-store'+(ind?' pm-det-ind':'')+'" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td><span class="strong">'+e(x.st.code||x.st.id)+'</span></td><td class="num">'+money(x.v)+'</td><td class="num">'+pctF.format(tot?x.v/tot:0)+'</td></tr>';
  box.querySelectorAll("[data-pie]").forEach(el=>{
+  // Abre as lojas do prefixo numa tela popin (antes abria embaixo da pizza).
   const act=()=>{
-   const id=el.dataset.pie,i=Number(el.dataset.i),g=pieState[id][i],det=box.querySelector('[data-pie-det="'+id+'"]');
-   box.querySelectorAll('[data-pie="'+id+'"]').forEach(x=>x.classList.toggle("on",Number(x.dataset.i)===i));
-   box.querySelector('[data-pie-box="'+id+'"]').classList.add("sel");
+   const id=el.dataset.pie,i=Number(el.dataset.i),g=pieState[id][i];
    const its=g.items.slice().sort((a,b)=>b.v-a.v);
-   det.innerHTML='<div class="pm-det-head"><strong>'+e(g.k)+'</strong><span class="muted">'+its.length+(its.length===1?' loja':' lojas')+' · '+money(g.v)+' · '+pctF.format(tot?g.v/tot:0)+' da rede</span>'+
-    '</div>'+
+   const body='<div class="pm-det-head"><span class="muted">'+its.length+(its.length===1?' loja':' lojas')+' · '+money(g.v)+' · '+pctF.format(tot?g.v/tot:0)+' da rede</span></div>'+
     '<div class="pm-det-scroll"><table class="pm-table pm-det"><thead><tr><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num" title="Participação no faturamento da rede">% da rede</th></tr></thead><tbody>'+
     (g.subs
      // "Outros": agrupado pelo prefixo (aeroporto/marca), cada grupo com subtotal. % sempre sobre a rede inteira (pedido do usuário).
      ? g.subs.map(sg=>'<tr class="pm-det-grp"><td><span class="pm-grp">'+e(sg.k)+'</span> <small class="muted">· '+sg.items.length+(sg.items.length===1?' loja':' lojas')+'</small></td><td class="num">'+money(sg.v)+'</td><td class="num">'+pctF.format(tot?sg.v/tot:0)+'</td></tr>'+
         sg.items.slice().sort((a,b)=>b.v-a.v).map(x=>detRow(x,g.v,true)).join("")).join("")
      : its.map(x=>detRow(x,g.v,false)).join(""))+
-    '</tbody></table></div>';
-   det.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
+    '</tbody><tfoot><tr><td>Total '+e(g.k)+'</td><td class="num">'+money(g.v)+'</td><td class="num">'+pctF.format(tot?g.v/tot:0)+'</td></tr></tfoot></table></div>';
+   const md=openModal({title:pieTitle[id]+" · "+g.k,body});
+   const dlg=[...document.querySelectorAll(".overlay-modal .pm-det")].pop();
+   dlg?.closest(".dialog")?.classList.add("pm-det-dialog");
+   dlg?.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{md.close();location.hash=tr.dataset.href.replace(/^#/,"")});
   };
   el.addEventListener("click",act);
   el.addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();act()}});
