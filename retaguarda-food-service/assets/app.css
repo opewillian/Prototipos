@@ -669,3 +669,8 @@ details.fold:not([open]) .fold-right small{display:none}
 .pm-table tfoot th,.pm-table tfoot td,.pm-table tfoot td.pm-wk,.pm-table tfoot td.pm-tot{position:sticky;bottom:0;background:var(--graphite);color:#fff;font-weight:700;border-bottom:0}
 .pm-table tfoot .pm-name{z-index:3}
 .pm-table tfoot .muted{color:rgba(255,255,255,.6)}
+.pm-table td.pm-proj{font-style:italic;color:var(--muted)}
+.pm-table thead th.pm-proj{background:#a8475a}
+.pm-table td.pm-first,.pm-table th.pm-first{border-left:2px solid var(--line)}
+.pm-table td.pm-tot{border-right:0}
+.pm-table tfoot td.pm-proj{color:rgba(255,255,255,.8)}

@@ -1,6 +1,8 @@
 // Matriz · Painel (refeito em 24/11/2026, pedido do usuário): uma tabela com todas as lojas e o faturamento líquido
 // de cada dia do mês. Linhas agrupadas pelo prefixo do código (marca: DEL primeiro, as outras em ordem alfabética) e,
 // dentro do grupo, ordenadas pelo 2º pedaço do código (aeroporto). Rolagem horizontal, sem quebra de texto.
+// Dias que ainda não fecharam (hoje em diante) mostram a projeção (public.sales_forecast, recalculada todo dia às 06:30),
+// em itálico. Últimas colunas: Total realizado (dias fechados) e Total projetado (realizado + projeção até o fim do mês).
 // Ordem fixa (data, loja) é obrigatória: a leitura vem em páginas de 1000 e, sem ordem, linhas se repetem ou somem.
 // Fonte: public.sales_imports (líquido por loja e dia, gravado pela importação do Degust; RLS = quem vê Faturamento/CMV).
 import {list} from "../../core/db.js";
@@ -16,28 +18,38 @@ export async function render(ctx){
  const hoje=today();
  if(!month)month=hoje.slice(0,7);
  const ini=month+"-01",last=new Date(+month.slice(0,4),+month.slice(5,7),0).getDate();
- // Dias do mês até ontem (o dia de hoje ainda está em andamento e a importação é feita no dia seguinte).
- const ontem=addDays(hoje,-1);
- const fimMes=month+"-"+String(last).padStart(2,"0"),fim=fimMes<ontem?fimMes:ontem;
- const days=[];for(let d=ini;d<=fim;d=addDays(d,1))days.push(d);
+ const fimMes=month+"-"+String(last).padStart(2,"0");
+ // Realizado: até ontem (a importação do dia é feita na manhã seguinte). De hoje até o fim do mês: projeção.
+ const ontem=addDays(hoje,-1),fimReal=fimMes<ontem?fimMes:ontem,iniProj=hoje>ini?hoje:ini;
+ const days=[];for(let d=ini;d<=fimMes;d=addDays(d,1))days.push(d);
+ const isProj=d=>d>fimReal;
 
  const stores=ctx.app.stores.filter(s=>s.store_type==="operational");
- const rows=days.length?await list("sales_imports",{select:"store_id,business_date,net",gte:{business_date:ini},lte:{business_date:fim},order:"business_date",asc:true,order2:"store_id",asc2:true,limit:50000}):[];
+ const [rows,fc]=await Promise.all([
+  fimReal>=ini?list("sales_imports",{select:"store_id,business_date,net",gte:{business_date:ini},lte:{business_date:fimReal},order:"business_date",asc:true,order2:"store_id",asc2:true,limit:50000}):[],
+  fimMes>=iniProj?list("sales_forecast",{select:"store_id,business_date,projected_net",gte:{business_date:iniProj},lte:{business_date:fimMes},order:"business_date",asc:true,order2:"store_id",asc2:true,limit:20000}).catch(()=>[]):[]
+ ]);
  if(!ctx.isCurrent())return;
 
- const val=new Map();for(const r of rows)val.set(r.store_id+"|"+r.business_date,Number(r.net)||0);
+ const val=new Map();
+ for(const r of fc)val.set(r.store_id+"|"+r.business_date,Number(r.projected_net)||0);
+ for(const r of rows)val.set(r.store_id+"|"+r.business_date,Number(r.net)||0);
  const parts=s=>String(s.code||s.id).split("-");
  const groups=new Map();
  for(const s of stores){const g=parts(s)[0]||"—";(groups.get(g)||groups.set(g,[]).get(g)).push(s)}
  const order=[...groups.keys()].sort((a,b)=>(a==="DEL"?-1:b==="DEL"?1:a.localeCompare(b)));
  for(const g of order)groups.get(g).sort((a,b)=>(parts(a)[1]||"").localeCompare(parts(b)[1]||"")||String(a.code).localeCompare(String(b.code)));
 
- const cell=(v,cls="")=>'<td class="num'+cls+'"'+(v?' title="'+e(money(v))+'"':'')+'>'+(v?int.format(v):'<span class="muted">—</span>')+'</td>';
  const wkd=d=>{const w=new Date(d+"T12:00:00").getDay();return w===0||w===6?" pm-wk":""};
+ const cls=d=>wkd(d)+(isProj(d)?" pm-proj":"");
+ const cell=(v,c="",tip="")=>'<td class="num'+c+'"'+(v?' title="'+e((tip?tip+": ":"")+money(v))+'"':'')+'>'+(v?int.format(v):'<span class="muted">—</span>')+'</td>';
  const sumOf=(ls,d)=>ls.reduce((t,s)=>t+(val.get(s.id+"|"+d)||0),0);
- const rowHtml=(label,ls,cls,href)=>{
-  const per=days.map(d=>sumOf(ls,d)),tot=per.reduce((a,b)=>a+b,0);
-  return '<tr class="'+cls+'"'+(href?' data-href="'+e(href)+'"':'')+'><th scope="row" class="pm-name">'+label+'</th>'+cell(tot," pm-tot")+per.map((v,i)=>cell(v,wkd(days[i]))).join("")+'</tr>';
+ const rowHtml=(label,ls,rc,href)=>{
+  const per=days.map(d=>sumOf(ls,d));
+  const real=per.reduce((t,v,i)=>t+(isProj(days[i])?0:v),0),proj=per.reduce((a,b)=>a+b,0);
+  return '<tr class="'+rc+'"'+(href?' data-href="'+e(href)+'"':'')+'><th scope="row" class="pm-name">'+label+'</th>'+
+   per.map((v,i)=>cell(v,cls(days[i]),isProj(days[i])?"Projetado":"")).join("")+
+   cell(real," pm-tot pm-first","Realizado")+cell(proj," pm-tot","Projetado no mês")+'</tr>';
  };
  let body="";
  for(const g of order){
@@ -45,8 +57,9 @@ export async function render(ctx){
   body+=rowHtml('<span class="pm-grp">'+e(g)+'</span><small> · '+ls.length+(ls.length===1?' loja':' lojas')+'</small>',ls,"pm-group");
   for(const s of ls)body+=rowHtml('<span class="strong">'+e(s.code||s.id)+'</span>',[s],"pm-store","#/loja/"+encodeURIComponent(s.id)+"/faturamento");
  }
- const head='<tr><th scope="col" class="pm-name">Loja</th><th scope="col" class="num pm-tot">Total</th>'+
-  days.map(d=>'<th scope="col" class="num'+wkd(d)+'">'+d.slice(8)+'<small>'+SEM[new Date(d+"T12:00:00").getDay()]+'</small></th>').join("")+'</tr>';
+ const head='<tr><th scope="col" class="pm-name">Loja</th>'+
+  days.map(d=>'<th scope="col" class="num'+cls(d)+'"'+(isProj(d)?' title="Projeção"':'')+'>'+d.slice(8)+'<small>'+(isProj(d)?'proj. ':'')+SEM[new Date(d+"T12:00:00").getDay()]+'</small></th>').join("")+
+  '<th scope="col" class="num pm-tot pm-first">Total geral<small>realizado</small></th><th scope="col" class="num pm-tot">Total projetado<small>fim do mês</small></th></tr>';
  const foot=rowHtml("Total da rede",stores,"pm-net");
 
  const [y,m]=month.split("-").map(Number);
@@ -54,10 +67,14 @@ export async function render(ctx){
  const nav='<div class="pm-month"><button type="button" class="icon-btn" data-m="'+prev+'" aria-label="Mês anterior">‹</button>'+
   '<strong>'+MESES[m-1][0].toUpperCase()+MESES[m-1].slice(1)+' de '+y+'</strong>'+
   '<button type="button" class="icon-btn" data-m="'+next+'" aria-label="Próximo mês"'+(canNext?'':' disabled')+'>›</button></div>';
- const table=days.length&&stores.length?'<div class="pm-scroll"><table class="pm-table"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>':
-  emptyState("chart",stores.length?"Sem dias fechados neste mês":"Nenhuma loja em operação",stores.length?"Os valores aparecem a partir do dia seguinte.":"");
- ctx.el.innerHTML=pageHead("Painel da Matriz","Faturamento líquido (R$) de cada loja, dia a dia, até ontem. Clique na loja para abrir o faturamento dela.",nav)+
+ const table=stores.length?'<div class="pm-scroll"><table class="pm-table"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>':
+  emptyState("store","Nenhuma loja em operação");
+ const temProj=days.some(isProj);
+ ctx.el.innerHTML=pageHead("Painel da Matriz","Faturamento líquido (R$) de cada loja, dia a dia"+(temProj?"; de hoje em diante, em itálico, a projeção":"")+". Clique na loja para abrir o faturamento dela.",nav)+
   card("",table,{flush:true});
  ctx.el.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{month=b.dataset.m;render(ctx)});
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
+ // Abre mostrando o dia de hoje (as últimas colunas) quando o mês tem projeção.
+ const sc=ctx.el.querySelector(".pm-scroll"),th=ctx.el.querySelector("thead th.pm-proj");
+ if(sc&&th)sc.scrollLeft=Math.max(0,th.offsetLeft-sc.querySelector(".pm-name").offsetWidth-6*th.offsetWidth);
 }
