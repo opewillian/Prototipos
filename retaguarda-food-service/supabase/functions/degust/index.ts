@@ -27,6 +27,7 @@
 //   "fila"     → processa a fila sales_import_jobs por até ~110 s (cron "degust-fila" a cada minuto, ou admin).
 //   "periodo_teste" → {codLoja, de, ate}: separa um período por dia sem gravar (conferência).
 // Lojas com vários pontos no Degust: stores.degust_codes (as vendas de todos entram somadas na loja).
+// Franquia de cada loja: stores.degust_franqueador (vazio = DEGUST_FRANQUEADOR, a DEL). "lojas", "vendas" e "periodo_teste" aceitam {franqueador}.
 //   "diario"   → para cada loja com código do Degust, reimporta os 3 dias anteriores.
 //   "resumir"  → {storeId, data, mes?}: refaz o resumo do dia a partir do arquivo já guardado (sem chamar a Linx);
 //                mes:true também refaz o resumo do mês.
@@ -44,7 +45,9 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+// Franquia padrão (DEL) nos segredos; outras franquias (SAL 2168, ACB 2642, BIT 2202) vêm de stores.degust_franqueador. Mesmo usuário Linx.
 const franqueador = () => Number(Deno.env.get("DEGUST_FRANQUEADOR"));
+const franqOf = (f?: number | null) => (Number(f) > 0 ? Number(f) : franqueador());
 const n = (v: unknown) => Number(String(v ?? 0).replace(",", ".")) || 0;
 const yes = (v: unknown) => String(v ?? "").trim().toUpperCase() === "S";
 const r2d = (v: number) => Math.round(v * 100) / 100;
@@ -53,14 +56,16 @@ const isStore = (s: string) => /^[a-z0-9-]+$/i.test(s);
 const DETALHE_DESDE = "2026-10-01";
 
 // ---------------------------------------------------------------- Linx
-async function token(force = false): Promise<string> {
+// Um token por franquia (o login leva o código da franquia): provider "degust" (padrão) ou "degust:<franquia>".
+async function token(force = false, franq?: number | null): Promise<string> {
+  const f = franqOf(franq), provider = f === franqueador() ? "degust" : "degust:" + f;
   if (!force) {
-    const { data } = await admin.from("integration_tokens").select("token,expires_at").eq("provider", "degust").maybeSingle();
+    const { data } = await admin.from("integration_tokens").select("token,expires_at").eq("provider", provider).maybeSingle();
     if (data && new Date(data.expires_at).getTime() - Date.now() > 10 * 60 * 1000) return data.token;
   }
   const r = await fetch(BASE + "/api/usuario/autenticar?api-version=1.0", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ usuario: Deno.env.get("DEGUST_USUARIO"), senha: Deno.env.get("DEGUST_SENHA"), codigoFranqueador: franqueador() }),
+    body: JSON.stringify({ usuario: Deno.env.get("DEGUST_USUARIO"), senha: Deno.env.get("DEGUST_SENHA"), codigoFranqueador: f }),
   });
   const txt = await r.text();
   if (!r.ok) throw new Error("Login na Linx recusado (" + r.status + ").");
@@ -68,16 +73,16 @@ async function token(force = false): Promise<string> {
   try { const j = JSON.parse(txt); tk = typeof j === "string" ? j : (j.acesso?.token ?? j.token ?? j.Token ?? j.accessToken ?? ""); } catch { /* texto puro */ }
   tk = String(tk).replace(/^Bearer\s+/i, "").replace(/^"|"$/g, "");
   if (!tk) throw new Error("A Linx não devolveu o token (formato de resposta inesperado)."); // nunca devolve o texto: pode ter o token
-  await admin.from("integration_tokens").upsert({ provider: "degust", token: tk, expires_at: new Date(Date.now() + 4 * 3600 * 1000).toISOString(), updated_at: new Date().toISOString() });
+  await admin.from("integration_tokens").upsert({ provider, token: tk, expires_at: new Date(Date.now() + 4 * 3600 * 1000).toISOString(), updated_at: new Date().toISOString() });
   return tk;
 }
-async function linx(method: string, path: string, opts: { query?: Record<string, unknown>; body?: unknown } = {}) {
+async function linx(method: string, path: string, opts: { query?: Record<string, unknown>; body?: unknown } = {}, franq?: number | null) {
   const url = new URL(BASE + path);
   url.searchParams.set("api-version", "1.0");
   for (const [k, v] of Object.entries(opts.query ?? {})) if (v != null) url.searchParams.set(k, String(v));
   const call = (tk: string) => fetch(url, { method, headers: { Authorization: "Bearer " + tk, "Content-Type": "application/json" }, body: opts.body ? JSON.stringify(opts.body) : undefined });
-  let r = await call(await token());
-  if (r.status === 401) r = await call(await token(true));
+  let r = await call(await token(false, franq));
+  if (r.status === 401) r = await call(await token(true, franq));
   const txt = await r.text();
   if (!r.ok) throw new Error("Linx " + path + " (" + r.status + "): " + txt.slice(0, 300).replace(/eyJ[\w.-]+/g, "[token]"));
   try { return JSON.parse(txt); } catch { return txt; }
@@ -252,7 +257,7 @@ async function periodSummary(storeId: string, de: string, ate: string, onlyDays 
 // ---------------------------------------------------------------- Importação
 // Busca UM dia de caixa na Linx e grava no R2: arquivo completo + resumo do dia + resumo do mês. Regravar substitui.
 // Pontos de venda do Degust de uma loja: stores.degust_codes (vários pontos com o mesmo CNPJ, somados na loja) ou degust_code.
-type StoreRow = { id: string; degust_code: number | null; degust_codes?: number[] | null };
+type StoreRow = { id: string; degust_code: number | null; degust_codes?: number[] | null; degust_franqueador?: number | null };
 const codesOf = (st: StoreRow) => ((st.degust_codes?.length ? st.degust_codes : [st.degust_code]) ?? []).filter((c): c is number => Number(c) > 0);
 // Dia de caixa da venda: dataVenda (dd/mm/aaaa); sem ela, datMovimento; sem as duas, o dia pedido.
 const diaDaVenda = (v: Record<string, any>, padrao: string) => {
@@ -262,12 +267,12 @@ const diaDaVenda = (v: Record<string, any>, padrao: string) => {
   return iso ? iso[0] : padrao;
 };
 /** Busca as vendas de um período (até 30 dias) em todos os pontos da loja; tira duplicadas e o documento do consumidor. */
-async function fetchSales(codes: number[], de: string, ate: string) {
+async function fetchSales(codes: number[], de: string, ate: string, franq?: number | null) {
   const byKey = new Map<string, Record<string, any>>();   // mesmo controle repetido: fica o último
   for (const cod of codes) {
     const r = await linx("POST", "/api/venda/relatorio-vendas", {
-      body: { dataInicial: de, dataFinal: ate, codFranqueador: franqueador(), codLoja: cod, exibirVendasCanceladas: true, tipoData: "C" },
-    });
+      body: { dataInicial: de, dataFinal: ate, codFranqueador: franqOf(franq), codLoja: cod, exibirVendasCanceladas: true, tipoData: "C" },
+    }, franq);
     for (const v of (Array.isArray(r) ? r : [])) byKey.set(cod + "|" + Number(v.controle), { ...v, codLoja: v.codLoja ?? cod });
   }
   return [...byKey.values()].map(({ docConsumidor: _a, docConsumidorDesconto: _b, ...v }) => v);
@@ -284,14 +289,14 @@ async function writeDay(storeId: string, codes: number[], dia: string, lista: Re
   return { data: dia, vendas: sum.sales, canceladas: sum.cancelled, liquido: sum.net, arquivo: gz ? { bytes: gz.length, bytesSemCompactar: enc.encode(doc).length } : "só resumo" };
 }
 // Busca UM dia de caixa na Linx e grava no R2. Regravar substitui.
-async function importDay(storeId: string, codes: number[], dia: string, userId: string | null, rebuild = true) {
-  return writeDay(storeId, codes, dia, await fetchSales(codes, dia, dia), userId, rebuild);
+async function importDay(storeId: string, codes: number[], dia: string, userId: string | null, rebuild = true, franq?: number | null) {
+  return writeDay(storeId, codes, dia, await fetchSales(codes, dia, dia, franq), userId, rebuild);
 }
 const addDia = (dia: string, n: number) => { const d = new Date(dia + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 /** Importa um período (até 30 dias) de uma vez: uma chamada por ponto, separa por dia e grava os dias em paralelo
  *  (5 por vez) e o registro em sales_imports numa chamada só. Não refaz o mês (o trabalho "mes" da fila faz). */
-async function importRange(storeId: string, codes: number[], de: string, ate: string, userId: string | null) {
-  const lista = await fetchSales(codes, de, ate);
+async function importRange(storeId: string, codes: number[], de: string, ate: string, userId: string | null, franq?: number | null) {
+  const lista = await fetchSales(codes, de, ate, franq);
   const porDia = new Map<string, Record<string, any>[]>();
   for (const v of lista) { const d = diaDaVenda(v, de); (porDia.get(d) ?? porDia.set(d, []).get(d)!).push(v); }
   const dias: string[] = [];
@@ -320,7 +325,7 @@ async function importRange(storeId: string, codes: number[], de: string, ate: st
 // kind "dias" = importRange(de..ate); kind "mes" = rebuildMonth(mês de "de"). Quem pega o trabalho: public.claim_sales_import_job().
 async function runQueue(budgetMs: number) {
   const t0 = Date.now(); let feitos = 0, erros = 0;
-  const lojas = new Map<string, number[]>();
+  const lojas = new Map<string, { codes: number[]; franq: number | null }>();
   while (Date.now() - t0 < budgetMs) {
     const { data: job, error } = await admin.rpc("claim_sales_import_job");
     if (error) throw new Error("Fila: " + error.message);
@@ -329,10 +334,10 @@ async function runQueue(budgetMs: number) {
     try {
       if (j.kind === "mes") { await rebuildMonth(j.store_id, String(j.de).slice(0, 7)); }
       else {
-        if (!lojas.has(j.store_id)) { const { data: st } = await admin.from("stores").select("id,degust_code,degust_codes").eq("id", j.store_id).maybeSingle(); lojas.set(j.store_id, st ? codesOf(st as StoreRow) : []); }
-        const codes = lojas.get(j.store_id)!;
-        if (!codes.length) throw new Error("Loja sem código do Degust.");
-        await importRange(j.store_id, codes, j.de, j.ate, null);
+        if (!lojas.has(j.store_id)) { const { data: st } = await admin.from("stores").select("id,degust_code,degust_codes,degust_franqueador").eq("id", j.store_id).maybeSingle(); lojas.set(j.store_id, { codes: st ? codesOf(st as StoreRow) : [], franq: (st as StoreRow | null)?.degust_franqueador ?? null }); }
+        const lj = lojas.get(j.store_id)!;
+        if (!lj.codes.length) throw new Error("Loja sem código do Degust.");
+        await importRange(j.store_id, lj.codes, j.de, j.ate, null, lj.franq);
       }
       await admin.from("sales_import_jobs").update({ status: "ok", error: null, updated_at: new Date().toISOString() }).eq("id", j.id);
       feitos++;
@@ -374,7 +379,7 @@ Deno.serve(async (req) => {
       if (p.acao === "fila") return json({ ok: true, ...(await runQueue(110_000)) });
       if (p.acao !== "diario") return json({ erro: "O agendamento só pode rodar as ações diario e fila." }, 400);
       // Diário: põe na fila os 3 últimos dias de cada loja com Degust (e o resumo dos meses tocados) e já processa a fila.
-      const { data: lojas } = await admin.from("stores").select("id,degust_code,degust_codes").eq("active", true);
+      const { data: lojas } = await admin.from("stores").select("id,degust_code,degust_codes,degust_franqueador").eq("active", true);
       const de = diaSP(3), ate = diaSP(1), jobs: Record<string, unknown>[] = [];
       for (const st of (lojas ?? []) as StoreRow[]) {
         if (!codesOf(st).length) continue;
@@ -422,18 +427,19 @@ Deno.serve(async (req) => {
     if (p.acao === "periodo_teste") {
       const de = String(p.de ?? ""), ate = String(p.ate ?? "");
       if (!isDay(de) || !isDay(ate)) return json({ erro: "Período inválido." }, 400);
-      const lista = await fetchSales([Number(p.codLoja)], de, ate);
+      const lista = await fetchSales([Number(p.codLoja)], de, ate, Number(p.franqueador) || null);
       const out: Record<string, { n: number; liq: number }> = {};
       for (const v of lista) { if (yes(v.cancelada)) continue; const d = diaDaVenda(v, de); const o = out[d] ?? (out[d] = { n: 0, liq: 0 }); o.n++; o.liq = r2d(o.liq + n(v.valLiquido)); }
       return json({ ok: true, dias: out });
     }
     if (p.acao === "fila") return json({ ok: true, ...(await runQueue(Math.min(Number(p.ms) || 60_000, 110_000))) });
     if (p.acao === "lojas") {
-      const r = await linx("GET", "/api/loja/listarLojasFranquia", { query: { codigoFranquia: franqueador() } });
+      const fq = franqOf(Number(p.franqueador) || null);
+      const r = await linx("GET", "/api/loja/listarLojasFranquia", { query: { codigoFranquia: fq } }, fq);
       return json({ ok: true, lojas: (Array.isArray(r) ? r : []).map((l: Record<string, unknown>) => ({ codigoLoja: l.codigoLoja, nomeLoja: l.nomeLoja, razaoSocial: l.razaoSocial, cnpj: l.cnpj, cidade: l.cidade, uf: l.uf, tipo: l.tipo })) });
     }
     if (p.acao === "vendas") {
-      const r = await linx("POST", "/api/venda/relatorio-vendas", { body: { dataInicial: p.dataInicial, dataFinal: p.dataFinal, codFranqueador: franqueador(), codLoja: Number(p.codLoja), exibirVendasCanceladas: true, tipoData: "C" } });
+      const r = await linx("POST", "/api/venda/relatorio-vendas", { body: { dataInicial: p.dataInicial, dataFinal: p.dataFinal, codFranqueador: franqOf(Number(p.franqueador) || null), codLoja: Number(p.codLoja), exibirVendasCanceladas: true, tipoData: "C" } }, Number(p.franqueador) || null);
       const vendas = Array.isArray(r) ? r : [];
       const ok = vendas.filter((v: Record<string, unknown>) => !yes(v.cancelada));
       return json({ ok: true, vendas: vendas.length, canceladas: vendas.length - ok.length, liquido: r2d(ok.reduce((s: number, v: Record<string, unknown>) => s + n(v.valLiquido), 0)) });
@@ -458,10 +464,10 @@ Deno.serve(async (req) => {
     }
     if (p.acao === "importar") {
       if (!isDay(dia)) return json({ erro: "Informe a data (AAAA-MM-DD)." }, 400);
-      const { data: st } = await admin.from("stores").select("id,degust_code,degust_codes").eq("id", storeId).maybeSingle();
+      const { data: st } = await admin.from("stores").select("id,degust_code,degust_codes,degust_franqueador").eq("id", storeId).maybeSingle();
       const codes = st ? codesOf(st as StoreRow) : [];
       if (!codes.length) return json({ erro: "Loja sem código do Degust." }, 400);
-      return json({ ok: true, ...(await importDay(st!.id, codes, dia, u.user.id, p.mes !== false)) });
+      return json({ ok: true, ...(await importDay(st!.id, codes, dia, u.user.id, p.mes !== false, (st as StoreRow).degust_franqueador ?? null)) });
     }
     return json({ erro: "Ação desconhecida." }, 400);
   } catch (e) {
