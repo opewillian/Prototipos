@@ -23,6 +23,7 @@
 //   "cupons"   → {storeId, data}: cupons do dia (recibos) lidos do arquivo completo; quem vê Faturamento/CMV. Só a partir de DETALHE_DESDE.
 //   "resumo"   → {storeId, de, ate, somenteDias?}: dias (com vendas por hora quando houver), produtos e formas de pagamento do período (lido dos resumos no R2);
 //                somenteDias:true devolve só o dia a dia (mais rápido, para gráficos).
+//   "ranking"  → {storeId}: ticket médio do mês passado e deste mês das lojas da mesma marca (quem vê Faturamento/CMV da loja).
 //   "importar" → {storeId, data}: busca o dia na Linx e grava arquivo + resumos no R2.
 //   "fila"     → processa a fila sales_import_jobs por até ~110 s (cron "degust-fila" a cada minuto, ou admin).
 //   "periodo_teste" → {codLoja, de, ate}: separa um período por dia sem gravar (conferência).
@@ -403,6 +404,44 @@ Deno.serve(async (req) => {
       if (error) throw new Error("Permissão: " + error.message);
       if (!can) return json({ erro: "Sem acesso ao faturamento desta loja." }, 403);
       return json({ ok: true, ...(await periodSummary(storeId, de, ate, !!p.somenteDias)) });
+    }
+    // Ranking de ticket médio das lojas da MESMA MARCA da loja vista (mês passado x este mês). Quem vê Faturamento/CMV
+    // da loja vê o ranking (só o ticket médio das outras lojas, não as vendas). Marca = stores.brand_id; sem marca, o
+    // prefixo do código (ACB, SAL…). Base: public.sales_imports (líquido e nº de vendas por dia).
+    if (p.acao === "ranking") {
+      const storeId = String(p.storeId ?? "");
+      if (!isStore(storeId)) return json({ erro: "Loja inválida." }, 400);
+      const asUser = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { auth: { persistSession: false }, global: { headers: { Authorization: "Bearer " + jwt } } });
+      const { data: can, error } = await asUser.rpc("can_view_sales", { p_store: storeId });
+      if (error) throw new Error("Permissão: " + error.message);
+      if (!can) return json({ erro: "Sem acesso ao faturamento desta loja." }, 403);
+      const { data: all } = await admin.from("stores").select("id,code,name,brand_id,degust_code,active").eq("store_type", "operational");
+      const key = (x: Record<string, any>) => x.brand_id ?? ("pref:" + String(x.code ?? "").split("-")[0]);
+      const me = (all ?? []).find((x) => x.id === storeId);
+      if (!me) return json({ erro: "Loja não encontrada." }, 404);
+      const lojas = (all ?? []).filter((x) => key(x) === key(me) && x.degust_code != null);
+      const hoje = diaSP(0), ontem = diaSP(1);
+      const curIni = hoje.slice(0, 8) + "01";
+      const prevIni = addDia(curIni, -1).slice(0, 8) + "01", prevFim = addDia(curIni, -1);
+      const tot = new Map<string, { pn: number; ps: number; cn: number; cs: number; cd: number }>();
+      for (const l of lojas) tot.set(l.id, { pn: 0, ps: 0, cn: 0, cs: 0, cd: 0 });
+      const ids = lojas.map((l) => l.id);
+      for (let from = 0; ids.length; from += 1000) {
+        const { data: rows, error: e2 } = await admin.from("sales_imports").select("store_id,business_date,sales,net")
+          .in("store_id", ids).gte("business_date", prevIni).lte("business_date", ontem).order("store_id").order("business_date").range(from, from + 999);
+        if (e2) throw new Error("Vendas: " + e2.message);
+        for (const r of rows ?? []) {
+          const t = tot.get(r.store_id)!; const d = String(r.business_date);
+          if (d <= prevFim) { t.pn += Number(r.net); t.ps += Number(r.sales); } else { t.cn += Number(r.net); t.cs += Number(r.sales); t.cd++; }
+        }
+        if (!rows || rows.length < 1000) break;
+      }
+      const tk = (n: number, q: number) => (q > 0 ? r2d(n / q) : null);
+      const out = lojas.map((l) => {
+        const t = tot.get(l.id)!; const a = tk(t.pn, t.ps), b = tk(t.cn, t.cs);
+        return { store_id: l.id, code: l.code, name: l.name, prev: a, cur: b, var: a && b ? Math.round((b / a - 1) * 10000) / 10000 : null, dias: t.cd };
+      });
+      return json({ ok: true, marca: me.brand_id ? null : String(me.code).split("-")[0], mesAnterior: prevIni.slice(0, 7), mesAtual: curIni.slice(0, 7), ate: ontem, lojas: out });
     }
     // Cupons de um dia (arquivo completo do R2; só existe a partir de DETALHE_DESDE). Mesma permissão do resumo.
     if (p.acao === "cupons") {

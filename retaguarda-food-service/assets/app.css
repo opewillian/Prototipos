@@ -627,3 +627,10 @@ details.fold:not([open]) .fold-right small{display:none}
 
 /* Início › gráfico Vendas: seletor de medida + visão */
 .chart-ctrls{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+/* Início › ranking de ticket médio */
+.table.rk tr.rk-me td{background:var(--brand-50);font-weight:600}
+.table.rk tr.rk-me td:first-child{box-shadow:inset 3px 0 0 var(--brand)}
+.rk-var{font-weight:700;white-space:nowrap}
+.rk-var.up{color:var(--ok)}
+.rk-var.down{color:var(--danger)}

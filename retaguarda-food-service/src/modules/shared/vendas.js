@@ -18,5 +18,13 @@ export async function salesSummary(storeId,de,ate,opts={}){
  const v={days:r.data.days||[],products:r.data.products||[],payments:r.data.payments||[],imported:r.data.imported||[]};
  cache.set(k,{t:Date.now(),v});return v;
 }
+/** Ranking de ticket médio das lojas da mesma marca (mês passado x este mês). {mesAnterior, mesAtual, ate, lojas:[{store_id,code,name,prev,cur,var,dias}]} */
+export async function salesRanking(storeId){
+ const k="rank|"+storeId,hit=cache.get(k);
+ if(hit&&Date.now()-hit.t<TTL)return hit.v;
+ const r=await supabase.functions.invoke("degust",{body:{acao:"ranking",storeId}});
+ if(r.error){let msg=r.error.message;try{msg=JSON.parse(await r.error.context.text()).erro||msg}catch{}throw Error(msg)}
+ cache.set(k,{t:Date.now(),v:r.data});return r.data;
+}
 /** Limpa o cache (ex.: depois de importar vendas). */
 export function clearSalesCache(){cache.clear()}

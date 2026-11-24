@@ -90,6 +90,7 @@ const SCREENS={
   {title:"Início da loja",text:"O resumo da loja: vendas e CMV."},
   {find:()=>$("#content [data-chart]")?.closest(".card"),title:"Vendas",text:"Linha cheia: o que já foi vendido. Pontilhada vinho: a projeção até o fim do mês (recalculada todo dia às 6h30). Passe o mouse para ver os valores."},
   {sel:inContent(".chart-ctrls"),title:"Medida e visão",text:"Escolha o que ver — Faturamento, Ticket médio ou Cupons — e a visão. No mês a mês, a linha cinza tracejada é o ano anterior. Por hora mostra quanto a loja vende, em média por dia, em cada hora — e o horário de pico — comparando com o mês anterior."},
+  {find:cardT("Ranking de ticket médio"),title:"Ranking de ticket médio",text:"As lojas da mesma marca, do ticket médio que mais subiu ao que mais caiu, comparando o mês passado com este mês (até ontem). A sua loja aparece em destaque."},
   {find:cardT("CMV por período"),title:"CMV por período",text:"Cada período entre duas contagens seguidas, com o CMV e o percentual sobre o faturamento. Clique para abrir o cálculo."}
  ],
  "loja:faturamento":[
