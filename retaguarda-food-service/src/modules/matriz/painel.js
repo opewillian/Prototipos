@@ -150,7 +150,7 @@ function pieCard(id,title,gs,tot,pctF){
   return '<path d="'+d+'" fill="'+col+'" data-pie="'+id+'" data-i="'+i+'" tabindex="0" role="button" aria-label="'+e(g.k+": "+pctF.format(frac))+'"><title>'+e(g.k+" · "+pctF.format(frac)+" · "+money(g.v))+'</title></path>';
  }).join("");
  const leg=gs.map((g,i)=>'<button type="button" class="pm-leg" data-pie="'+id+'" data-i="'+i+'"><i style="background:'+(g.other?PIE_OTHER:PIE_COLORS[i])+'"></i><span class="pm-leg-k">'+e(g.k)+'</span><span class="pm-leg-p">'+pctF.format(tot?g.v/tot:0)+'</span><span class="pm-leg-v muted">'+money(g.v)+'</span></button>').join("");
- return '<div class="pm-pie" data-pie-box="'+id+'"><h3>'+e(title)+'</h3><div class="pm-pie-row"><svg viewBox="0 0 180 180" width="180" height="180" class="pm-pie-svg" aria-label="'+e(title)+'">'+arcs+'</svg><div class="pm-legend">'+leg+'</div></div>'+
+ return '<div class="pm-pie" data-pie-box="'+id+'"><h3>'+e(title)+'</h3><div class="pm-pie-row"><svg viewBox="0 0 180 180" width="130" height="130" class="pm-pie-svg" aria-label="'+e(title)+'">'+arcs+'</svg><div class="pm-legend">'+leg+'</div></div>'+
   '<div class="pm-pie-det" data-pie-det="'+id+'"><p class="muted">Clique numa fatia ou na legenda para ver as lojas.</p></div></div>';
 }
 function bindPies(box,tot,pctF){
@@ -162,8 +162,8 @@ function bindPies(box,tot,pctF){
    const its=g.items.slice().sort((a,b)=>b.v-a.v);
    det.innerHTML='<div class="pm-det-head"><strong>'+e(g.k)+'</strong><span class="muted">'+its.length+(its.length===1?' loja':' lojas')+' · '+money(g.v)+' · '+pctF.format(tot?g.v/tot:0)+' da rede</span>'+
     (g.other?'<small class="muted">('+e(g.other.join(", "))+')</small>':'')+'</div>'+
-    '<div class="pm-det-scroll"><table class="pm-table pm-det"><thead><tr><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">% do '+(id==="marca"?"grupo":"aeroporto")+'</th><th scope="col" class="num">% da rede</th></tr></thead><tbody>'+
-    its.map(x=>'<tr class="pm-store" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td><span class="strong">'+e(x.st.code||x.st.id)+'</span></td><td class="num">'+money(x.v)+'</td><td class="num">'+pctF.format(g.v?x.v/g.v:0)+'</td><td class="num">'+pctF.format(tot?x.v/tot:0)+'</td></tr>').join("")+
+    '<div class="pm-det-scroll"><table class="pm-table pm-det"><thead><tr><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">% do '+(id==="marca"?"grupo":"aeroporto")+'</th></tr></thead><tbody>'+
+    its.map(x=>'<tr class="pm-store" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td><span class="strong">'+e(x.st.code||x.st.id)+'</span></td><td class="num">'+money(x.v)+'</td><td class="num">'+pctF.format(g.v?x.v/g.v:0)+'</td></tr>').join("")+
     '</tbody></table></div>';
    det.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
   };
