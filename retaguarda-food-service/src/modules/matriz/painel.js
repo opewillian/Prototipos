@@ -83,7 +83,8 @@ export async function render(ctx){
 }
 
 // Ranking de faturamento (realizado no mês, até ontem): loja, valor e % de participação na rede. Só lojas com venda; páginas de 10.
-// Tem o próprio seletor de mês; só este card é refeito ao trocar.
+// Tem o próprio seletor de mês; só este card é refeito ao trocar. À direita: pizzas de participação por marca (1º prefixo)
+// e por aeroporto (2º prefixo); clique na fatia mostra as lojas daquele prefixo.
 async function drawRanking(ctx,stores){
  const box=ctx.el.querySelector("[data-rk-card]");if(!box)return;
  const hoje=today(),ontem=addDays(hoje,-1),mm=rkMonth;
@@ -107,16 +108,66 @@ async function drawRanking(ctx,stores){
   Array.from({length:pages},(_,k)=>'<button type="button" class="rk-pg'+(k===page?' on':'')+'" data-rkp="'+k+'"'+(k===page?' aria-current="page"':'')+'>'+(k+1)+'</button>').join("")+
   '<button type="button" class="icon-btn" data-rkp="'+(page+1)+'"'+(page===pages-1?' disabled':'')+' aria-label="Próxima página">›</button></span>':'')+'</div>';
  const sub=fim<fimMes&&fim>=ini?"até "+fim.slice(8)+"/"+fim.slice(5,7):"";
+ // Pizzas de participação: 1º prefixo do código (marca) e 2º prefixo (aeroporto). Clique abre as lojas do prefixo.
+ const pies=rk.length?pieCard("marca","Participação por marca",groupBy(rk,0),rkTot,pctF)+pieCard("aero","Participação por aeroporto",groupBy(rk,1),rkTot,pctF):"";
  const draw=page=>{
   page=Math.max(0,Math.min(pages-1,page));
-  const body=rk.length?'<div class="pm-scroll pm-rk-scroll"><table class="pm-table pm-rk"><thead><tr><th scope="col" class="num">#</th><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">Participação</th></tr></thead><tbody>'+
+  const tb=box.querySelector("[data-rk-tbl]");
+  tb.innerHTML='<div class="pm-scroll pm-rk-scroll"><table class="pm-table pm-rk"><thead><tr><th scope="col" class="num">#</th><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">Participação</th></tr></thead><tbody>'+
    rk.slice(page*PG,page*PG+PG).map((x,k)=>{const i=page*PG+k,p=rkTot?x.v/rkTot:0;return '<tr class="pm-store'+(i<3?' pm-top':'')+'" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td class="num muted">'+(i+1)+'º</td><td><span class="strong">'+e(x.st.code||x.st.id)+'</span>'+(x.st.name&&x.st.name!==x.st.code?' <span class="muted">· '+e(x.st.name)+'</span>':'')+'</td>'+
     '<td class="num">'+money(x.v)+'</td><td class="num"><span class="pm-bar"><i style="width:'+(p/(rk[0].v/rkTot)*100).toFixed(1)+'%"></i></span>'+pctF.format(p)+'</td></tr>'}).join("")+
-   '</tbody><tfoot><tr><td></td><td>Total da rede · '+rk.length+' lojas</td><td class="num">'+money(rkTot)+'</td><td class="num">'+pctF.format(1)+'</td></tr></tfoot></table></div>'+pager(page):
-   emptyState("chart","Sem faturamento no mês");
-  box.innerHTML=head(sub)+'<div class="card-body flush">'+body+'</div>';bind();
-  box.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
-  box.querySelectorAll("[data-rkp]").forEach(b=>b.onclick=()=>draw(Number(b.dataset.rkp)));
+   '</tbody><tfoot><tr><td></td><td>Total da rede · '+rk.length+' lojas</td><td class="num">'+money(rkTot)+'</td><td class="num">'+pctF.format(1)+'</td></tr></tfoot></table></div>'+pager(page);
+  tb.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
+  tb.querySelectorAll("[data-rkp]").forEach(b=>b.onclick=()=>draw(Number(b.dataset.rkp)));
  };
+ if(!rk.length){box.innerHTML=head(sub)+'<div class="card-body">'+emptyState("chart","Sem faturamento no mês")+'</div>';bind();return}
+ box.innerHTML=head(sub)+'<div class="card-body flush pm-rk-grid"><div class="pm-rk-tbl" data-rk-tbl></div><div class="pm-pies">'+pies+'</div></div>';bind();
  draw(0);
+ bindPies(box,rkTot,pctF);
+}
+
+// ------------------------------------------------------------------ Pizzas de participação
+// Cores: paleta categórica validada (ordem fixa por fatia, do maior para o menor); a partir da 9ª fatia, "Outros" em cinza.
+const PIE_COLORS=["#2a78d6","#eb6834","#1baf7a","#eda100","#e87ba4","#008300","#6250d6","#e34948"],PIE_OTHER="#a3a3a8";
+function groupBy(rk,idx){
+ const m=new Map();
+ for(const x of rk){const k=String(x.st.code||x.st.id).split("-")[idx]||"—";const g=m.get(k)||m.set(k,{k,v:0,items:[]}).get(k);g.v+=x.v;g.items.push(x)}
+ const gs=[...m.values()].sort((a,b)=>b.v-a.v);
+ if(gs.length<=8)return gs;
+ const rest=gs.slice(7);
+ return [...gs.slice(0,7),{k:"Outros",v:rest.reduce((t,g)=>t+g.v,0),items:rest.flatMap(g=>g.items),other:rest.map(g=>g.k)}];
+}
+const pieState={};
+function pieCard(id,title,gs,tot,pctF){
+ pieState[id]=gs;
+ const R=80,C=90;let a0=-Math.PI/2;
+ const arcs=gs.map((g,i)=>{
+  const frac=tot?g.v/tot:0,a1=a0+frac*2*Math.PI,col=g.other?PIE_OTHER:PIE_COLORS[i];
+  let d;
+  if(frac>=0.9999)d='M'+C+' '+(C-R)+' A'+R+' '+R+' 0 1 1 '+(C-0.01)+' '+(C-R)+' Z';
+  else{const x0=C+R*Math.cos(a0),y0=C+R*Math.sin(a0),x1=C+R*Math.cos(a1),y1=C+R*Math.sin(a1);d='M'+C+' '+C+' L'+x0.toFixed(2)+' '+y0.toFixed(2)+' A'+R+' '+R+' 0 '+(frac>0.5?1:0)+' 1 '+x1.toFixed(2)+' '+y1.toFixed(2)+' Z'}
+  a0=a1;
+  return '<path d="'+d+'" fill="'+col+'" data-pie="'+id+'" data-i="'+i+'" tabindex="0" role="button" aria-label="'+e(g.k+": "+pctF.format(frac))+'"><title>'+e(g.k+" · "+pctF.format(frac)+" · "+money(g.v))+'</title></path>';
+ }).join("");
+ const leg=gs.map((g,i)=>'<button type="button" class="pm-leg" data-pie="'+id+'" data-i="'+i+'"><i style="background:'+(g.other?PIE_OTHER:PIE_COLORS[i])+'"></i><span class="pm-leg-k">'+e(g.k)+'</span><span class="pm-leg-p">'+pctF.format(tot?g.v/tot:0)+'</span><span class="pm-leg-v muted">'+money(g.v)+'</span></button>').join("");
+ return '<div class="pm-pie" data-pie-box="'+id+'"><h3>'+e(title)+'</h3><div class="pm-pie-row"><svg viewBox="0 0 180 180" width="180" height="180" class="pm-pie-svg" aria-label="'+e(title)+'">'+arcs+'</svg><div class="pm-legend">'+leg+'</div></div>'+
+  '<div class="pm-pie-det" data-pie-det="'+id+'"><p class="muted">Clique numa fatia ou na legenda para ver as lojas.</p></div></div>';
+}
+function bindPies(box,tot,pctF){
+ box.querySelectorAll("[data-pie]").forEach(el=>{
+  const act=()=>{
+   const id=el.dataset.pie,i=Number(el.dataset.i),g=pieState[id][i],det=box.querySelector('[data-pie-det="'+id+'"]');
+   box.querySelectorAll('[data-pie="'+id+'"]').forEach(x=>x.classList.toggle("on",Number(x.dataset.i)===i));
+   box.querySelector('[data-pie-box="'+id+'"]').classList.add("sel");
+   const its=g.items.slice().sort((a,b)=>b.v-a.v);
+   det.innerHTML='<div class="pm-det-head"><strong>'+e(g.k)+'</strong><span class="muted">'+its.length+(its.length===1?' loja':' lojas')+' · '+money(g.v)+' · '+pctF.format(tot?g.v/tot:0)+' da rede</span>'+
+    (g.other?'<small class="muted">('+e(g.other.join(", "))+')</small>':'')+'</div>'+
+    '<div class="pm-det-scroll"><table class="pm-table pm-det"><thead><tr><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">% do '+(id==="marca"?"grupo":"aeroporto")+'</th><th scope="col" class="num">% da rede</th></tr></thead><tbody>'+
+    its.map(x=>'<tr class="pm-store" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td><span class="strong">'+e(x.st.code||x.st.id)+'</span></td><td class="num">'+money(x.v)+'</td><td class="num">'+pctF.format(g.v?x.v/g.v:0)+'</td><td class="num">'+pctF.format(tot?x.v/tot:0)+'</td></tr>').join("")+
+    '</tbody></table></div>';
+   det.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
+  };
+  el.addEventListener("click",act);
+  el.addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();act()}});
+ });
 }
