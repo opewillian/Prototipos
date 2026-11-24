@@ -51,7 +51,7 @@ export async function render(ctx){
  const [y,m]=month.split("-").map(Number);
  const prev=addDays(ini,-1).slice(0,7),next=addDays(fimMes,1).slice(0,7),canNext=next<=hoje.slice(0,7);
  const nav='<div class="pm-month"><button type="button" class="icon-btn" data-m="'+prev+'" aria-label="Mês anterior">‹</button>'+
-  '<strong>'+MESES[m-1]+' de '+y+'</strong>'+
+  '<strong>'+MESES[m-1][0].toUpperCase()+MESES[m-1].slice(1)+' de '+y+'</strong>'+
   '<button type="button" class="icon-btn" data-m="'+next+'" aria-label="Próximo mês"'+(canNext?'':' disabled')+'>›</button></div>';
  const table=days.length&&stores.length?'<div class="pm-scroll"><table class="pm-table"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>':
   emptyState("chart",stores.length?"Sem dias fechados neste mês":"Nenhuma loja em operação",stores.length?"Os valores aparecem a partir do dia seguinte.":"");
