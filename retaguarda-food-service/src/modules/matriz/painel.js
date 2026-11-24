@@ -82,7 +82,7 @@ export async function render(ctx){
  const sc=ctx.el.querySelector(".pm-scroll");if(sc)sc.scrollLeft=sc.scrollWidth;
 }
 
-// Ranking de faturamento (realizado no mês, até ontem): loja, valor e % de participação na rede. Só lojas com venda; páginas de 10.
+// Ranking de faturamento (realizado no mês, até ontem): loja, valor e % de participação na rede. Só lojas com venda; páginas de no mínimo 10 (até o fim do card, ao lado das pizzas); largura das colunas fixa.
 // Tem o próprio seletor de mês; só este card é refeito ao trocar. À direita: pizzas de participação por marca (1º prefixo)
 // e por aeroporto (2º prefixo); clique na fatia mostra as lojas daquele prefixo.
 async function drawRanking(ctx,stores){
@@ -102,7 +102,9 @@ async function drawRanking(ctx,stores){
  const tot=new Map();for(const r of rows)tot.set(r.store_id,(tot.get(r.store_id)||0)+(Number(r.net)||0));
  const rk=stores.map(st=>({st,v:tot.get(st.id)||0})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
  const rkTot=rk.reduce((t,x)=>t+x.v,0),pctF=new Intl.NumberFormat("pt-BR",{style:"percent",minimumFractionDigits:2,maximumFractionDigits:2});
- const PG=10,pages=Math.ceil(rk.length/PG);
+ // Linhas por página: no mínimo 10; se a coluna das pizzas for mais alta, cabe mais lojas até o fim do card.
+ // Largura das colunas fixa (medida com todas as lojas), para a tabela não mudar de tamanho ao trocar de página.
+ let PG=10,first=0,colW=null,pages=1;
  const pager=page=>'<div class="rk-pager"><span class="muted">'+(rk.length?(page*PG+1)+'–'+Math.min(rk.length,page*PG+PG)+' de '+rk.length+' lojas':'')+'</span>'+
   (pages>1?'<span class="rk-pages"><button type="button" class="icon-btn" data-rkp="'+(page-1)+'"'+(page===0?' disabled':'')+' aria-label="Página anterior">‹</button>'+
   Array.from({length:pages},(_,k)=>'<button type="button" class="rk-pg'+(k===page?' on':'')+'" data-rkp="'+k+'"'+(k===page?' aria-current="page"':'')+'>'+(k+1)+'</button>').join("")+
@@ -110,20 +112,42 @@ async function drawRanking(ctx,stores){
  const sub=fim<fimMes&&fim>=ini?"até "+fim.slice(8)+"/"+fim.slice(5,7):"";
  // Pizzas de participação: 1º prefixo do código (marca) e 2º prefixo (aeroporto). Clique abre as lojas do prefixo.
  const pies=rk.length?pieCard("marca","Participação por marca",groupBy(rk,0),rkTot,pctF)+pieCard("aero","Participação por aeroporto",groupBy(rk,1),rkTot,pctF):"";
+ const rowHtml=(x,i)=>{const p=rkTot?x.v/rkTot:0;return '<tr class="pm-store'+(i<3?' pm-top':'')+'" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td class="num muted">'+(i+1)+'º</td><td><span class="strong">'+e(x.st.code||x.st.id)+'</span>'+(x.st.name&&x.st.name!==x.st.code?' <span class="muted">· '+e(x.st.name)+'</span>':'')+'</td>'+
+  '<td class="num">'+money(x.v)+'</td><td class="num"><span class="pm-bar"><i style="width:'+(p/(rk[0].v/rkTot)*100).toFixed(1)+'%"></i></span>'+pctF.format(p)+'</td></tr>'};
+ const tableHtml=(from,to)=>'<div class="pm-scroll pm-rk-scroll"><table class="pm-table pm-rk"'+(colW?' style="table-layout:fixed;width:'+colW.reduce((a,b)=>a+b,0)+'px"':'')+'>'+
+  (colW?'<colgroup>'+colW.map(w=>'<col style="width:'+w+'px">').join("")+'</colgroup>':'')+
+  '<thead><tr><th scope="col" class="num">#</th><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">Participação</th></tr></thead><tbody>'+
+  rk.slice(from,to).map((x,k)=>rowHtml(x,from+k)).join("")+
+  '</tbody><tfoot><tr><td></td><td>Total da rede · '+rk.length+' lojas</td><td class="num">'+money(rkTot)+'</td><td class="num">'+pctF.format(1)+'</td></tr></tfoot></table></div>';
  const draw=page=>{
-  page=Math.max(0,Math.min(pages-1,page));
+  page=Math.max(0,Math.min(pages-1,page));first=page*PG;
   const tb=box.querySelector("[data-rk-tbl]");
-  tb.innerHTML='<div class="pm-scroll pm-rk-scroll"><table class="pm-table pm-rk"><thead><tr><th scope="col" class="num">#</th><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">Participação</th></tr></thead><tbody>'+
-   rk.slice(page*PG,page*PG+PG).map((x,k)=>{const i=page*PG+k,p=rkTot?x.v/rkTot:0;return '<tr class="pm-store'+(i<3?' pm-top':'')+'" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td class="num muted">'+(i+1)+'º</td><td><span class="strong">'+e(x.st.code||x.st.id)+'</span>'+(x.st.name&&x.st.name!==x.st.code?' <span class="muted">· '+e(x.st.name)+'</span>':'')+'</td>'+
-    '<td class="num">'+money(x.v)+'</td><td class="num"><span class="pm-bar"><i style="width:'+(p/(rk[0].v/rkTot)*100).toFixed(1)+'%"></i></span>'+pctF.format(p)+'</td></tr>'}).join("")+
-   '</tbody><tfoot><tr><td></td><td>Total da rede · '+rk.length+' lojas</td><td class="num">'+money(rkTot)+'</td><td class="num">'+pctF.format(1)+'</td></tr></tfoot></table></div>'+pager(page);
+  tb.innerHTML=tableHtml(page*PG,page*PG+PG)+pager(page);
   tb.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
   tb.querySelectorAll("[data-rkp]").forEach(b=>b.onclick=()=>draw(Number(b.dataset.rkp)));
  };
+ // Mede tudo uma vez (todas as lojas): largura de cada coluna e altura de linha, cabeçalho, rodapé e paginação.
+ let rowH=40,fixedH=150;
+ const measure=()=>{
+  const tb=box.querySelector("[data-rk-tbl]");
+  tb.innerHTML=tableHtml(0,rk.length)+pager(0);
+  const t=tb.querySelector("table");
+  colW=[...t.tHead.rows[0].cells].map(c=>Math.ceil(c.getBoundingClientRect().width));
+  const rows=t.tBodies[0].rows;rowH=rows.length?rows[0].getBoundingClientRect().height:40;
+  fixedH=t.tHead.getBoundingClientRect().height+t.tFoot.getBoundingClientRect().height+(tb.querySelector(".rk-pager")?.getBoundingClientRect().height||50)+2;
+ };
+ const fit=()=>{
+  const piesH=box.querySelector(".pm-pies")?.getBoundingClientRect().height||0;
+  const n=Math.max(10,Math.floor((piesH-fixedH)/rowH));
+  if(n===PG&&box.querySelector("[data-rk-tbl] table"))return;
+  PG=n;pages=Math.max(1,Math.ceil(rk.length/PG));draw(Math.floor(first/PG));
+ };
  if(!rk.length){box.innerHTML=head(sub)+'<div class="card-body">'+emptyState("chart","Sem faturamento no mês")+'</div>';bind();return}
  box.innerHTML=head(sub)+'<div class="card-body flush pm-rk-grid"><div class="pm-rk-tbl" data-rk-tbl></div><div class="pm-pies">'+pies+'</div></div>';bind();
- draw(0);
+ measure();PG=0;fit();
  bindPies(box,rkTot,pctF);
+ // Abrir o detalhe de uma pizza aumenta a coluna da direita: a página do ranking acompanha.
+ if(window.ResizeObserver){const ro=new ResizeObserver(()=>{if(!box.isConnected){ro.disconnect();return}fit()});ro.observe(box.querySelector(".pm-pies"))}
 }
 
 // ------------------------------------------------------------------ Pizzas de participação
