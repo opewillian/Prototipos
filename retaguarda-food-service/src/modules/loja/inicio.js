@@ -79,7 +79,7 @@ export async function render(ctx){
   (showSales?card("Vendas",'<div class="chart-total"><span data-chart-total></span><small data-chart-sub></small></div><div data-chart></div>',
     {actions:'<div class="chart-ctrls"><div class="seg" role="tablist" aria-label="Medida"><button type="button" role="tab" data-met="fat">Faturamento</button><button type="button" role="tab" data-met="tkt">Ticket médio</button><button type="button" role="tab" data-met="cup">Cupons</button></div>'+
      '<div class="seg" role="tablist" aria-label="Visualização"><button type="button" role="tab" data-view="dia">Dia a dia</button><button type="button" role="tab" data-view="mes">Mês a mês</button><button type="button" role="tab" data-view="hora">Por hora</button></div></div>'}):'')+
-  (showSales?rankingCard(ctx,ranking):'')+
+  ((showSales||showCmv)?'<div class="grid-2 inicio-duo">':'')+(showSales?rankingCard(ctx,ranking):'')+
   (showCmv?card("CMV por período",periods.length?dataTable([
     {label:"Período",render:p=>'<span class="strong">'+dateBR(p.a.count_date)+' a '+dateBR(p.b.count_date)+'</span><small class="sub">'+e(p.a.display_id)+' → '+e(p.b.display_id)+((p.a.status==="draft"||p.b.status==="draft")?' · contagem em rascunho':'')+'</small>'},
     {label:"CMV",cls:"num",render:p=>p.error?'<span class="muted">—</span>':money(p.cmv)},
@@ -87,8 +87,10 @@ export async function render(ctx){
     {label:"CMV / faturamento",cls:"num",render:p=>p.rev?'<strong>'+pct(p.cmv/p.rev)+'</strong>':'<span class="muted">—</span>'}
    ],periods,{rowHref:p=>ctx.base+"/cmv/novo/"+p.a.id+"/"+p.b.id})
    :emptyState("chart","Nenhum período de CMV","São necessárias duas contagens em datas diferentes."),{flush:true}):'')+
+  ((showSales||showCmv)?'</div>':'')+
   (!showSales&&!showCmv?alertBox("Nenhum módulo com resumo liberado para esta loja.","info"):'');
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
+ if(showSales&&ranking&&!ranking.erro)drawRanking(ctx,ranking,null);
  if(showSales){
   // Um gráfico só; o botão no topo troca entre dia a dia (mês atual), mês a mês (12 meses x ano anterior) e por hora.
   const box=ctx.el.querySelector("[data-chart]"),tot=ctx.el.querySelector("[data-chart-total]"),sub=ctx.el.querySelector("[data-chart-sub]");
@@ -130,20 +132,40 @@ export async function render(ctx){
  }
 }
 // Ranking de ticket médio da marca: mês passado x este mês (até ontem), ordenado pela variação; a loja vista em destaque.
+// Meia largura (ao lado do CMV por período) e páginas de 10 em 10; abre na página da loja vista.
 const MES_N=m=>MESES[Number(String(m).slice(5,7))-1]+"/"+String(m).slice(0,4);
+const RK_PAGE=10;
+function rankingRows(R){
+ const rows=R.lojas.slice().sort((a,b)=>(b.var??-Infinity)-(a.var??-Infinity)||(b.cur??0)-(a.cur??0));
+ let pos=0;for(const r of rows)r.pos=r.var==null?null:++pos;
+ return rows;
+}
 function rankingCard(ctx,R){
  if(!R||R.erro)return card("Ranking de ticket médio",'<p class="muted" style="padding:16px 18px;margin:0">'+e(R?.erro?"Não foi possível carregar o ranking: "+R.erro:"Sem dados.")+'</p>');
- const rows=R.lojas.slice().sort((a,b)=>(b.var??-Infinity)-(a.var??-Infinity)||(b.cur??0)-(a.cur??0));
+ return card("Ranking de ticket médio",'<div data-rk></div><p class="muted" style="margin:0;padding:10px 18px;font-size:12px">Ticket médio = faturamento líquido ÷ cupons. Este mês até '+e(dateBR(R.ate))+'. Ordenado pela variação.</p>',{flush:true,cls:"rk-card"});
+}
+function drawRanking(ctx,R,page){
+ const box=ctx.el.querySelector("[data-rk]");if(!box)return;
+ const rows=rankingRows(R),pages=Math.max(1,Math.ceil(rows.length/RK_PAGE));
+ const meIdx=rows.findIndex(r=>r.store_id===ctx.storeId),me=rows[meIdx];
+ if(page==null)page=meIdx>=0?Math.floor(meIdx/RK_PAGE):0;
+ page=Math.max(0,Math.min(pages-1,page));
+ if(!rows.length){box.innerHTML='<p class="muted" style="padding:16px 18px;margin:0">Nenhuma loja da marca com vendas importadas.</p>';return}
  const fmtVar=v=>v==null?'<span class="muted">—</span>':'<span class="rk-var '+(v>0?"up":v<0?"down":"")+'">'+(v>0?"▲ +":v<0?"▼ ":"")+pct(v)+'</span>';
- let pos=0;
- const body=rows.length?'<div class="table-wrap"><table class="table rk"><thead><tr><th class="num">#</th><th>Loja</th><th class="num">Ticket '+e(MES_N(R.mesAnterior))+'</th><th class="num">Ticket '+e(MES_N(R.mesAtual))+'</th><th class="num">Variação</th></tr></thead><tbody>'+
-  rows.map(r=>{const me=r.store_id===ctx.storeId;const n=r.var==null?"":String(++pos);
-   return '<tr class="'+(me?"rk-me":"")+'"><td class="num" data-label="#">'+n+'</td><td data-label="Loja"><span class="strong">'+e(r.name||r.code)+'</span>'+(me?' <span class="tag">esta loja</span>':'')+'</td>'+
-    '<td class="num" data-label="Mês passado">'+(r.prev==null?'<span class="muted">—</span>':money(r.prev))+'</td>'+
-    '<td class="num" data-label="Este mês">'+(r.cur==null?'<span class="muted">—</span>':money(r.cur))+'</td>'+
-    '<td class="num" data-label="Variação">'+fmtVar(r.var)+'</td></tr>'}).join("")+'</tbody></table></div>'
-  :'<p class="muted" style="padding:16px 18px;margin:0">Nenhuma loja da marca com vendas importadas.</p>';
- return card("Ranking de ticket médio",body+'<p class="muted" style="margin:0;padding:10px 18px;font-size:12px">Ticket médio = faturamento líquido ÷ cupons. Este mês até '+e(dateBR(R.ate))+'. Ordenado pela variação.</p>',{flush:true});
+ const slice=rows.slice(page*RK_PAGE,page*RK_PAGE+RK_PAGE);
+ box.innerHTML='<div class="table-wrap"><table class="table rk"><thead><tr><th class="num">#</th><th>Loja</th><th class="num">'+e(MES_N(R.mesAnterior))+'</th><th class="num">'+e(MES_N(R.mesAtual))+'</th><th class="num">Variação</th></tr></thead><tbody>'+
+  slice.map(r=>{const isMe=r.store_id===ctx.storeId;
+   return '<tr class="'+(isMe?"rk-me":"")+'"><td class="num" data-label="#">'+(r.pos??"")+'</td><td data-label="Loja"><span class="strong">'+e(r.name||r.code)+'</span>'+(isMe?' <span class="tag">esta loja</span>':'')+'</td>'+
+    '<td class="num" data-label="'+e(MES_N(R.mesAnterior))+'">'+(r.prev==null?'<span class="muted">—</span>':money(r.prev))+'</td>'+
+    '<td class="num" data-label="'+e(MES_N(R.mesAtual))+'">'+(r.cur==null?'<span class="muted">—</span>':money(r.cur))+'</td>'+
+    '<td class="num" data-label="Variação">'+fmtVar(r.var)+'</td></tr>'}).join("")+'</tbody></table></div>'+
+  '<div class="rk-pager"><span class="muted">'+(page*RK_PAGE+1)+'–'+Math.min(rows.length,page*RK_PAGE+RK_PAGE)+' de '+rows.length+'</span>'+
+  (me?'<button type="button" class="rk-me-link" data-rk-me>Esta loja: '+(me.pos?me.pos+'º':'sem posição')+'</button>':'')+
+  '<span class="rk-pages"><button type="button" class="icon-btn" data-rk-go="'+(page-1)+'"'+(page===0?" disabled":"")+' aria-label="Página anterior">‹</button>'+
+  Array.from({length:pages},(_,i)=>'<button type="button" class="rk-pg'+(i===page?" on":"")+'" data-rk-go="'+i+'"'+(i===page?' aria-current="page"':'')+'>'+(i+1)+'</button>').join("")+
+  '<button type="button" class="icon-btn" data-rk-go="'+(page+1)+'"'+(page===pages-1?" disabled":"")+' aria-label="Próxima página">›</button></span></div>';
+ box.querySelectorAll("[data-rk-go]").forEach(b=>b.onclick=()=>drawRanking(ctx,R,Number(b.dataset.rkGo)));
+ box.querySelector("[data-rk-me]")?.addEventListener("click",()=>drawRanking(ctx,R,null));
 }
 let view=(()=>{try{const v=localStorage.getItem("rfs-inicio-fat");return v==="mes"||v==="hora"?v:"dia"}catch{return "dia"}})();
 let metric=(()=>{try{const v=localStorage.getItem("rfs-inicio-met");return v==="tkt"||v==="cup"?v:"fat"}catch{return "fat"}})();
