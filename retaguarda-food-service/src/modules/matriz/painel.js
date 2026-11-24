@@ -4,9 +4,12 @@
 // Dias que ainda não fecharam (hoje em diante) mostram a projeção (public.sales_forecast, recalculada todo dia às 06:30),
 // em itálico. Últimas colunas: Total realizado (dias fechados) e Total projetado (realizado + projeção até o fim do mês).
 // Ordem fixa (data, loja) é obrigatória: a leitura vem em páginas de 1000 e, sem ordem, linhas se repetem ou somem.
-// Abaixo: ranking de faturamento realizado no mês (loja, valor, % de participação).
+// Abaixo: ranking de faturamento; depois, gráfico do faturamento mês a mês da rede com projeção até dezembro.
+// Antes: ranking de faturamento realizado no mês (loja, valor, % de participação).
 // Fonte: public.sales_imports (líquido por loja e dia, gravado pela importação do Degust; RLS = quem vê Faturamento/CMV).
 import {list} from "../../core/db.js";
+import {supabase} from "../../core/supabase.js";
+import {lineChart} from "../../core/chart.js";
 import {e,money,today,addDays} from "../../core/format.js";
 import {pageHead,card,emptyState,openModal} from "../../core/ui.js";
 
@@ -73,11 +76,13 @@ export async function render(ctx){
   emptyState("store","Nenhuma loja em operação");
  const temProj=days.some(isProj);
  ctx.el.innerHTML=pageHead("Painel da Matriz","Faturamento líquido (R$) de cada loja, dia a dia"+(temProj?"; de hoje em diante, em itálico, a projeção":"")+". Clique na loja para abrir o faturamento dela.",nav)+
-  card("",table,{flush:true})+'<section class="card" data-rk-card></section>';
+  card("",table,{flush:true})+'<section class="card" data-rk-card></section>'+
+  card("Faturamento mês a mês · rede",'<div class="pm-yr" data-yr><p class="muted" style="margin:0">Carregando…</p></div>');
  ctx.el.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{month=b.dataset.m;render(ctx)});
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
  if(!rkMonth)rkMonth=month;
  drawRanking(ctx,stores);
+ drawYear(ctx);
  // Abre rolada até o fim: últimos dias (com a projeção) e as colunas de total à vista.
  const sc=ctx.el.querySelector(".pm-scroll");if(sc)sc.scrollLeft=sc.scrollWidth;
 }
@@ -201,4 +206,50 @@ function bindPies(box,tot,pctF){
   el.addEventListener("click",act);
   el.addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();act()}});
  });
+}
+
+// ------------------------------------------------------------------ Faturamento mês a mês da rede + projeção
+// Ano atual (vinho) x ano anterior (cinza tracejado). Projeção (vinho claro tracejado):
+//   mês atual = realizado até ontem + sales_forecast (de hoje ao fim do mês);
+//   meses seguintes do ano = mesmo mês do ano anterior × crescimento dos 3 últimos meses fechados (ano atual ÷ ano anterior).
+// Base: public.sales_by_month (soma de sales_imports por mês, só lojas operacionais; respeita o RLS de quem vê).
+const MES_CURTO=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+async function drawYear(ctx){
+ const box=ctx.el.querySelector("[data-yr]");if(!box)return;
+ const hoje=today(),ontem=addDays(hoje,-1),Y=+hoje.slice(0,4),PY=Y-1,curM=+hoje.slice(5,7)-1;
+ const fimMes=hoje.slice(0,8)+String(new Date(Y,curM+1,0).getDate()).padStart(2,"0");
+ let rows,fc;
+ try{
+  const [a,b]=await Promise.all([
+   supabase.rpc("sales_by_month",{p_from:PY+"-01-01",p_to:ontem}),
+   list("sales_forecast",{select:"store_id,business_date,projected_net",gte:{business_date:hoje},lte:{business_date:fimMes},order:"business_date",asc:true,order2:"store_id",asc2:true,limit:20000}).catch(()=>[])
+  ]);
+  if(a.error)throw a.error;rows=a.data||[];fc=b;
+ }catch(err){box.innerHTML='<p class="muted" style="margin:0">Não foi possível carregar o faturamento mensal.</p>';return}
+ if(!ctx.isCurrent()||!box.isConnected)return;
+ const by=new Map(rows.map(r=>[String(r.month).slice(0,7),Number(r.net)||0]));
+ const key=(y,m)=>y+"-"+String(m+1).padStart(2,"0");
+ const cur=MES_CURTO.map((_,m)=>m<curM?(by.get(key(Y,m))??null):null);
+ const prev=MES_CURTO.map((_,m)=>by.get(key(PY,m))??null);
+ // Crescimento: 3 últimos meses fechados do ano atual ÷ os mesmos meses do ano anterior.
+ const base=[curM-3,curM-2,curM-1].filter(m=>m>=0&&cur[m]!=null&&prev[m]);
+ const g=base.length?base.reduce((t,m)=>t+cur[m],0)/base.reduce((t,m)=>t+prev[m],0):1;
+ const realNow=by.get(key(Y,curM))||0,fcNow=fc.reduce((t,r)=>t+(Number(r.projected_net)||0),0);
+ const proj=MES_CURTO.map(()=>null),how=MES_CURTO.map(()=>"");
+ proj[curM]=realNow+fcNow;how[curM]="Realizado até "+ontem.slice(8)+"/"+ontem.slice(5,7)+": "+money(realNow)+"<br>Projeção do resto do mês: "+money(fcNow);
+ for(let m=curM+1;m<12;m++){if(prev[m]!=null){proj[m]=prev[m]*g;how[m]=MES_CURTO[m]+"/"+PY+" × "+(g*100).toFixed(1).replace(".",",")+"% (crescimento de "+base.map(b=>MES_CURTO[b]).join(", ")+")"}}
+ if(curM>0&&cur[curM-1]!=null)proj[curM-1]=cur[curM-1]; // liga a linha da projeção ao último mês fechado
+ const realYear=cur.reduce((t,v)=>t+(v||0),0)+realNow,projYear=cur.reduce((t,v)=>t+(v||0),0)+proj.slice(curM).reduce((t,v)=>t+(v||0),0);
+ const prevYear=prev.reduce((t,v)=>t+(v||0),0),varY=prevYear?projYear/prevYear-1:null;
+ const pctF=v=>(v>=0?"+":"")+(v*100).toFixed(1).replace(".",",")+"%";
+ box.innerHTML='<div class="pm-yr-kpis">'+
+  '<div><small>Realizado em '+Y+' (até '+ontem.slice(8)+'/'+ontem.slice(5,7)+')</small><strong>'+money(realYear)+'</strong></div>'+
+  '<div><small>Projetado para '+Y+'</small><strong>'+money(projYear)+'</strong></div>'+
+  '<div><small>'+PY+' inteiro</small><strong>'+money(prevYear)+'</strong>'+(varY!=null?'<span class="'+(varY>=0?'pm-up':'pm-down')+'">'+pctF(varY)+' projetado x '+PY+'</span>':'')+'</div>'+
+  '<div><small>Crescimento usado na projeção</small><strong>'+pctF(g-1)+'</strong><span class="muted">'+base.map(b=>MES_CURTO[b]).join(", ")+' x '+PY+'</span></div>'+
+  '</div><div class="pm-yr-chart"></div>';
+ const lab=MES_CURTO.map(m=>m);
+ lineChart(box.querySelector(".pm-yr-chart"),{labels:lab,height:260,tickEvery:1,format:money,ariaLabel:"Faturamento da rede mês a mês, "+Y+" e "+PY+", com projeção até dezembro",
+  series:[{name:String(Y),color:"#85071D",values:cur},{name:"Projeção "+Y,color:"#c46a7c",dash:true,values:proj},{name:String(PY),color:"#9a9a9e",dash:true,values:prev}],
+  extra:i=>i>=curM&&how[i]?'<div class="lc-extra">'+how[i]+'</div>':""});
 }

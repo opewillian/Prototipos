@@ -726,3 +726,10 @@ details.fold:not([open]) .fold-right small{display:none}
 .pm-det-dialog{width:min(560px,calc(100vw - 32px))}
 .pm-det-dialog .pm-det-scroll{max-height:min(62vh,560px)}
 .pm-det tfoot td{position:sticky;bottom:0;background:var(--graphite);color:#fff;font-weight:700}
+/* Painel › faturamento mês a mês da rede */
+.pm-yr-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px}
+.pm-yr-kpis>div{background:var(--surface-2);border:1px solid var(--line-2);border-radius:10px;padding:10px 14px;white-space:nowrap}
+.pm-yr-kpis small{display:block;font-size:12px;color:var(--muted)}
+.pm-yr-kpis strong{display:block;font-size:18px;color:var(--ink);font-variant-numeric:tabular-nums}
+.pm-yr-kpis span{display:block;font-size:12px}
+.pm-up{color:var(--ok)}.pm-down{color:var(--danger)}
