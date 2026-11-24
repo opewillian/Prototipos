@@ -674,3 +674,11 @@ details.fold:not([open]) .fold-right small{display:none}
 .pm-table td.pm-first,.pm-table th.pm-first{border-left:2px solid var(--line)}
 .pm-table td.pm-tot{border-right:0}
 .pm-table tfoot td.pm-proj{color:rgba(255,255,255,.8)}
+/* Painel: 1ª coluna (loja) e as duas últimas (totais) travadas na rolagem */
+.pm-table th.pm-tot,.pm-table td.pm-tot{position:sticky;z-index:1;box-sizing:border-box;width:124px;min-width:124px;max-width:124px}
+.pm-table .pm-tot:last-child{right:0}
+.pm-table .pm-tot.pm-first{right:124px;box-shadow:-6px 0 8px -6px rgba(20,10,12,.25)}
+.pm-table .pm-name{box-shadow:6px 0 8px -6px rgba(20,10,12,.25)}
+.pm-table thead th.pm-tot,.pm-table tfoot td.pm-tot{z-index:3}
+.pm-table tbody td.pm-tot{background:var(--surface)}
+.pm-table tr.pm-group td.pm-tot{background:var(--brand-50)}
