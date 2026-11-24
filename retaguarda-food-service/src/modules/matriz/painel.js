@@ -186,8 +186,8 @@ function bindPies(box,tot,pctF){
    box.querySelector('[data-pie-box="'+id+'"]').classList.add("sel");
    const its=g.items.slice().sort((a,b)=>b.v-a.v);
    det.innerHTML='<div class="pm-det-head"><strong>'+e(g.k)+'</strong><span class="muted">'+its.length+(its.length===1?' loja':' lojas')+' · '+money(g.v)+' · '+pctF.format(tot?g.v/tot:0)+' da rede</span>'+
-    (g.other?'<small class="muted">('+e(g.other.join(", "))+')</small>':'')+'</div>'+
-    '<div class="pm-det-scroll"><table class="pm-table pm-det"><thead><tr><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">% do '+(id==="marca"?"grupo":"aeroporto")+'</th></tr></thead><tbody>'+
+    '</div>'+
+    '<div class="pm-det-scroll"><table class="pm-table pm-det"><thead><tr><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num" title="Participação dentro de '+e(g.k)+'">%</th></tr></thead><tbody>'+
     (g.subs
      // "Outros": agrupado pelo prefixo (aeroporto/marca), cada grupo com subtotal e % dentro de "Outros".
      ? g.subs.map(sg=>'<tr class="pm-det-grp"><td><span class="pm-grp">'+e(sg.k)+'</span> <small class="muted">· '+sg.items.length+(sg.items.length===1?' loja':' lojas')+'</small></td><td class="num">'+money(sg.v)+'</td><td class="num">'+pctF.format(g.v?sg.v/g.v:0)+'</td></tr>'+
