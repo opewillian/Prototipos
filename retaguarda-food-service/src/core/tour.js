@@ -87,11 +87,10 @@ const SCREENS={
  ],
  // ---------------- Loja
  "loja:inicio":[
-  {title:"Início da loja",text:"O resumo da loja: faturamento, CMV e notas pendentes."},
+  {title:"Início da loja",text:"O resumo da loja: vendas e CMV."},
   {find:()=>$("#content [data-chart]")?.closest(".card"),title:"Vendas",text:"Linha cheia: o que já foi vendido. Pontilhada vinho: a projeção até o fim do mês (recalculada todo dia às 6h30). Passe o mouse para ver os valores."},
   {sel:inContent(".chart-ctrls"),title:"Medida e visão",text:"Escolha o que ver — Faturamento, Ticket médio ou Cupons — e a visão. No mês a mês, a linha cinza tracejada é o ano anterior. Por hora mostra quanto a loja vende, em média por dia, em cada hora — e o horário de pico — comparando com o mês anterior."},
-  {find:cardT("CMV por período"),title:"CMV por período",text:"Cada período entre duas contagens seguidas, com o CMV e o percentual sobre o faturamento. Clique para abrir o cálculo."},
-  {find:cardT("Notas pendentes"),title:"Notas pendentes de entrada",text:"Notas lançadas que ainda não entraram no estoque. Enquanto pendentes, ficam fora do CMV."}
+  {find:cardT("CMV por período"),title:"CMV por período",text:"Cada período entre duas contagens seguidas, com o CMV e o percentual sobre o faturamento. Clique para abrir o cálculo."}
  ],
  "loja:faturamento":[
   {title:"Faturamento",text:"Vendas do caixa (Degust), importadas automaticamente todo dia às 6h."},
@@ -207,7 +206,7 @@ function generalSteps(area){
   {sel:"#store-combo",title:"Loja",text:"Troque de loja por aqui, buscando pelo nome ou código. Atalho: Ctrl+K. Ao trocar, você continua na mesma tela."}
  ];
  const loja=[
-  {sel:'#nav a[href$="/inicio"]',side:"right",title:"Início",text:"Resumo da loja: faturamento do mês com a projeção, comparação com o ano anterior, CMV de cada período e notas que ainda não deram entrada."},
+  {sel:'#nav a[href$="/inicio"]',side:"right",title:"Início",text:"Resumo da loja: faturamento do mês com a projeção, comparação com o ano anterior e CMV de cada período."},
   {sel:grp("Financeiro"),side:"right",title:"Financeiro · Faturamento",text:"Vendas do caixa (Degust), importadas automaticamente todo dia às 6h: por dia, produtos e formas de pagamento."},
   {sel:grp("Estoque"),side:"right",title:"Estoque",text:"Contagem (inventário por listas), Listas, Transferências entre lojas e Perdas."},
   {sel:grp("Compras"),side:"right",title:"Compras",text:"Pedidos de compra com sugestão pelo consumo e Notas fiscais, que ao dar entrada contam no estoque e no CMV."},

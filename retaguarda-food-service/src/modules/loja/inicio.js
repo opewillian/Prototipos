@@ -5,14 +5,12 @@
 //   Por hora: média do líquido de cada hora (0h a 23h) por dia no mês atual x mês anterior (tracejado). As horas vêm dos
 //   resumos de dia feitos a partir do cupom completo (desde 01/10/2026).
 //   3) Últimos períodos de CMV (entre contagens seguidas) com o % sobre o faturamento.
-//   4) Notas pendentes de entrada no estoque.
 // Faturamento = líquido das vendas do Degust (resumos no R2, via ../shared/vendas.js), o mesmo usado no CMV. Cada bloco só aparece com o módulo liberado.
 import {list} from "../../core/db.js";
 import {salesSummary} from "../shared/vendas.js";
 import {e,money,num,dateBR,today,round2,pct} from "../../core/format.js";
 import {card,dataTable,emptyState,alertBox} from "../../core/ui.js";
 import {lineChart} from "../../core/chart.js";
-import {loadSuppliers} from "../shared/catalog.js";
 import {computeCMV} from "./cmv.js";
 import {enabledModules} from "../../areas/loja/shell.js";
 
@@ -24,18 +22,15 @@ async function salesByDay(storeId,from,to){return (await salesSummary(storeId,fr
 
 export async function render(ctx){
  const on=new Set(enabledModules(ctx.app,ctx.storeId).map(m=>m.id));
- const showSales=on.has("faturamento"),showNotes=on.has("notas"),showCmv=on.has("cmv");
+ const showSales=on.has("faturamento"),showCmv=on.has("cmv");
  const t=today(),mStart=t.slice(0,8)+"01",curM=ym(t);
  const Y=Number(t.slice(0,4)),PY=Y-1;   // ano atual e o anterior (comparativo)
- const [days,forecast,invoices,suppliers,counts]=await Promise.all([
+ const [days,forecast,counts]=await Promise.all([
   showSales?salesByDay(ctx.storeId,PY+"-01-01",t).catch(()=>[]):[],
   showSales?list("sales_forecast",{select:"business_date,projected_net",eq:{store_id:ctx.storeId},order:"business_date",asc:true}).catch(()=>[]):[],
-  showNotes?list("invoices",{select:"id,invoice_number,issue_date,entry_date,total_amount,supplier_id",eq:{store_id:ctx.storeId,status:"pending"},order:"entry_date",asc:true}):[],
-  showNotes?loadSuppliers().catch(()=>[]):[],
   showCmv?list("stock_counts",{select:"id,display_id,count_date,status",eq:{store_id:ctx.storeId},order:"count_date",asc:true}):[]
  ]);
  if(!ctx.isCurrent())return;
- const sup=new Map(suppliers.map(s=>[s.id,s.name]));
  // ---- Vendas (gráfico): três medidas — Faturamento (líquido), Ticket médio (líquido ÷ cupons) e Cupons (nº de vendas).
  const isoD=d=>String(d.business_date).slice(0,10);
  const dayRec=new Map(days.map(d=>[isoD(d),{net:Number(d.net||0),n:Number(d.sales||0)}]));
@@ -79,7 +74,6 @@ export async function render(ctx){
   if(!ctx.isCurrent())return;
  }
 
- const notesTotal=round2(invoices.reduce((s,i)=>s+Number(i.total_amount||0),0));
  ctx.el.innerHTML='<header class="page-head"><div><h1>'+e(ctx.store.name)+'</h1></div></header>'+
   (showSales?card("Vendas",'<div class="chart-total"><span data-chart-total></span><small data-chart-sub></small></div><div data-chart></div>',
     {actions:'<div class="chart-ctrls"><div class="seg" role="tablist" aria-label="Medida"><button type="button" role="tab" data-met="fat">Faturamento</button><button type="button" role="tab" data-met="tkt">Ticket médio</button><button type="button" role="tab" data-met="cup">Cupons</button></div>'+
@@ -91,15 +85,7 @@ export async function render(ctx){
     {label:"CMV / faturamento",cls:"num",render:p=>p.rev?'<strong>'+pct(p.cmv/p.rev)+'</strong>':'<span class="muted">—</span>'}
    ],periods,{rowHref:p=>ctx.base+"/cmv/novo/"+p.a.id+"/"+p.b.id})
    :emptyState("chart","Nenhum período de CMV","São necessárias duas contagens em datas diferentes."),{flush:true}):'')+
-  (showNotes?card("Notas pendentes de entrada ("+invoices.length+")",invoices.length?dataTable([
-    {label:"Nota",render:i=>'<span class="strong">Nº '+e(i.invoice_number)+'</span><small class="sub">'+e(sup.get(i.supplier_id)||"Sem fornecedor")+'</small>'},
-    {label:"Emissão",render:i=>dateBR(i.issue_date)},
-    {label:"Entrada",render:i=>dateBR(i.entry_date)},
-    {label:"Valor",cls:"num",render:i=>money(i.total_amount||0)}
-   ],invoices,{rowHref:i=>ctx.base+"/notas/"+i.id}).replace('class="table"','class="table stack"')+
-   '<p class="muted" style="margin:0;padding:10px 18px;font-size:13px">Total pendente: <strong>'+money(notesTotal)+'</strong></p>'
-   :emptyState("check","Nenhuma nota pendente","Todas as notas já deram entrada no estoque."),{flush:true}):'')+
-  (!showSales&&!showNotes&&!showCmv?alertBox("Nenhum módulo com resumo liberado para esta loja.","info"):'');
+  (!showSales&&!showCmv?alertBox("Nenhum módulo com resumo liberado para esta loja.","info"):'');
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
  if(showSales){
   // Um gráfico só; o botão no topo troca entre dia a dia (mês atual), mês a mês (12 meses x ano anterior) e por hora.
