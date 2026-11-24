@@ -1,4 +1,4 @@
-// Loja · Início (repaginada em 23/11/2026). Ranking de ticket médio da marca (mês passado x este mês). Gráfico "Vendas": medida (Faturamento, Ticket médio ou Cupons) × visão:
+// Loja · Início (repaginada em 23/11/2026). Ranking de ticket médio da marca; notas pendentes (mais novas primeiro, páginas de 10) (mês passado x este mês). Gráfico "Vendas": medida (Faturamento, Ticket médio ou Cupons) × visão:
 //   1) Faturamento dia a dia do mês atual (linha).
 //   2) Faturamento mês a mês de janeiro a dezembro do ano + pontilhado com o ano anterior.
 //   Nos dois, linha pontilhada vinho = projeção (tabela sales_forecast, recalculada todo dia às 06:30).
@@ -13,6 +13,7 @@ import {card,dataTable,emptyState,alertBox} from "../../core/ui.js";
 import {lineChart} from "../../core/chart.js";
 import {computeCMV} from "./cmv.js";
 import {enabledModules} from "../../areas/loja/shell.js";
+import {loadSuppliers} from "../shared/catalog.js";
 
 const BRAND="#85071D",GRAY="#8E8E93",PROJ=BRAND;
 const MESES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
@@ -22,14 +23,16 @@ async function salesByDay(storeId,from,to){return (await salesSummary(storeId,fr
 
 export async function render(ctx){
  const on=new Set(enabledModules(ctx.app,ctx.storeId).map(m=>m.id));
- const showSales=on.has("faturamento"),showCmv=on.has("cmv");
+ const showSales=on.has("faturamento"),showCmv=on.has("cmv"),showNotes=on.has("notas");
  const t=today(),mStart=t.slice(0,8)+"01",curM=ym(t);
  const Y=Number(t.slice(0,4)),PY=Y-1;   // ano atual e o anterior (comparativo)
- const [days,ranking,forecast,counts]=await Promise.all([
+ const [days,ranking,forecast,counts,invoices,suppliers]=await Promise.all([
   showSales?salesByDay(ctx.storeId,PY+"-01-01",t).catch(()=>[]):[],
   showSales?salesRanking(ctx.storeId).catch(error=>({erro:error.message})):null,
   showSales?list("sales_forecast",{select:"business_date,projected_net",eq:{store_id:ctx.storeId},order:"business_date",asc:true}).catch(()=>[]):[],
-  showCmv?list("stock_counts",{select:"id,display_id,count_date,status",eq:{store_id:ctx.storeId},order:"count_date",asc:true}):[]
+  showCmv?list("stock_counts",{select:"id,display_id,count_date,status",eq:{store_id:ctx.storeId},order:"count_date",asc:true}):[],
+  showNotes?list("invoices",{select:"id,invoice_number,issue_date,entry_date,total_amount,supplier_id",eq:{store_id:ctx.storeId,status:"pending"}}).catch(()=>[]):[],
+  showNotes?loadSuppliers().catch(()=>[]):[]
  ]);
  if(!ctx.isCurrent())return;
  // ---- Vendas (gráfico): três medidas — Faturamento (líquido), Ticket médio (líquido ÷ cupons) e Cupons (nº de vendas).
@@ -87,9 +90,11 @@ export async function render(ctx){
     {label:"CMV / faturamento",cls:"num",render:p=>p.rev?'<strong>'+pct(p.cmv/p.rev)+'</strong>':'<span class="muted">—</span>'}
    ],periods,{rowHref:p=>ctx.base+"/cmv/novo/"+p.a.id+"/"+p.b.id})
    :emptyState("chart","Nenhum período de CMV","São necessárias duas contagens em datas diferentes."),{flush:true}):'')+
-  (!showSales&&!showCmv?alertBox("Nenhum módulo com resumo liberado para esta loja.","info"):'');
+  (showNotes?card("Notas pendentes de entrada ("+invoices.length+")",'<div data-nt></div>',{flush:true}):'')+
+  (!showSales&&!showCmv&&!showNotes?alertBox("Nenhum módulo com resumo liberado para esta loja.","info"):'');
  ctx.el.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
  if(showSales&&ranking&&!ranking.erro)drawRanking(ctx,ranking,null);
+ if(showNotes)drawNotes(ctx,invoices,new Map(suppliers.map(x=>[x.id,x.name])),0);
  if(showSales){
   // Um gráfico só; o botão no topo troca entre dia a dia (mês atual), mês a mês (12 meses x ano anterior) e por hora.
   const box=ctx.el.querySelector("[data-chart]"),tot=ctx.el.querySelector("[data-chart-total]"),sub=ctx.el.querySelector("[data-chart-sub]");
@@ -165,6 +170,32 @@ function drawRanking(ctx,R,page){
   '<button type="button" class="icon-btn" data-rk-go="'+(page+1)+'"'+(page===pages-1?" disabled":"")+' aria-label="Próxima página">›</button></span></div>';
  box.querySelectorAll("[data-rk-go]").forEach(b=>b.onclick=()=>drawRanking(ctx,R,Number(b.dataset.rkGo)));
  box.querySelector("[data-rk-me]")?.addEventListener("click",()=>drawRanking(ctx,R,null));
+}
+// Notas pendentes de entrada: da mais nova para a mais antiga (data de entrada; sem ela, a emissão), páginas de 10.
+const NT_PAGE=10;
+function pager(page,pages,total,attr){
+ return '<div class="rk-pager"><span class="muted">'+(total?(page*NT_PAGE+1)+'–'+Math.min(total,page*NT_PAGE+NT_PAGE)+' de '+total:'')+'</span>'+
+  (pages>1?'<span class="rk-pages"><button type="button" class="icon-btn" '+attr+'="'+(page-1)+'"'+(page===0?" disabled":"")+' aria-label="Página anterior">‹</button>'+
+  Array.from({length:pages},(_,i)=>'<button type="button" class="rk-pg'+(i===page?" on":"")+'" '+attr+'="'+i+'"'+(i===page?' aria-current="page"':'')+'>'+(i+1)+'</button>').join("")+
+  '<button type="button" class="icon-btn" '+attr+'="'+(page+1)+'"'+(page===pages-1?" disabled":"")+' aria-label="Próxima página">›</button></span>':'')+'</div>';
+}
+function drawNotes(ctx,invoices,sup,page){
+ const box=ctx.el.querySelector("[data-nt]");if(!box)return;
+ if(!invoices.length){box.innerHTML=emptyState("check","Nenhuma nota pendente","Todas as notas já deram entrada no estoque.");return}
+ const key=i=>String(i.entry_date||i.issue_date||"");
+ const rows=invoices.slice().sort((a,b)=>key(b).localeCompare(key(a))||String(b.invoice_number).localeCompare(String(a.invoice_number)));
+ const pages=Math.ceil(rows.length/NT_PAGE);page=Math.max(0,Math.min(pages-1,page));
+ const total=round2(rows.reduce((s,i)=>s+Number(i.total_amount||0),0));
+ box.innerHTML=dataTable([
+   {label:"Nota",render:i=>'<span class="strong">Nº '+e(i.invoice_number)+'</span><small class="sub">'+e(sup.get(i.supplier_id)||"Sem fornecedor")+'</small>'},
+   {label:"Emissão",render:i=>dateBR(i.issue_date)},
+   {label:"Entrada",render:i=>dateBR(i.entry_date)},
+   {label:"Valor",cls:"num",render:i=>money(i.total_amount||0)}
+  ],rows.slice(page*NT_PAGE,page*NT_PAGE+NT_PAGE),{rowHref:i=>ctx.base+"/notas/"+i.id}).replace('class="table"','class="table stack"')+
+  pager(page,pages,rows.length,"data-nt-go")+
+  '<p class="muted" style="margin:0;padding:0 18px 12px;font-size:13px">Total pendente: <strong>'+money(total)+'</strong></p>';
+ box.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>ctx.go(tr.dataset.href));
+ box.querySelectorAll("[data-nt-go]").forEach(b=>b.onclick=()=>drawNotes(ctx,invoices,sup,Number(b.dataset.ntGo)));
 }
 let view=(()=>{try{const v=localStorage.getItem("rfs-inicio-fat");return v==="mes"||v==="hora"?v:"dia"}catch{return "dia"}})();
 let metric=(()=>{try{const v=localStorage.getItem("rfs-inicio-met");return v==="tkt"||v==="cup"?v:"fat"}catch{return "fat"}})();
