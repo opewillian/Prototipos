@@ -719,3 +719,5 @@ details.fold:not([open]) .fold-right small{display:none}
 .pm-det{width:100%}
 .pm-det thead th{position:sticky;top:0}
 @media (max-width:1100px){.pm-rk-grid{grid-template-columns:minmax(0,1fr)}.pm-rk-tbl{border-right:0;border-bottom:1px solid var(--line-2)}}
+.pm-det tr.pm-det-grp td{background:var(--brand-50);font-weight:600;color:var(--ink);border-top:1px solid var(--brand-100)}
+.pm-det tr.pm-det-ind td:first-child{padding-left:24px}

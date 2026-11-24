@@ -159,7 +159,7 @@ function groupBy(rk,idx){
  const gs=[...m.values()].sort((a,b)=>b.v-a.v);
  if(gs.length<=8)return gs;
  const rest=gs.slice(7);
- return [...gs.slice(0,7),{k:"Outros",v:rest.reduce((t,g)=>t+g.v,0),items:rest.flatMap(g=>g.items),other:rest.map(g=>g.k)}];
+ return [...gs.slice(0,7),{k:"Outros",v:rest.reduce((t,g)=>t+g.v,0),items:rest.flatMap(g=>g.items),other:rest.map(g=>g.k),subs:rest}];
 }
 const pieState={};
 function pieCard(id,title,gs,tot,pctF){
@@ -178,6 +178,7 @@ function pieCard(id,title,gs,tot,pctF){
   '<div class="pm-pie-det" data-pie-det="'+id+'"><p class="muted">Clique numa fatia ou na legenda para ver as lojas.</p></div></div>';
 }
 function bindPies(box,tot,pctF){
+ const detRow=(x,gv,ind)=>'<tr class="pm-store'+(ind?' pm-det-ind':'')+'" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td><span class="strong">'+e(x.st.code||x.st.id)+'</span></td><td class="num">'+money(x.v)+'</td><td class="num">'+pctF.format(gv?x.v/gv:0)+'</td></tr>';
  box.querySelectorAll("[data-pie]").forEach(el=>{
   const act=()=>{
    const id=el.dataset.pie,i=Number(el.dataset.i),g=pieState[id][i],det=box.querySelector('[data-pie-det="'+id+'"]');
@@ -187,7 +188,11 @@ function bindPies(box,tot,pctF){
    det.innerHTML='<div class="pm-det-head"><strong>'+e(g.k)+'</strong><span class="muted">'+its.length+(its.length===1?' loja':' lojas')+' · '+money(g.v)+' · '+pctF.format(tot?g.v/tot:0)+' da rede</span>'+
     (g.other?'<small class="muted">('+e(g.other.join(", "))+')</small>':'')+'</div>'+
     '<div class="pm-det-scroll"><table class="pm-table pm-det"><thead><tr><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num">% do '+(id==="marca"?"grupo":"aeroporto")+'</th></tr></thead><tbody>'+
-    its.map(x=>'<tr class="pm-store" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td><span class="strong">'+e(x.st.code||x.st.id)+'</span></td><td class="num">'+money(x.v)+'</td><td class="num">'+pctF.format(g.v?x.v/g.v:0)+'</td></tr>').join("")+
+    (g.subs
+     // "Outros": agrupado pelo prefixo (aeroporto/marca), cada grupo com subtotal e % dentro de "Outros".
+     ? g.subs.map(sg=>'<tr class="pm-det-grp"><td><span class="pm-grp">'+e(sg.k)+'</span> <small class="muted">· '+sg.items.length+(sg.items.length===1?' loja':' lojas')+'</small></td><td class="num">'+money(sg.v)+'</td><td class="num">'+pctF.format(g.v?sg.v/g.v:0)+'</td></tr>'+
+        sg.items.slice().sort((a,b)=>b.v-a.v).map(x=>detRow(x,g.v,true)).join("")).join("")
+     : its.map(x=>detRow(x,g.v,false)).join(""))+
     '</tbody></table></div>';
    det.querySelectorAll("tr[data-href]").forEach(tr=>tr.onclick=()=>{location.hash=tr.dataset.href.replace(/^#/,"")});
   };
