@@ -178,7 +178,7 @@ function pieCard(id,title,gs,tot,pctF){
   '<div class="pm-pie-det" data-pie-det="'+id+'"><p class="muted">Clique numa fatia ou na legenda para ver as lojas.</p></div></div>';
 }
 function bindPies(box,tot,pctF){
- const detRow=(x,gv,ind)=>'<tr class="pm-store'+(ind?' pm-det-ind':'')+'" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td><span class="strong">'+e(x.st.code||x.st.id)+'</span></td><td class="num">'+money(x.v)+'</td><td class="num">'+pctF.format(gv?x.v/gv:0)+'</td></tr>';
+ const detRow=(x,gv,ind)=>'<tr class="pm-store'+(ind?' pm-det-ind':'')+'" data-href="#/loja/'+encodeURIComponent(x.st.id)+'/faturamento"><td><span class="strong">'+e(x.st.code||x.st.id)+'</span></td><td class="num">'+money(x.v)+'</td><td class="num">'+pctF.format(tot?x.v/tot:0)+'</td></tr>';
  box.querySelectorAll("[data-pie]").forEach(el=>{
   const act=()=>{
    const id=el.dataset.pie,i=Number(el.dataset.i),g=pieState[id][i],det=box.querySelector('[data-pie-det="'+id+'"]');
@@ -187,10 +187,10 @@ function bindPies(box,tot,pctF){
    const its=g.items.slice().sort((a,b)=>b.v-a.v);
    det.innerHTML='<div class="pm-det-head"><strong>'+e(g.k)+'</strong><span class="muted">'+its.length+(its.length===1?' loja':' lojas')+' · '+money(g.v)+' · '+pctF.format(tot?g.v/tot:0)+' da rede</span>'+
     '</div>'+
-    '<div class="pm-det-scroll"><table class="pm-table pm-det"><thead><tr><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num" title="Participação dentro de '+e(g.k)+'">%</th></tr></thead><tbody>'+
+    '<div class="pm-det-scroll"><table class="pm-table pm-det"><thead><tr><th scope="col">Loja</th><th scope="col" class="num">Faturamento</th><th scope="col" class="num" title="Participação no faturamento da rede">% da rede</th></tr></thead><tbody>'+
     (g.subs
-     // "Outros": agrupado pelo prefixo (aeroporto/marca), cada grupo com subtotal e % dentro de "Outros".
-     ? g.subs.map(sg=>'<tr class="pm-det-grp"><td><span class="pm-grp">'+e(sg.k)+'</span> <small class="muted">· '+sg.items.length+(sg.items.length===1?' loja':' lojas')+'</small></td><td class="num">'+money(sg.v)+'</td><td class="num">'+pctF.format(g.v?sg.v/g.v:0)+'</td></tr>'+
+     // "Outros": agrupado pelo prefixo (aeroporto/marca), cada grupo com subtotal. % sempre sobre a rede inteira (pedido do usuário).
+     ? g.subs.map(sg=>'<tr class="pm-det-grp"><td><span class="pm-grp">'+e(sg.k)+'</span> <small class="muted">· '+sg.items.length+(sg.items.length===1?' loja':' lojas')+'</small></td><td class="num">'+money(sg.v)+'</td><td class="num">'+pctF.format(tot?sg.v/tot:0)+'</td></tr>'+
         sg.items.slice().sort((a,b)=>b.v-a.v).map(x=>detRow(x,g.v,true)).join("")).join("")
      : its.map(x=>detRow(x,g.v,false)).join(""))+
     '</tbody></table></div>';
