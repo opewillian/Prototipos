@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Base de dados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="top"><div class="top-in">
+ <div class="crumb"><img src="../../assets/brand/logo-mft.png" alt="MFT"><a href="index.html">Documentação</a><span>›</span><span>5 de 8</span></div>
+ <h1>Base de dados</h1>
+ <p>Um único Postgres no Supabase (Retaguarda MFT). Cadastros centrais são compartilhados; tudo o que é operacional carrega a loja (<code style="background:rgba(255,255,255,.14);color:#fff">store_id</code>) e é isolado por RLS.</p>
+</div></header>
+<main>
+ <nav class="toc"><a href="#mapa">Mapa</a><a href="#central">Cadastros centrais</a><a href="#oper">Operação por loja</a><a href="#vendas">Vendas e indicadores</a><a href="#estados">Estados</a><a href="#estoque">Estoque</a><a href="#sql">Scripts SQL</a></nav>
+
+ <section id="mapa">
+  <h2>Mapa</h2>
+  <div class="grid g2">
+   <div class="layer"><div class="lbl">Central (Matriz)</div>
+    <div class="grid g2">
+     <div class="box brand"><b>stores</b>lojas, só leitura no app</div>
+     <div class="box"><b>brands</b>marcas + Global</div>
+     <div class="box"><b>items</b>catálogo, marca, tipo, un/kg/l</div>
+     <div class="box"><b>suppliers</b>fornecedores</div>
+     <div class="box"><b>supplier_item_map</b>de-para fornecedor → item</div>
+     <div class="box"><b>store_item_suppliers</b>loja × item × fornecedor</div>
+    </div>
+   </div>
+   <div class="layer"><div class="lbl">Acesso e controle</div>
+    <div class="grid g2">
+     <div class="box"><b>user_profiles</b>criado sozinho ao cadastrar usuário</div>
+     <div class="box"><b>store_memberships</b>usuário × loja × papel</div>
+     <div class="box"><b>user_tab_permissions</b>usuário × loja × módulo</div>
+     <div class="box"><b>store_feature_flags</b>módulos liberados por loja</div>
+     <div class="box"><b>audit_events</b>log imutável pelo app</div>
+     <div class="box"><b>integration_tokens</b>tokens de integração, sem acesso do app</div>
+    </div>
+   </div>
+  </div>
+  <div class="down">↓ store_id</div>
+  <div class="layer"><div class="lbl">Operação (isolada por loja)</div>
+   <div class="grid g4">
+    <div class="box"><b>Listas</b>purchase_lists · purchase_list_items</div>
+    <div class="box"><b>Contagens</b>stock_counts · stock_count_items</div>
+    <div class="box"><b>Pedidos</b>purchase_orders · purchase_order_items</div>
+    <div class="box"><b>Notas</b>invoices · invoice_items · invoice_nfe_items · invoice_other_costs · invoice_payments · invoice_attachments · invoice_reversals</div>
+    <div class="box"><b>Transferências</b>transfers · transfer_items (origem e destino)</div>
+    <div class="box"><b>Perdas</b>losses · loss_items</div>
+    <div class="box dark"><b>Estoque</b>stock_movements → views store_stock_balance, store_last_purchase_cost</div>
+    <div class="box"><b>CMV</b>cmv_closings · cmv_closing_items</div>
+   </div>
+  </div>
+  <div class="down">↓</div>
+  <div class="layer"><div class="lbl">Vendas e indicadores</div>
+   <div class="grid g4">
+    <div class="box"><b>sales_imports</b>loja × dia: cupons, cancelados, líquido</div>
+    <div class="box"><b>sales_forecast</b>projeção por loja e dia</div>
+    <div class="box"><b>sales_import_jobs</b>fila de importação do Degust</div>
+    <div class="box"><b>airport_passengers</b>passageiros ANAC por aeroporto e mês</div>
+   </div>
+  </div>
+ </section>
+
+ <section id="central">
+  <h2>Cadastros centrais: campos que importam</h2>
+  <div class="tw"><table>
+   <tr><th>Tabela</th><th>Campos-chave</th><th>Regras</th></tr>
+   <tr><td class="nw"><code>stores</code></td><td>id, code, name, store_type (operational/matrix), everest_code, cnpj, brand_id, degust_code(s), degust_franqueador, airport_iata, airport_area</td><td>Sem INSERT/UPDATE/DELETE para usuários. CGH = <code>id 'teste'</code>.</td></tr>
+   <tr><td class="nw"><code>items</code></td><td>code, name, item_type, brand_id, base_unit, standard_cost, min_stock, composes_cmv, active</td><td><code>base_unit</code> só un, kg, l. Tipo: Matéria-prima, Revenda, Embalagem, Produto acabado, Uso e consumo, Outras, Ativo imobilizado.</td></tr>
+   <tr><td class="nw"><code>brands</code></td><td>name (único), is_global, active</td><td>No máximo uma Global. Inativa, não exclui.</td></tr>
+   <tr><td class="nw"><code>supplier_item_map</code></td><td>supplier_id, código do fornecedor, item_id, factor, item_unit</td><td>Código único por fornecedor. Qtd interna = qtd da nota × fator.</td></tr>
+  </table></div>
+ </section>
+
+ <section id="oper">
+  <h2>Isolamento por loja</h2>
+  <div class="grid g3">
+   <div class="card accent"><h3>store_id em tudo</h3><p>Todo documento e linha operacional tem a loja. Transferência tem origem e destino.</p></div>
+   <div class="card accent"><h3>Chave composta</h3><p>Linha aponta para (documento, loja). Não dá para pôr linha da loja A num documento da loja B.</p></div>
+   <div class="card accent"><h3>Únicos que protegem</h3><p>Item não repete na lista nem na contagem; 1 contagem por loja e data; nota única por loja + fornecedor + número + série.</p></div>
+  </div>
+ </section>
+
+ <section id="vendas">
+  <h2>Funções de leitura (RPC)</h2>
+  <div class="tw"><table>
+   <tr><th>Função</th><th>Devolve</th><th>Acesso</th></tr>
+   <tr><td class="nw"><code>sales_by_month(p_from, p_to)</code></td><td>mês, líquido, cupons, dias, lojas (só operacionais)</td><td>SECURITY INVOKER: respeita o RLS de quem chama</td></tr>
+   <tr><td class="nw"><code>refresh_sales_forecast(de, ate)</code></td><td>refaz a projeção do período</td><td>rotina das 06:30</td></tr>
+   <tr><td class="nw"><code>can_view_sales(p_store)</code></td><td>se a pessoa vê vendas da loja</td><td>usada pela função degust</td></tr>
+   <tr><td class="nw"><code>reverse_invoice(id, motivo)</code></td><td>estorna nota recebida</td><td>só administrador da Matriz; bloqueia se a nota está num CMV salvo</td></tr>
+   <tr><td class="nw"><code>claim_sales_import_job()</code></td><td>pega a próxima tarefa da fila</td><td>só a função (SKIP LOCKED)</td></tr>
+  </table></div>
+ </section>
+
+ <section id="estados">
+  <h2>Estados dos documentos</h2>
+  <div class="tw"><table>
+   <tr><th>Documento</th><th>Caminho</th><th>Efeito no estoque</th></tr>
+   <tr><td>Contagem</td><td><span class="pill">Rascunho</span> → <span class="pill ok">Finalizada</span> · <span class="pill">Cancelada</span></td><td>Ajuste (<code>count_adjustment</code>) ao finalizar</td></tr>
+   <tr><td>Nota fiscal</td><td><span class="pill warn">Pendente</span> → <span class="pill ok">Recebida</span> · <span class="pill">Cancelada</span></td><td>Entrada (<code>invoice_receipt</code>) ao receber; estorno volta para pendente</td></tr>
+   <tr><td>Pedido de compra</td><td><span class="pill">Rascunho</span> → <span class="pill info">Enviado</span> → <span class="pill warn">Em andamento</span> → <span class="pill ok">Realizado</span> · <span class="pill">Cancelado</span></td><td>Nenhum</td></tr>
+   <tr><td>Transferência</td><td><span class="pill">Rascunho</span> → <span class="pill ok">Emitida</span> · <span class="pill">Cancelada</span></td><td>Saída na origem e entrada no destino ao emitir</td></tr>
+   <tr><td>Perda</td><td><span class="pill">Rascunho</span> → <span class="pill ok">Registrada</span> · <span class="pill">Cancelada</span></td><td>Baixa ao registrar</td></tr>
+   <tr><td>Parcela</td><td><span class="pill warn">Pendente</span> → <span class="pill ok">Paga</span> · <span class="pill">Cancelada</span></td><td>Nenhum</td></tr>
+  </table></div>
+  <p class="muted small" style="margin-top:10px">Gatilhos do banco fazem a transição e travam edição depois do estado final. Documento finalizado não se exclui pelo app.</p>
+ </section>
+
+ <section id="estoque">
+  <h2>Como o saldo nasce</h2>
+  <div class="flow">
+   <div class="step"><b>Contagem finalizada</b><span>ajusta para o contado</span></div><div class="arrow">+</div>
+   <div class="step"><b>Nota recebida</b><span>entra com custo da linha (com rateio)</span></div><div class="arrow">±</div>
+   <div class="step"><b>Transferência emitida</b><span>sai de uma loja, entra na outra</span></div><div class="arrow">−</div>
+   <div class="step"><b>Perda registrada</b><span>baixa</span></div><div class="arrow">=</div>
+   <div class="step"><b>store_stock_balance</b><span>view, soma dos movimentos</span></div>
+  </div>
+ </section>
+
+ <section id="sql">
+  <h2>Scripts SQL (docs/sql)</h2>
+  <div class="grid g4">
+   <div class="card"><div class="kicker">01–11</div><p class="small">Anexos, limpeza de teste, CGH, marcas e tipos, importação de itens, unidades un/kg/l, contagem por lista.</p></div>
+   <div class="card"><div class="kicker">12–32</div><p class="small">Lojas do Everest, transferências, fornecedores, de-para, NF-e, outros custos, anexos por parcela, estorno, contagens da CGH.</p></div>
+   <div class="card"><div class="kicker">33–47</div><p class="small">Integração Degust, vendas no R2, agenda diária, acessos novos, perfil automático, projeção, fila de importação.</p></div>
+   <div class="card"><div class="kicker">48–53</div><p class="small">Franquias SAL/ACB/BIT, passageiros ANAC, projeção só de lojas vendendo, mês a mês da rede com cupons.</p></div>
+  </div>
+  <p class="muted small" style="margin-top:10px">Numeração sempre crescente; nunca reescrever um script já executado: criar o próximo.</p>
+ </section>
+</main>
+<p class="foot"><a href="index.html">← Documentação</a> · Fonte: CEREBRO.md seções 5, 9 e registros até 24/11/2026; docs/sql. O esquema real do Supabase prevalece.</p>
+</body>
+</html>

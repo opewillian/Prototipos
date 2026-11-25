@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Design system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+<style>
+ .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid transparent;border-radius:8px;padding:9px 15px;font-weight:600;font-size:13.5px;white-space:nowrap;font-family:var(--font)}
+ .b1{background:var(--brand);color:#fff}.b2{background:#fff;border-color:var(--line);color:var(--ink)}.b3{background:transparent;color:var(--graphite)}
+ .b4{background:var(--danger);color:#fff}.b5{background:var(--ok);color:#fff}.bs{padding:6px 10px;font-size:12.5px}
+ .kpi{display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+ .kpi small{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}.kpi strong{font-family:var(--font-title);font-size:22px;color:var(--ink)}
+ .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+ .seg span{padding:6px 12px;font-size:13px;font-weight:600;color:var(--graphite)}.seg span.on{background:var(--brand);color:#fff}
+ .fld{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--ink)}
+ .fld i{font-style:normal;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-weight:400;color:var(--muted);background:#fff}
+ .type-row{display:flex;align-items:baseline;gap:16px;padding:8px 0;border-top:1px solid var(--line-2)}
+ .type-row:first-child{border-top:0}.type-row code{flex:none;width:150px}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+ <div class="crumb"><img src="../../assets/brand/logo-mft.png" alt="MFT"><a href="index.html">Documentação</a><span>›</span><span>2 de 8</span></div>
+ <h1>Design system</h1>
+ <p>Marca MFT nos dois ambientes: vinho como cor principal, grafite como apoio, fundo claro. Tokens definidos em <code style="background:rgba(255,255,255,.14);color:#fff">assets/app.css</code>; estrutura (menu e barra) em <code style="background:rgba(255,255,255,.14);color:#fff">assets/shell.css</code>.</p>
+</div></header>
+<main>
+ <nav class="toc"><a href="#cores">Cores</a><a href="#tipo">Tipografia</a><a href="#comp">Componentes</a><a href="#status">Status</a><a href="#graf">Gráficos</a><a href="#layout">Layout</a><a href="#fmt">Formatos</a></nav>
+
+ <section id="cores">
+  <h2>Cores da marca</h2>
+  <div class="grid g4">
+   <div class="sw"><div class="chip" style="background:#85071D"></div><div class="meta"><b>Vinho · principal</b><code>--brand #85071D</code></div></div>
+   <div class="sw"><div class="chip" style="background:#5E0514"></div><div class="meta"><b>Vinho escuro · menu</b><code>--brand-700 #5E0514</code></div></div>
+   <div class="sw"><div class="chip" style="background:#F8ECEE"></div><div class="meta"><b>Vinho claro · fundos</b><code>--brand-50 #F8ECEE</code></div></div>
+   <div class="sw"><div class="chip" style="background:#595959"></div><div class="meta"><b>Grafite · apoio</b><code>--graphite #595959</code></div></div>
+   <div class="sw"><div class="chip" style="background:#1d1d1f"></div><div class="meta"><b>Tinta · títulos</b><code>--ink #1d1d1f</code></div></div>
+   <div class="sw"><div class="chip" style="background:#7c7c80"></div><div class="meta"><b>Texto secundário</b><code>--muted #7c7c80</code></div></div>
+   <div class="sw"><div class="chip" style="background:#f6f5f4"></div><div class="meta"><b>Fundo da página</b><code>--bg #f6f5f4</code></div></div>
+   <div class="sw"><div class="chip" style="background:#e7e4e5"></div><div class="meta"><b>Linhas e bordas</b><code>--line #e7e4e5</code></div></div>
+  </div>
+  <h3 style="margin:18px 0 10px;font-size:14px">Cores de estado (reservadas: nunca usar como cor de série)</h3>
+  <div class="grid g4">
+   <div class="sw"><div class="chip" style="background:#2E7D32"></div><div class="meta"><b>Sucesso</b><code>--ok #2E7D32 / #E9F4EA</code></div></div>
+   <div class="sw"><div class="chip" style="background:#B26A00"></div><div class="meta"><b>Atenção</b><code>--warn #B26A00 / #FFF4E0</code></div></div>
+   <div class="sw"><div class="chip" style="background:#2F5E8C"></div><div class="meta"><b>Informação</b><code>--info #2F5E8C / #EAF1F8</code></div></div>
+   <div class="sw"><div class="chip" style="background:#C2410C"></div><div class="meta"><b>Perigo</b><code>--danger #C2410C / #FDEEE6</code></div></div>
+  </div>
+ </section>
+
+ <section id="tipo">
+  <h2>Tipografia</h2>
+  <div class="card">
+   <div class="type-row"><code>Montserrat 700</code><span style="font-family:var(--font-title);font-size:26px;font-weight:700;color:var(--ink)">Títulos de página</span></div>
+   <div class="type-row"><code>Montserrat 600</code><span style="font-family:var(--font-title);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink)">Título de cartão em caixa alta</span></div>
+   <div class="type-row"><code>Inter 400 · 14px</code><span>Texto do sistema, tabelas e formulários.</span></div>
+   <div class="type-row"><code>Inter 600 · 12px</code><span style="font-size:12px;font-weight:600;color:var(--muted)">Rótulos, dicas e legendas</span></div>
+   <div class="type-row"><code>tabular-nums</code><span style="font-variant-numeric:tabular-nums">R$ 1.234.567,89 · 12,5% · 2.237.826</span></div>
+  </div>
+ </section>
+
+ <section id="comp">
+  <h2>Componentes (src/core/ui.js)</h2>
+  <div class="grid g2">
+   <div class="card"><div class="kicker">Botões · btn()</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px"><span class="btn b1">Salvar</span><span class="btn b2">Cancelar</span><span class="btn b3">Voltar</span><span class="btn b4">Excluir</span><span class="btn b5">Dar entrada</span><span class="btn b1 bs">Pequeno</span></div>
+    <p class="muted small" style="margin-top:10px">Uma ação principal (vinho) por área. Ações irreversíveis pedem confirmação (<code>confirmDialog</code>).</p></div>
+   <div class="card"><div class="kicker">Indicador · kpi()</div>
+    <div class="grid g2" style="margin-top:6px"><div class="kpi"><small>Faturamento do mês</small><strong>R$ 5,83 mi</strong></div><div class="kpi" style="border-left-color:var(--ok)"><small>CMV</small><strong>22,6%</strong></div></div>
+    <p class="muted small" style="margin-top:10px">Faixa lateral colorida, número grande, conceito e período no rótulo.</p></div>
+   <div class="card"><div class="kicker">Seletor segmentado</div>
+    <div style="margin-top:6px"><span class="seg"><span class="on">Faturamento</span><span>Cupons</span></span> &nbsp; <span class="seg"><span>Dia a dia</span><span class="on">Mês a mês</span><span>Por hora</span></span></div>
+    <p class="muted small" style="margin-top:10px">Troca a medida ou a visão de um mesmo gráfico.</p></div>
+   <div class="card"><div class="kicker">Campo · field() / input()</div>
+    <div class="grid g2" style="margin-top:6px"><label class="fld">Data da contagem<i>24/11/2026</i></label><label class="fld">Quantidade<i>2,5</i></label></div>
+    <p class="muted small" style="margin-top:10px">Rótulo sempre visível; erro junto do campo; grava ao sair do campo ou com Enter.</p></div>
+   <div class="card" style="grid-column:1/-1"><div class="kicker">Tabela · dataTable()</div>
+    <div class="tw" style="margin-top:6px"><table><tr><th>Loja</th><th style="text-align:right">Faturamento</th><th style="text-align:right">% da rede</th></tr>
+     <tr><td class="nw">DEL-SSA-DOM</td><td style="text-align:right">R$ 352.719,17</td><td style="text-align:right">6,05%</td></tr>
+     <tr><td class="nw">DEL-GIG-DES</td><td style="text-align:right">R$ 310.739,44</td><td style="text-align:right">5,33%</td></tr></table></div>
+    <p class="muted small" style="margin-top:10px">Cabeçalho vinho, números à direita, sem quebra de texto, rolagem horizontal quando não couber, primeira coluna travada em tabelas largas.</p></div>
+   <div class="card"><div class="kicker">Popin · openModal() · Gaveta · openDrawer()</div><p>Detalhe sem sair da tela (lojas de uma fatia da pizza, recibos, memória do CMV). Gaveta lateral para formulários de cadastro.</p></div>
+   <div class="card"><div class="kicker">Retorno ao usuário</div><p><code>toast()</code> após gravar, <code>alertBox()</code> para avisos fixos, <code>emptyState()</code> para listas vazias, <code>skeleton()</code> enquanto carrega.</p></div>
+  </div>
+ </section>
+
+ <section id="status">
+  <h2>Status dos documentos (STATUS em ui.js)</h2>
+  <div class="card" style="display:flex;flex-wrap:wrap;gap:8px">
+   <span class="pill">Rascunho</span><span class="pill ok">Finalizada</span><span class="pill">Cancelado</span><span class="pill warn">Pendente</span><span class="pill ok">Recebida</span><span class="pill info">Enviado</span><span class="pill warn">Em andamento</span><span class="pill ok">Realizado</span><span class="pill ok">Emitida</span><span class="pill ok">Registrada</span><span class="pill ok">Pago</span><span class="pill warn">Em aberto</span><span class="pill danger">Vencido</span>
+  </div>
+ </section>
+
+ <section id="graf">
+  <h2>Gráficos (src/core/chart.js)</h2>
+  <div class="grid g2">
+   <div class="card">
+    <div class="kicker">Linhas: ano atual × projeção × ano anterior</div>
+    <svg viewBox="0 0 420 170" width="100%" role="img" aria-label="Exemplo de gráfico de linhas">
+     <g stroke="#f0eeee"><line x1="30" y1="20" x2="410" y2="20"/><line x1="30" y1="65" x2="410" y2="65"/><line x1="30" y1="110" x2="410" y2="110"/><line x1="30" y1="150" x2="410" y2="150"/></g>
+     <polyline fill="none" stroke="#9a9a9e" stroke-width="2" stroke-dasharray="5 4" points="30,70 80,80 130,72 180,60 230,66 280,58 330,62 380,50 410,40"/>
+     <polyline fill="none" stroke="#85071D" stroke-width="2" points="30,82 80,92 130,85 180,74 230,80 280,72 330,76"/>
+     <polyline fill="none" stroke="#c46a7c" stroke-width="2" stroke-dasharray="5 4" points="330,76 380,64 410,54"/>
+     <g font-size="11" fill="#7c7c80"><text x="30" y="166">jan</text><text x="210" y="166">jun</text><text x="390" y="166">dez</text></g>
+    </svg>
+    <p class="small"><span style="color:#85071D">━</span> ano atual <code>#85071D</code> · <span style="color:#c46a7c">┅</span> projeção <code>#c46a7c</code> · <span style="color:#9a9a9e">┅</span> ano anterior <code>#9a9a9e</code></p>
+    <p class="muted small">Linha de 2px, dica ao passar o mouse explicando a conta de cada ponto projetado. Nunca dois eixos Y.</p>
+   </div>
+   <div class="card">
+    <div class="kicker">Paleta categórica (pizzas), em ordem fixa</div>
+    <div style="display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin:8px 0">
+     <div style="height:40px;border-radius:6px;background:#2a78d6"></div><div style="height:40px;border-radius:6px;background:#eb6834"></div><div style="height:40px;border-radius:6px;background:#1baf7a"></div><div style="height:40px;border-radius:6px;background:#eda100"></div><div style="height:40px;border-radius:6px;background:#e87ba4"></div><div style="height:40px;border-radius:6px;background:#008300"></div><div style="height:40px;border-radius:6px;background:#6250d6"></div><div style="height:40px;border-radius:6px;background:#e34948"></div><div style="height:40px;border-radius:6px;background:#a3a3a8"></div>
+    </div>
+    <p class="small"><code>#2a78d6 #eb6834 #1baf7a #eda100 #e87ba4 #008300 #6250d6 #e34948</code> + Outros <code>#a3a3a8</code></p>
+    <p class="muted small">No máximo 8 fatias; da 8ª em diante vira "Outros". A cor segue a entidade, não a posição. Legenda com % e R$; clique abre o detalhe em popin.</p>
+   </div>
+  </div>
+ </section>
+
+ <section id="layout">
+  <h2>Layout</h2>
+  <div class="card" style="padding:0;overflow:hidden">
+   <div style="display:grid;grid-template-columns:150px 1fr;min-height:200px">
+    <div style="background:linear-gradient(180deg,#4a0410,#5E0514 40%,#3d030d);color:#f1dfe2;padding:14px;font-size:12.5px">
+     <b style="color:#fff">Menu lateral</b><br>recolhível (252 ↔ 72 px), busca, grupos: Início · Financeiro · Estoque · Compras · Análise</div>
+    <div>
+     <div style="border-bottom:1px solid var(--line);padding:12px 16px;font-size:12.5px;display:flex;gap:12px;flex-wrap:wrap"><b>Barra superior</b><span class="pill brand">Ambiente: Loja</span><span class="pill">Loja: DEL-CGH-PUB ⌘K</span><span class="pill">Tour</span></div>
+     <div style="padding:14px 16px;font-size:13px"><b style="font-family:var(--font-title);font-size:18px;color:var(--ink)">TÍTULO DA PÁGINA</b><p class="muted">Cartões e tabelas. Conteúdo reflui em tablet e celular; tabelas largas rolam para o lado.</p></div>
+    </div>
+   </div>
+  </div>
+ </section>
+
+ <section id="fmt">
+  <h2>Formatos e escrita (src/core/format.js)</h2>
+  <div class="tw"><table>
+   <tr><th>Tipo</th><th>Exemplo</th><th>Função</th></tr>
+   <tr><td>Dinheiro</td><td class="nw">R$ 7.626.277,90</td><td><code>money()</code></td></tr>
+   <tr><td>Número / quantidade</td><td class="nw">2,5 · 10,8 kg</td><td><code>num()</code>, <code>parseNum()</code> (aceita vírgula)</td></tr>
+   <tr><td>Percentual</td><td class="nw">−6,7%</td><td><code>pct()</code></td></tr>
+   <tr><td>Data</td><td class="nw">24/11/2026 · 24/11/2026 06:30</td><td><code>dateBR()</code>, <code>dateTimeBR()</code></td></tr>
+   <tr><td>Texto do usuário</td><td class="nw">sempre escapado</td><td><code>e()</code> / <code>escapeHtml()</code></td></tr>
+  </table></div>
+  <div class="grid g2" style="margin-top:14px">
+   <div class="do"><h4>Escrever assim</h4><ul><li>Português claro, sem termos técnicos na tela.</li><li>Mensagens de erro dizem o que fazer.</li><li>Projeção sempre marcada (itálico, "proj.", tracejado).</li></ul></div>
+   <div class="dont"><h4>Evitar</h4><ul><li>Rótulos de protótipo ("Aguardando liberação").</li><li>Número bonito inventado em painel real.</li><li>Cor como único sinal de estado (use rótulo também).</li></ul></div>
+  </div>
+ </section>
+</main>
+<p class="foot"><a href="index.html">← Documentação</a> · Fonte: assets/app.css, assets/shell.css, src/core/ui.js, src/core/chart.js, CEREBRO.md seção 11.</p>
+</body>
+</html>

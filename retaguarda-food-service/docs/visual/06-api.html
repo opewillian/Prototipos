@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="top"><div class="top-in">
+ <div class="crumb"><img src="../../assets/brand/logo-mft.png" alt="MFT"><a href="index.html">Documentação</a><span>›</span><span>6 de 8</span></div>
+ <h1>API</h1>
+ <p>Não existe servidor próprio: o app usa a API REST do Supabase pelo supabase-js, funções RPC do Postgres e a Edge Function <code style="background:rgba(255,255,255,.14);color:#fff">degust</code>. Por fora, Linx Degust, Cloudflare R2 e ANAC.</p>
+</div></header>
+<main>
+ <nav class="toc"><a href="#camadas">Camadas</a><a href="#db">db.js</a><a href="#rpc">RPC</a><a href="#degust">Função degust</a><a href="#externas">APIs externas</a><a href="#erros">Erros</a></nav>
+
+ <section id="camadas">
+  <h2>Camadas</h2>
+  <div class="flow">
+   <div class="step"><b>Módulo da tela</b><span>render(ctx)</span></div><div class="arrow">→</div>
+   <div class="step"><b>src/core/db.js</b><span>list, get, insert, update, remove + log</span></div><div class="arrow">→</div>
+   <div class="step"><b>supabase-js</b><span>com a sessão do usuário</span></div><div class="arrow">→</div>
+   <div class="step"><b>PostgREST</b><span>RLS decide o que volta</span></div><div class="arrow">→</div>
+   <div class="step"><b>Postgres</b><span>gatilhos de estoque e status</span></div>
+  </div>
+ </section>
+
+ <section id="db">
+  <h2>src/core/db.js</h2>
+  <div class="tw"><table>
+   <tr><th>Função</th><th>Uso</th><th>Observação</th></tr>
+   <tr><td class="nw"><code>list(tabela, opts)</code></td><td>Lê com filtros <code>eq in gte lte gt lt neq or</code>, <code>order/asc</code>, <code>order2/asc2</code>, <code>select</code>, <code>limit</code></td><td>Pagina de 1.000 em 1.000 até <code>limit</code> (padrão 10.000). <b>Exige ordem única</b> para não repetir nem perder linhas.</td></tr>
+   <tr><td class="nw"><code>count(tabela, opts)</code></td><td>Conta com os mesmos filtros</td><td>Contagem exata, sem baixar linhas.</td></tr>
+   <tr><td class="nw"><code>get(tabela, id)</code></td><td>Um registro</td><td>Erro "não encontrado ou sem permissão" se o RLS esconder.</td></tr>
+   <tr><td class="nw"><code>insert / insertMany</code></td><td>Grava e devolve a linha</td><td>Registra no log (<code>audit_events</code>). Recusa <code>stores</code>.</td></tr>
+   <tr><td class="nw"><code>update(tabela, id, patch)</code></td><td>Altera</td><td>Lê antes para o log guardar só o que mudou (valor anterior e novo).</td></tr>
+   <tr><td class="nw"><code>remove(tabela, id)</code></td><td>Exclui</td><td>Documento finalizado é bloqueado pelo banco.</td></tr>
+   <tr><td class="nw"><code>insertWithCode</code></td><td>Grava com código aleatório (CT-7F3A9C, TR-…)</td><td>Sorteia de novo só se o duplicado for o próprio código.</td></tr>
+  </table></div>
+<pre style="margin-top:12px"><code>// Exemplo: vendas de um mês, paginadas com ordem única
+const rows = await list("sales_imports", {
+  select: "store_id,business_date,net",
+  gte: { business_date: "2026-11-01" }, lte: { business_date: "2026-11-30" },
+  order: "business_date", asc: true, order2: "store_id", asc2: true,
+  limit: 20000
+});</code></pre>
+ </section>
+
+ <section id="rpc">
+  <h2>Funções RPC</h2>
+  <div class="tw"><table>
+   <tr><th>Chamada</th><th>Parâmetros</th><th>Quem pode</th></tr>
+   <tr><td class="nw"><code>sales_by_month</code></td><td><code>p_from, p_to</code> (datas)</td><td>usuário logado; resultado filtrado pelo RLS dele</td></tr>
+   <tr><td class="nw"><code>reverse_invoice</code></td><td><code>p_invoice_id, p_reason</code></td><td>administrador da Matriz</td></tr>
+   <tr><td class="nw"><code>can_view_sales</code></td><td><code>p_store</code></td><td>usuário logado (responde só sobre ele)</td></tr>
+   <tr><td class="nw"><code>refresh_sales_forecast</code></td><td><code>de, ate</code> (padrão: hoje ao fim do mês)</td><td>rotina agendada / administração</td></tr>
+  </table></div>
+<pre style="margin-top:12px"><code>const { data, error } = await supabase.rpc("sales_by_month", { p_from: "2025-01-01", p_to: ontem });</code></pre>
+ </section>
+
+ <section id="degust">
+  <h2>Edge Function degust</h2>
+  <p class="lead">POST JSON <code>{ "acao": "...", ... }</code> para <code>/functions/v1/degust</code>, com o token da sessão. Roda no servidor; as senhas da Linx e do R2 nunca vão ao navegador.</p>
+  <div class="tw"><table>
+   <tr><th>Ação</th><th>Parâmetros</th><th>Devolve</th><th>Quem pode</th></tr>
+   <tr><td class="nw"><code>resumo</code></td><td>storeId, de, ate, somenteDias?</td><td>dias (com horas), produtos, pagamentos</td><td><span class="pill info">vê vendas da loja</span></td></tr>
+   <tr><td class="nw"><code>cupons</code></td><td>storeId, data</td><td>recibos do dia (desde 01/10/2026)</td><td><span class="pill info">vê vendas da loja</span></td></tr>
+   <tr><td class="nw"><code>ranking</code></td><td>storeId</td><td>ticket médio das lojas da mesma marca</td><td><span class="pill info">vê vendas da loja</span></td></tr>
+   <tr><td class="nw"><code>diario</code></td><td>—</td><td>enfileira 3 últimos dias de cada loja e processa</td><td><span class="pill">agendamento (x-cron-key)</span></td></tr>
+   <tr><td class="nw"><code>fila</code></td><td>ms?</td><td>processa <code>sales_import_jobs</code> por até ~110 s</td><td><span class="pill">agendamento</span> <span class="pill brand">admin</span></td></tr>
+   <tr><td class="nw"><code>importar</code></td><td>storeId, data</td><td>refaz um dia (Linx → R2 → sales_imports)</td><td><span class="pill brand">admin Matriz</span></td></tr>
+   <tr><td class="nw"><code>resumir</code></td><td>storeId, data, mes?</td><td>refaz resumo a partir do arquivo guardado</td><td><span class="pill brand">admin Matriz</span></td></tr>
+   <tr><td class="nw"><code>lojas</code> · <code>vendas</code> · <code>periodo_teste</code></td><td>franqueador?, codLoja, de, ate</td><td>consulta direta à Linx, sem gravar</td><td><span class="pill brand">admin Matriz</span></td></tr>
+   <tr><td class="nw"><code>r2_list</code> · <code>r2_limpar_detalhe</code></td><td>prefixo? / storeId</td><td>lista ou limpa arquivos no R2</td><td><span class="pill brand">admin Matriz</span></td></tr>
+  </table></div>
+  <div class="grid g2" style="margin-top:14px">
+   <div class="card"><h3>Regras de valores (iguais às da tela)</h3><ul class="small">
+    <li>Vendas canceladas ficam fora dos valores.</li>
+    <li>Bruto = valProduto + valDescontoItem.</li>
+    <li>Descontos = valDesconto + valDescontoItem.</li>
+    <li>Líquido = valLiquido (bate com a soma dos pagamentos).</li>
+   </ul></div>
+   <div class="card"><h3>Arquivos no R2</h3>
+<pre><code>vendas/loja=&lt;id&gt;/ano=AAAA/mes=MM/AAAA-MM-DD.json.gz
+resumo/loja=&lt;id&gt;/ano=AAAA/mes=MM/AAAA-MM-DD.json
+resumo/loja=&lt;id&gt;/ano=AAAA/mes=MM/mes.json</code></pre></div>
+  </div>
+ </section>
+
+ <section id="externas">
+  <h2>APIs externas</h2>
+  <div class="grid g3">
+   <div class="card accent"><h3>Linx Degust One</h3><p class="small">Login em <code>/api/usuario/autenticar</code> devolve token de 4 h (guardado em <code>integration_tokens</code>, um por franquia). Relatório de vendas até 30 dias por chamada, pela data do caixa. Franquias: DEL (segredo), SAL 2168, ACB 2642, BIT 2202.</p></div>
+   <div class="card accent"><h3>Cloudflare R2</h3><p class="small">API compatível com S3 (assinatura SigV4) chamada só pela função. Bucket <code>retaguarda-vendas</code>.</p></div>
+   <div class="card accent"><h3>ANAC</h3><p class="small">Arquivo público de dados estatísticos; soma de passageiros pagos por origem (embarque) e destino (desembarque). Carga por SQL, sem API.</p></div>
+  </div>
+ </section>
+
+ <section id="erros">
+  <h2>Erros</h2>
+  <div class="grid g2">
+   <div class="card"><h3>No app</h3><p class="small">Erros do Supabase passam por <code>errorMessage()</code> (ui.js) e viram texto em português no <code>toast</code> ou junto do campo. Têm tradução própria: sem permissão (RLS), registro duplicado, vínculo com outros documentos, sem conexão e sessão expirada.</p></div>
+   <div class="card"><h3>Na função</h3><p class="small">Responde <code>{ erro: "..." }</code> com status HTTP (400, 401, 403, 500). Falha de uma quinzena na fila marca a tarefa com erro para reenfileirar; tarefa parada há 15 min volta para a fila.</p></div>
+  </div>
+ </section>
+</main>
+<p class="foot"><a href="index.html">← Documentação</a> · Fonte: src/core/db.js, supabase/functions/degust/index.ts, docs/sql 33–53, CEREBRO.md.</p>
+</body>
+</html>

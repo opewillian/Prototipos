@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Requisitos do produto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="top"><div class="top-in">
+ <div class="crumb"><img src="../../assets/brand/logo-mft.png" alt="MFT"><a href="index.html">Documentação</a><span>›</span><span>1 de 8</span></div>
+ <h1>Requisitos do produto</h1>
+ <p>A Retaguarda Food Service é a plataforma web de retaguarda das lojas MFT: a Matriz cuida dos cadastros e acompanha a rede; cada loja faz a sua rotina de estoque, compras e CMV.</p>
+</div></header>
+<main>
+ <nav class="toc"><a href="#objetivo">Objetivo</a><a href="#ambientes">Matriz e Loja</a><a href="#modulos">Módulos</a><a href="#regras">Regras de negócio</a><a href="#fontes">Fontes de dados</a><a href="#principios">Princípios</a><a href="#pronto">Critério de pronto</a></nav>
+
+ <section id="objetivo">
+  <h2>Objetivo</h2>
+  <p class="lead">Centralizar os cadastros corporativos na Matriz e dar a cada loja uma rotina operacional própria, consistente, auditável e fácil de usar, com dados reais do Supabase.</p>
+  <div class="grid g3">
+   <div class="card accent"><h3>Matriz enxerga a rede</h3><p>Administra itens, marcas, fornecedores, de-para, usuários e acessos, e acompanha faturamento, notas e pedidos de todas as lojas sem entrar em cada uma.</p></div>
+   <div class="card accent"><h3>Loja executa o dia a dia</h3><p>Conta estoque, dá entrada em notas, faz pedidos, transferências e perdas, e fecha o CMV com memória de cálculo.</p></div>
+   <div class="card accent"><h3>Cada um vê só o que pode</h3><p>Dados isolados por loja no banco. Quem não tem acesso a uma loja ou módulo não lê nem grava nada dela.</p></div>
+  </div>
+ </section>
+
+ <section id="ambientes">
+  <h2>Jornada de acesso</h2>
+  <div class="flow">
+   <div class="step"><b>Login</b><span>E-mail e senha (Supabase Auth). A tela inicial já é o login.</span></div><div class="arrow">→</div>
+   <div class="step"><b>Último lugar usado</b><span>Abre o último ambiente e loja (sem tela de escolha).</span></div><div class="arrow">→</div>
+   <div class="step"><b>Barra superior</b><span>Troca Ambiente (Matriz/Loja) e Loja pesquisável (Ctrl+K), mantendo o módulo aberto.</span></div><div class="arrow">→</div>
+   <div class="step"><b>Menu lateral</b><span>Só os módulos liberados para a pessoa e para a loja.</span></div>
+  </div>
+ </section>
+
+ <section id="modulos">
+  <h2>Módulos</h2>
+  <div class="grid g2">
+   <div class="card">
+    <h3>Matriz</h3>
+    <div class="tw"><table>
+     <tr><th>Módulo</th><th>O que faz</th></tr>
+     <tr><td class="nw">Painel</td><td>Faturamento diário de todas as lojas (com projeção), ranking com pizzas por marca e aeroporto, mês a mês da rede (faturamento ou cupons) contra o ano anterior.</td></tr>
+     <tr><td class="nw">Pedidos das lojas</td><td>Consulta dos pedidos de compra de todas as unidades.</td></tr>
+     <tr><td class="nw">Notas fiscais</td><td>Todas as notas, filtros, abrir na loja e estorno de nota recebida (só administrador).</td></tr>
+     <tr><td class="nw">Itens e Marcas</td><td>Catálogo central: código, nome, tipo, marca, unidade (un, kg, l), custo padrão, mínimo, compõe CMV.</td></tr>
+     <tr><td class="nw">Fornecedores e De-para</td><td>Cadastro central e conversão do código/unidade do fornecedor para o nosso item.</td></tr>
+     <tr><td class="nw">Usuários, acessos e log</td><td>Lojas liberadas + módulos; log de alterações imutável.</td></tr>
+    </table></div>
+   </div>
+   <div class="card">
+    <h3>Loja</h3>
+    <div class="tw"><table>
+     <tr><th>Módulo</th><th>O que faz</th></tr>
+     <tr><td class="nw">Início</td><td>Gráfico Vendas (faturamento, ticket, cupons, taxa de oportunidade), ranking de ticket da marca, CMV por período, notas pendentes.</td></tr>
+     <tr><td class="nw">Faturamento</td><td>Vendas do Degust por dia, produto, pagamento e hora; recibos do dia.</td></tr>
+     <tr><td class="nw">Contagem</td><td>Todos os itens liberados já como linhas; colunas por lista; vazio = não contado.</td></tr>
+     <tr><td class="nw">Listas</td><td>Listas de contagem, ordenação por arrastar, importar/exportar planilha.</td></tr>
+     <tr><td class="nw">Notas fiscais</td><td>NF-e com de-para automático, outros custos com rateio, parcelas, anexos, entrada no estoque.</td></tr>
+     <tr><td class="nw">Pedidos de compra</td><td>Nasce da contagem de referência, com sugestão calculada.</td></tr>
+     <tr><td class="nw">Transferências</td><td>Saída na origem e entrada no destino automáticas; custo da última compra.</td></tr>
+     <tr><td class="nw">Perdas</td><td>Motivo obrigatório; baixa do estoque ao registrar.</td></tr>
+     <tr><td class="nw">CMV</td><td>Calendário de contagens, prévia, fechamento, memória por item e Análise completa.</td></tr>
+    </table></div>
+   </div>
+  </div>
+ </section>
+
+ <section id="regras">
+  <h2>Regras de negócio que não mudam sem decisão</h2>
+  <div class="grid g3">
+   <div class="card info"><div class="kicker">CMV</div><p><b>Estoque inicial + compras líquidas elegíveis − estoque final</b>, só itens que compõem CMV. Perdas aparecem separadas, sem descontar duas vezes.</p></div>
+   <div class="card info"><div class="kicker">Contagem</div><p><b>Vazio = não contado. Zero = contado sem estoque.</b> Decimais com vírgula, sem negativos. Uma contagem por loja e data.</p></div>
+   <div class="card info"><div class="kicker">Custo</div><p>Última compra recebida <b>da mesma loja</b>; sem compra, o custo padrão do item, sempre mostrando a origem.</p></div>
+   <div class="card info"><div class="kicker">Estoque</div><p>Não existe aba Estoque: o saldo é resultado de contagens, notas, transferências e perdas (movimentos).</p></div>
+   <div class="card info"><div class="kicker">Marca</div><p>A loja vê os itens da marca dela + a marca Global. Item sem marca não aparece em loja nenhuma.</p></div>
+   <div class="card info"><div class="kicker">De-para</div><p>Qtd interna = qtd da nota × fator; custo interno = valor da nota ÷ fator. Nota sem de-para completo não dá entrada.</p></div>
+   <div class="card info"><div class="kicker">Transferência</div><p>Não trava por falta de saldo: só avisa. A origem pode ficar negativa até a próxima contagem.</p></div>
+   <div class="card info"><div class="kicker">Mês fechado</div><p>Não alterar estoque de um mês já fechado. Correções entram na data do mês atual.</p></div>
+   <div class="card info"><div class="kicker">Projeção</div><p>Média do mesmo dia da semana (8 semanas) e do ano anterior × crescimento; só lojas que venderam nos últimos 14 dias.</p></div>
+  </div>
+ </section>
+
+ <section id="fontes">
+  <h2>De onde vêm os dados</h2>
+  <div class="tw"><table>
+   <tr><th>Origem</th><th>O que entra</th><th>Como</th></tr>
+   <tr><td class="nw">Digitado na Retaguarda</td><td>Contagens, listas, pedidos, transferências, perdas, de-para, acessos</td><td>Telas do app</td></tr>
+   <tr><td class="nw">Linx Degust One</td><td>Vendas, cupons, produtos, pagamentos, horas (DEL, SAL, ACB, BIT)</td><td>Edge Function <code>degust</code>, todo dia às 06:00</td></tr>
+   <tr><td class="nw">Everest (ERP)</td><td>Lojas, itens, fornecedores, NF-e recebidas e itens, inventários</td><td>Extração pela tela com login do usuário, só leitura; sem API</td></tr>
+   <tr><td class="nw">ANAC</td><td>Passageiros por aeroporto e mês</td><td>CSV público, carga por SQL</td></tr>
+  </table></div>
+ </section>
+
+ <section id="principios">
+  <h2>Princípios</h2>
+  <div class="grid g2">
+   <div class="do"><h4>Sempre</h4><ul>
+    <li>Supabase é a única fonte de dados reais.</li>
+    <li>O banco manda na segurança (RLS), não o botão escondido.</li>
+    <li>Toda funcionalidade nasce e é testada na CGH (<code>teste</code>) antes de outras lojas.</li>
+    <li>Indicador com conceito e período explícitos; estimativa sempre identificada.</li>
+    <li>Estado vazio honesto: sem informação, mostrar que falta.</li>
+   </ul></div>
+   <div class="dont"><h4>Nunca</h4><ul>
+    <li>Modo demonstração, dados fictícios ou localStorage como banco.</li>
+    <li>Criar, editar ou excluir lojas pela Retaguarda.</li>
+    <li>Gravar documentos operacionais na unidade <code>matriz</code>.</li>
+    <li>Apresentar amostra (ex.: 1.000 linhas) como total.</li>
+    <li>Dizer que está pronto só porque o build passou.</li>
+   </ul></div>
+  </div>
+ </section>
+
+ <section id="pronto">
+  <h2>Critério de pronto</h2>
+  <div class="flow">
+   <div class="step"><b>Planejado</b></div><div class="arrow">→</div>
+   <div class="step"><b>Em desenvolvimento</b></div><div class="arrow">→</div>
+   <div class="step"><b>Implementado</b><span>código na branch</span></div><div class="arrow">→</div>
+   <div class="step"><b>Testando na CGH</b><span>prévia, login real</span></div><div class="arrow">→</div>
+   <div class="step"><b>Homologado</b><span>aprovado pelo usuário</span></div><div class="arrow">→</div>
+   <div class="step"><b>Liberado por loja</b><span>feature flag</span></div>
+  </div>
+  <p class="muted small" style="margin-top:12px">Homologado exige: telas completas em desktop e celular, regras implementadas, gravação correta no Supabase, escopo por loja respeitado, mensagens de erro e vazio claras, cálculos com memória verificável, movimentos de estoque sem duplicar e teste real no navegador registrado.</p>
+ </section>
+</main>
+<p class="foot"><a href="index.html">← Documentação</a> · Fonte: CEREBRO.md, seções 1, 3, 7, 8, 13 e registros até 24/11/2026.</p>
+</body>
+</html>

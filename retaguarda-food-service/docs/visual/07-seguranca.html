@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Segurança</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="top"><div class="top-in">
+ <div class="crumb"><img src="../../assets/brand/logo-mft.png" alt="MFT"><a href="index.html">Documentação</a><span>›</span><span>7 de 8</span></div>
+ <h1>Segurança</h1>
+ <p>O banco manda na segurança. Esconder um botão não protege nada: cada leitura e gravação passa pelo login e pelas políticas RLS do Supabase.</p>
+</div></header>
+<main>
+ <nav class="toc"><a href="#camadas">Camadas</a><a href="#acessos">Acessos</a><a href="#segredos">Segredos</a><a href="#arquivos">Arquivos</a><a href="#log">Log</a><a href="#dados">Dados pessoais</a><a href="#limites">Limites conhecidos</a></nav>
+
+ <section id="camadas">
+  <h2>Camadas de proteção</h2>
+  <div class="flow">
+   <div class="step"><b>1 · Login</b><span>Supabase Auth, e-mail e senha. Sem login, tudo responde "permission denied".</span></div><div class="arrow">→</div>
+   <div class="step"><b>2 · Vínculo com a loja</b><span><code>store_memberships</code> ativo</span></div><div class="arrow">→</div>
+   <div class="step"><b>3 · Módulo liberado</b><span><code>user_tab_permissions</code> para a pessoa</span></div><div class="arrow">→</div>
+   <div class="step"><b>4 · Módulo ligado na loja</b><span><code>store_feature_flags</code> para gravar</span></div><div class="arrow">→</div>
+   <div class="step"><b>5 · Regras do documento</b><span>gatilhos travam documentos finalizados</span></div>
+  </div>
+  <p class="muted small" style="margin-top:10px">As camadas 2 a 4 são checadas no banco pela função <code>mft_private.has_tab_access</code>; administrador da Matriz pela <code>mft_private.is_matrix_admin()</code>. A tela repete a checagem só para não mostrar o que a pessoa não pode usar.</p>
+ </section>
+
+ <section id="acessos">
+  <h2>Modelo de acessos</h2>
+  <div class="grid g2">
+   <div class="card">
+    <h3>Na tela (Matriz › Usuários e acessos)</h3>
+    <ul class="small">
+     <li>A pessoa recebe <b>Matriz</b> e/ou <b>lojas</b> marcadas.</li>
+     <li>Módulos da Matriz: Pedidos das lojas, Notas fiscais, Itens, Fornecedores, Usuários/acessos/log.</li>
+     <li>Módulos das lojas valem para todas as lojas marcadas: Faturamento, Contagem, Listas, Pedidos, Notas, Transferências, Perdas, CMV.</li>
+     <li>Módulo liberado = usar e editar. Não há perfil "administrador" na tela.</li>
+     <li>Ninguém remove o próprio acesso à Matriz nem ao módulo de Usuários.</li>
+    </ul>
+   </div>
+   <div class="card">
+    <h3>No banco</h3>
+    <div class="tw"><table>
+     <tr><th>Papel</th><th>Quando</th></tr>
+     <tr><td class="nw"><code>matrix_admin</code></td><td>Matriz marcada (vínculo com <code>matriz</code>)</td></tr>
+     <tr><td class="nw"><code>store_operator</code></td><td>loja marcada com módulos</td></tr>
+     <tr><td class="nw"><code>store_manager</code></td><td>gerentes antigos (mantidos)</td></tr>
+     <tr><td class="nw"><code>viewer</code></td><td>só leitura</td></tr>
+    </table></div>
+    <p class="muted small" style="margin-top:8px">Usuário novo criado no painel do Supabase ganha perfil automático sem nenhum acesso.</p>
+   </div>
+  </div>
+ </section>
+
+ <section id="segredos">
+  <h2>Segredos</h2>
+  <div class="grid g2">
+   <div class="do"><h4>Onde ficam</h4><ul>
+    <li>Senhas e chaves das integrações: <b>Supabase › Edge Functions › Secrets</b> (Linx: usuário, senha, franquia; R2: conta e chaves). Cadastradas pelo usuário; ninguém lê o valor.</li>
+    <li>Tokens reaproveitados e a chave do agendamento: tabela <code>integration_tokens</code>, sem acesso pelo app.</li>
+    <li>No código só existe a <b>chave publicável</b> do Supabase.</li>
+   </ul></div>
+   <div class="dont"><h4>Proibido</h4><ul>
+    <li><code>service_role</code>, <code>sb_secret</code>, senhas ou tokens no repositório ou no navegador.</li>
+    <li>IA digitar senha ou ler valores de segredos.</li>
+    <li>Cadastro público de administrador ou atalho que pule o login.</li>
+   </ul></div>
+  </div>
+  <p class="muted small" style="margin-top:10px">O build (<code>scripts/build.mjs</code>) falha se encontrar <code>sb_secret_</code> ou <code>service_role</code> no <code>config.js</code>, ou se a chave publicável sumir.</p>
+ </section>
+
+ <section id="arquivos">
+  <h2>Arquivos e chamadas protegidas</h2>
+  <div class="grid g3">
+   <div class="card accent"><h3>Storage de anexos</h3><p class="small">Bucket privado <code>retaguarda-anexos</code>, 15 MB por arquivo, pastas por loja (<code>&lt;loja&gt;/…</code>). Ler: módulo Notas ou CMV. Enviar e excluir: Notas com edição.</p></div>
+   <div class="card accent"><h3>Função degust</h3><p class="small">Confere o token do usuário (Verify JWT ligado). Resumo, cupons e ranking exigem <code>can_view_sales</code> da loja; o resto, administrador da Matriz. O agendamento usa uma chave própria no cabeçalho e só pode rodar <code>diario</code> e <code>fila</code>.</p></div>
+   <div class="card accent"><h3>Lojas</h3><p class="small">INSERT, UPDATE e DELETE em <code>stores</code> revogados dos usuários; <code>db.js</code> também recusa. Lojas só pelo painel administrativo do Supabase.</p></div>
+  </div>
+ </section>
+
+ <section id="log">
+  <h2>Log de alterações</h2>
+  <div class="card">
+   <p>Tabela <code>audit_events</code> (loja, usuário, ação, tipo, id, detalhes, data). Gravada pelo app em toda inserção, alteração e exclusão de itens, fornecedores, vínculos, listas, contagens, pedidos, notas, parcelas, perdas, transferências e fechamentos de CMV, guardando só os campos que mudaram (antes e depois). Mudanças de acesso e estornos de nota também entram. <b>O banco recusa excluir registros do log.</b></p>
+  </div>
+ </section>
+
+ <section id="dados">
+  <h2>Dados pessoais</h2>
+  <div class="grid g2">
+   <div class="card ok"><h3>Consumidor</h3><p class="small">CPF/CNPJ do consumidor nunca é guardado: as vendas do Degust são gravadas sem esse campo (só um indicador de que havia documento). Os recibos mostram só os dados da venda.</p></div>
+   <div class="card ok"><h3>Ranking entre lojas</h3><p class="small">Quem vê uma loja enxerga o ticket médio das outras lojas da mesma marca, mas não as vendas delas.</p></div>
+  </div>
+ </section>
+
+ <section id="limites">
+  <h2>Limites conhecidos</h2>
+  <div class="grid g2">
+   <div class="card warn"><h3>Matriz parcial = alcance total no banco</h3><p class="small">Quem tem a Matriz marcada, mesmo com poucos módulos, fica com papel <code>matrix_admin</code> no banco e pode ler todas as lojas pela API. Para restringir, as políticas RLS precisam passar a considerar os módulos da Matriz (migração a planejar).</p></div>
+   <div class="card warn"><h3>Log gravado pelo app</h3><p class="small">Não há gatilhos de auditoria no banco: alterações feitas direto por SQL administrativo não entram no log. Registrar essas mudanças no CEREBRO e no script.</p></div>
+  </div>
+ </section>
+</main>
+<p class="foot"><a href="index.html">← Documentação</a> · Fonte: CEREBRO.md seções 5, 6 e versões 1.2–1.3; scripts 22, 27, 33, 35, 40, 42; supabase/functions/degust.</p>
+</body>
+</html>

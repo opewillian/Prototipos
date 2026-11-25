@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estilo de código</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="top"><div class="top-in">
+ <div class="crumb"><img src="../../assets/brand/logo-mft.png" alt="MFT"><a href="index.html">Documentação</a><span>›</span><span>8 de 8</span></div>
+ <h1>Estilo de código</h1>
+ <p>JavaScript nativo com ES Modules, sem framework e sem etapa de compilação. Código enxuto, comentários em português explicando o porquê, e as regras de negócio num só lugar.</p>
+</div></header>
+<main>
+ <nav class="toc"><a href="#js">JavaScript</a><a href="#modulo">Modelo de módulo</a><a href="#css">CSS</a><a href="#sql">SQL</a><a href="#git">Git</a><a href="#checks">Verificação</a></nav>
+
+ <section id="js">
+  <h2>JavaScript</h2>
+  <div class="grid g2">
+   <div class="do"><h4>Fazer</h4><ul>
+    <li>Um arquivo por módulo em <code>src/modules/&lt;área&gt;/</code>, exportando <code>render(ctx)</code>.</li>
+    <li>Peças comuns em <code>src/core/</code> e <code>src/modules/shared/</code>; não copiar código entre Matriz e Loja.</li>
+    <li>Dados só por <code>db.js</code> (ou <code>supabase.rpc</code> / função degust).</li>
+    <li>HTML montado como texto, sempre passando dado do usuário por <code>e()</code>.</li>
+    <li>Números e datas por <code>format.js</code> (<code>money</code>, <code>num</code>, <code>dateBR</code>, <code>parseNum</code>).</li>
+    <li>Depois de cada <code>await</code>, conferir <code>ctx.isCurrent()</code> antes de desenhar.</li>
+    <li>Buscas independentes em paralelo com <code>Promise.all</code>.</li>
+    <li>Comentário curto no topo do arquivo dizendo o que a tela faz e as regras que ela segue.</li>
+   </ul></div>
+   <div class="dont"><h4>Evitar</h4><ul>
+    <li>Framework, bundler ou dependência nova sem decisão.</li>
+    <li>Cálculo de regra de negócio espalhado por componentes.</li>
+    <li><code>window.confirm</code> e <code>alert</code>: usar <code>confirmDialog</code> e <code>toast</code>.</li>
+    <li>localStorage para dados (só preferências de tela, ex.: <code>rfs-last-route</code>).</li>
+    <li>Ler tabela grande sem ordem única.</li>
+    <li>Reescrever arquivo inteiro quando uma mudança localizada resolve.</li>
+   </ul></div>
+  </div>
+  <div class="grid g3" style="margin-top:14px">
+   <div class="card"><div class="kicker">Formatação</div><p class="small">Aspas duplas, ponto e vírgula, indentação de 1 espaço, linhas compactas. Seguir o estilo do arquivo que está sendo editado.</p></div>
+   <div class="card"><div class="kicker">Nomes</div><p class="small">Código em inglês curto (<code>render</code>, <code>loadItems</code>, <code>drawYear</code>); textos de tela e comentários em português.</p></div>
+   <div class="card"><div class="kicker">Atributos de evento</div><p class="small">Ações ligadas por <code>data-*</code> (<code>data-new</code>, <code>data-print-form</code>, <code>data-yrm</code>) e <code>querySelector</code> dentro de <code>ctx.el</code>.</p></div>
+  </div>
+ </section>
+
+ <section id="modulo">
+  <h2>Modelo de módulo</h2>
+<pre><code>// Loja · Perdas: validade, quebra, avaria e descarte. Registrar reduz o estoque (gatilho do banco).
+import {list} from "../../core/db.js";
+import {e,money,dateBR} from "../../core/format.js";
+import {pageHead,btn,dataTable,card,emptyState} from "../../core/ui.js";
+
+export async function render(ctx){
+ if(ctx.params[0])return detail(ctx,ctx.params[0]);          // rota com id = tela de detalhe
+ const rows=await list("losses",{eq:{store_id:ctx.storeId},  // sempre no escopo da loja
+  order:"loss_date",order2:"created_at"});
+ if(!ctx.isCurrent())return;                                 // usuário já saiu da tela
+ ctx.el.innerHTML=pageHead("Perdas","Registro de perdas com baixa no estoque.",
+   btn("Registrar perda",{icon:"plus",attrs:"data-new"}))+
+  card("",rows.length?dataTable([...],rows):emptyState("Nenhuma perda registrada."));
+ ctx.el.querySelector("[data-new]").onclick=()=>{ /* cria o rascunho e abre */ };
+}</code></pre>
+ </section>
+
+ <section id="css">
+  <h2>CSS</h2>
+  <div class="grid g2">
+   <div class="card"><h3>Onde</h3><ul class="small"><li><code>assets/app.css</code>: tokens e componentes.</li><li><code>assets/shell.css</code>: login, menu e barra superior.</li><li>Regras novas ao fim do arquivo, com comentário <code>/* Tela › parte */</code>.</li></ul></div>
+   <div class="card"><h3>Como</h3><ul class="small"><li>Cores sempre por token (<code>var(--brand)</code>), nunca hex solto para cores da marca.</li><li>Prefixo curto por tela: <code>pm-</code> (painel da Matriz), <code>rc-</code> (recibos), <code>lc-</code> (gráfico de linha).</li><li><code>white-space:nowrap</code> em tabelas; rolagem horizontal em vez de quebrar.</li><li>Respeitar <code>prefers-reduced-motion</code> em animações.</li></ul></div>
+  </div>
+ </section>
+
+ <section id="sql">
+  <h2>SQL</h2>
+  <div class="grid g2">
+<pre><code>-- 53: sales_by_month passa a trazer também os cupons, 24/11/2026.
+-- Pedido: no gráfico mês a mês do Painel da Matriz, trocar
+-- entre Faturamento e Cupons, com comparativo do ano anterior.
+begin;
+drop function if exists public.sales_by_month(date, date);
+create function public.sales_by_month(p_from date, p_to date)
+returns table (month date, net numeric, cupons bigint,
+               days integer, stores integer)
+language sql stable security invoker set search_path = '' as $$
+  select ... from public.sales_imports i ...
+$$;
+revoke all on function public.sales_by_month(date, date) from public, anon;
+grant execute on function public.sales_by_month(date, date) to authenticated;
+select * from public.sales_by_month('2025-09-01', '2026-11-23');
+commit;</code></pre>
+   <div class="card"><h3>Regras</h3><ul class="small">
+    <li>Arquivo <code>docs/sql/NN-descricao-curta.sql</code>, número seguinte ao último.</li>
+    <li>Cabeçalho: número, o que muda, data e o pedido do usuário.</li>
+    <li>Tudo entre <code>begin</code> e <code>commit</code>, com um <code>select</code> de conferência.</li>
+    <li>Funções com <code>set search_path = ''</code> e nomes com esquema (<code>public.</code>).</li>
+    <li>Preferir <code>security invoker</code>; <code>security definer</code> só com motivo escrito.</li>
+    <li><code>revoke</code> de <code>public</code>/<code>anon</code> e <code>grant</code> só a <code>authenticated</code>.</li>
+    <li>Toda tabela nova com RLS e políticas no mesmo script.</li>
+   </ul></div>
+  </div>
+ </section>
+
+ <section id="git">
+  <h2>Git</h2>
+  <div class="grid g3">
+   <div class="card"><div class="kicker">Branch</div><p class="small">Trabalho em <code>feat/versao-1</code> (gera a prévia). <code>main</code> = produção, só com "Publicar".</p></div>
+   <div class="card"><div class="kicker">Mensagem</div><p class="small">Português, sem acento, "Tela: o que mudou". Ex.: <code>Painel da matriz: mes a mes com Faturamento ou Cupons</code>.</p></div>
+   <div class="card"><div class="kicker">CEREBRO junto</div><p class="small">Cada mudança de regra ou tela atualiza o <code>CEREBRO.md</code> no mesmo push (ou num commit "CEREBRO: …" logo depois).</p></div>
+  </div>
+ </section>
+
+ <section id="checks">
+  <h2>Verificação</h2>
+  <div class="flow">
+   <div class="step"><b>npm run test</b><span>sintaxe de todo .js e imports que existem</span></div><div class="arrow">→</div>
+   <div class="step"><b>npm run build</b><span>arquivos obrigatórios, sem segredo, copia para dist</span></div><div class="arrow">→</div>
+   <div class="step"><b>GitHub Actions</b><span>roda o build em todo push na pasta</span></div><div class="arrow">→</div>
+   <div class="step"><b>Prévia no navegador</b><span>login real, console sem erro, números conferidos</span></div>
+  </div>
+ </section>
+</main>
+<p class="foot"><a href="index.html">← Documentação</a> · Fonte: código em src/, assets/, docs/sql, scripts/build.mjs e histórico do Git.</p>
+</body>
+</html>

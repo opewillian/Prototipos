@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Documentação Retaguarda MFT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="top"><div class="top-in">
+ <div class="crumb"><img src="../../assets/brand/logo-mft.png" alt="MFT"><span>Retaguarda Food Service · documentação visual</span></div>
+ <h1>Como a Retaguarda MFT é construída</h1>
+ <p>Oito páginas que resumem o produto, o visual, a arquitetura, as regras para IA, o banco, a API, a segurança e o estilo de código. A fonte detalhada continua sendo o <code style="background:rgba(255,255,255,.14);color:#fff">CEREBRO.md</code>; o código e o banco mandam sobre o que existe hoje.</p>
+ <span class="tag">Atualizado em 24/11/2026</span>
+</div></header>
+<main>
+ <section class="grid g3 hub">
+  <a class="card" href="01-requisitos-produto.html"><span class="num">1</span><h3>Requisitos do produto</h3><p class="muted small">Para quem é, o que resolve, módulos da Matriz e da Loja, regras de negócio e critério de pronto.</p></a>
+  <a class="card" href="02-design-system.html"><span class="num">2</span><h3>Design system</h3><p class="muted small">Cores da marca, tipografia, componentes, status, gráficos e formatos pt-BR.</p></a>
+  <a class="card" href="03-arquitetura.html"><span class="num">3</span><h3>Arquitetura</h3><p class="muted small">Navegador, Cloudflare Pages, Supabase, Edge Function, R2, Linx Degust e agendamentos.</p></a>
+  <a class="card" href="04-regras-ia.html"><span class="num">4</span><h3>Regras para IA (Agents)</h3><p class="muted small">O que qualquer agente deve fazer antes, durante e depois de mexer no projeto.</p></a>
+  <a class="card" href="05-base-de-dados.html"><span class="num">5</span><h3>Base de dados</h3><p class="muted small">Tabelas por domínio, isolamento por loja, estados dos documentos e scripts SQL.</p></a>
+  <a class="card" href="06-api.html"><span class="num">6</span><h3>API</h3><p class="muted small">Camada db.js, funções RPC, a Edge Function degust e as APIs externas.</p></a>
+  <a class="card" href="07-seguranca.html"><span class="num">7</span><h3>Segurança</h3><p class="muted small">Login, RLS, acessos por loja e módulo, segredos, log e limites conhecidos.</p></a>
+  <a class="card" href="08-estilo-de-codigo.html"><span class="num">8</span><h3>Estilo de código</h3><p class="muted small">JavaScript sem framework, padrão dos módulos, CSS, SQL numerado e commits.</p></a>
+ </section>
+ <section>
+  <h2>Em números</h2>
+  <div class="grid g4">
+   <div class="card accent"><div class="kicker">Lojas no cadastro</div><div class="big">109</div><p class="muted small">108 operacionais + Matriz, vindas do Everest</p></div>
+   <div class="card accent"><div class="kicker">Lojas com vendas</div><div class="big">78</div><p class="muted small">DEL, SAL, ACB e BIT pelo Degust</p></div>
+   <div class="card accent"><div class="kicker">Dias de venda importados</div><div class="big">104.676</div><p class="muted small">R$ 439,4 mi líquidos no histórico</p></div>
+   <div class="card accent"><div class="kicker">Scripts SQL</div><div class="big">53</div><p class="muted small">em <code>docs/sql</code>, numerados</p></div>
+  </div>
+ </section>
+</main>
+<p class="foot">Pasta <code>retaguarda-food-service/docs/visual</code>. Abra os arquivos no navegador (duplo clique). Ao mudar uma regra, atualize o CEREBRO.md e a página correspondente.</p>
+</body>
+</html>
